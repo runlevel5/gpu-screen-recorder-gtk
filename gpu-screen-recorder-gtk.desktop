@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Gpu screen recorder
+GenericName=Screen recorder
+Comment=A gpu based screen recorder / streaming program
+Exec=gpu-screen-recorder-gtk
+Terminal=false
+Keywords=gpu-screen-recorder;screen recorder;streaming;twitch;
