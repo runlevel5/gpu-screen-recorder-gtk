@@ -285,17 +285,13 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
             int status;
             if(waitpid(gpu_screen_recorder_process, &status, 0) == -1) {
                 perror("waitpid failed");
-                if(ffmpeg_process != -1)
-                    kill(ffmpeg_process, SIGKILL);
                 /* Ignore... */
-            } else {
-                if(ffmpeg_process != -1)
-                    waitpid(ffmpeg_process, &status, 0);
             }
-        } else {
-            if(ffmpeg_process != -1)
-                kill(ffmpeg_process, SIGKILL);
         }
+
+        if(ffmpeg_process != -1)
+            kill(ffmpeg_process, SIGKILL);
+
         gtk_button_set_label(button, "Start streaming");
         streaming = false;
         gpu_screen_recorder_process = -1;
@@ -583,17 +579,11 @@ static gboolean on_destroy_window(GtkWidget *widget, GdkEvent *event, gpointer d
         int status;
         if(waitpid(gpu_screen_recorder_process, &status, 0) == -1) {
             perror("waitpid failed");
-            if(ffmpeg_process != -1)
-                kill(ffmpeg_process, SIGKILL);
             /* Ignore... */
-        } else {
-            if(ffmpeg_process != -1)
-                waitpid(ffmpeg_process, &status, 0);
         }
-    } else {
-        if(ffmpeg_process != -1)
-            kill(ffmpeg_process, SIGKILL);
     }
+    if(ffmpeg_process != -1)
+        kill(ffmpeg_process, SIGKILL);
     return true;
 }
 
