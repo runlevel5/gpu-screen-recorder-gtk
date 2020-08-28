@@ -769,7 +769,7 @@ static gboolean on_destroy_window(GtkWidget *widget, GdkEvent *event, gpointer d
 static void activate(GtkApplication *app, gpointer userdata) { 
     GtkWidget *window = gtk_application_window_new(app);
     g_signal_connect(window, "destroy", G_CALLBACK(on_destroy_window), nullptr);
-    gtk_window_set_title(GTK_WINDOW(window), "Gpu screen recorder");
+    gtk_window_set_title(GTK_WINDOW(window), "GPU Screen Recorder");
     gtk_window_set_resizable(GTK_WINDOW(window), false);
 
     crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);
