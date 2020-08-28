@@ -4,4 +4,6 @@ This screen recorder can be used for recording your desktop offline, for live st
 where only the last few seconds are saved.
 
 # TODO
-Stop streaming/recording if the child process dies. This could happen when out of disk space, or when streaming network connection is lost
+* Stop streaming/recording if the child process dies. This could happen when out of disk space, or when streaming network connection is lost
+* Stop recording if gpu-screen-recorder exits with an error
+* Create directories up to the output file when recording

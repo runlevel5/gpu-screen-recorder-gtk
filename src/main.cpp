@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <sys/prctl.h>
 #include <fcntl.h>
+#include <pwd.h>
 
 typedef struct {
     Display *display;
@@ -19,6 +20,7 @@ typedef struct {
 typedef struct {
     GtkStack *stack;
     GtkWidget *common_settings_page;
+    GtkWidget *replay_page;
     GtkWidget *recording_page;
     GtkWidget *streaming_page;
 } PageNavigationUserdata;
@@ -30,17 +32,39 @@ static Cursor crosshair_cursor;
 static GtkSpinButton *fps_entry;
 static GtkComboBoxText *audio_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
-static int num_audio_input = 0;
 static GtkButton *file_chooser_button;
+static GtkButton *directory_chooser_button;
 static GtkButton *stream_button;
 static GtkButton *record_button;
+static GtkButton *replay_button;
+static GtkButton *replay_back_button;
 static GtkButton *record_back_button;
 static GtkButton *stream_back_button;
 static GtkEntry *stream_id_entry;
+static GtkSpinButton *replay_time_entry;
+static bool replaying = false;
 static bool recording = false;
 static bool streaming = false;
+static std::string replay_output_path;
 static pid_t gpu_screen_recorder_process = -1;
 static pid_t ffmpeg_process = -1;
+
+static const char* get_home_dir() {
+    const char *home_dir = getenv("HOME");
+    if(!home_dir) {
+        passwd *pw = getpwuid(getuid());
+        home_dir = pw->pw_dir;
+    }
+    return home_dir;
+}
+
+static std::string get_date_str() {
+    char str[128];
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    strftime(str, sizeof(str)-1, "%Y-%m-%d_%H-%M-%S", t);
+    return str;
+}
 
 static void enable_stream_record_button_if_info_filled() {
     if(gtk_combo_box_get_active(GTK_COMBO_BOX(audio_input_menu)) == -1)
@@ -49,6 +73,7 @@ static void enable_stream_record_button_if_info_filled() {
     if(select_window_userdata.selected_window == None)
         return;
     
+    gtk_widget_set_sensitive(GTK_WIDGET(replay_button), true);
     gtk_widget_set_sensitive(GTK_WIDGET(record_button), true);
     gtk_widget_set_sensitive(GTK_WIDGET(stream_button), true);
 }
@@ -131,9 +156,19 @@ static gboolean on_select_window_button_click(GtkButton *button, gpointer userda
     return true;
 }
 
+static gboolean on_start_replay_click(GtkButton *button, gpointer userdata) {
+    PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
+    gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->replay_page);
+    return true;
+}
+
 static gboolean on_start_recording_click(GtkButton *button, gpointer userdata) {
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
+
+    std::string video_filepath = get_home_dir();
+    video_filepath += "/Videos/Video_" + get_date_str() + ".mp4";
+    gtk_button_set_label(file_chooser_button, video_filepath.c_str());
     return true;
 }
 
@@ -167,7 +202,102 @@ static gboolean on_file_chooser_button_click(GtkButton *button, gpointer userdat
     return true;
 }
 
+static gboolean on_directory_chooser_button_click(GtkButton *button, gpointer userdata) {
+    GtkWidget *file_chooser_dialog = gtk_file_chooser_dialog_new("Where do you want to save the replays?", nullptr, GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
+        "Cancel", GTK_RESPONSE_CANCEL,
+        "Save", GTK_RESPONSE_ACCEPT,
+        nullptr);
+    //gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(file_chooser_dialog), "video.mp4");
+
+    int res = gtk_dialog_run(GTK_DIALOG(file_chooser_dialog));
+    if(res == GTK_RESPONSE_ACCEPT) {
+        char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(file_chooser_dialog));
+        printf("directory: %s\n", filename);
+        gtk_button_set_label(button, filename);
+        g_free(filename);
+    }
+    gtk_widget_destroy(file_chooser_dialog);
+    return true;
+}
+
 /* TODO: XSetErrorHandler to prevent program crash, show notifications or inline error message instead of fprintf(stderr), more validations... */
+
+static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
+    GtkApplication *app = (GtkApplication*)userdata;
+
+    if(replaying) {
+        if(gpu_screen_recorder_process != -1) {
+            kill(gpu_screen_recorder_process, SIGINT);
+            int status;
+            if(waitpid(gpu_screen_recorder_process, &status, 0) == -1) {
+                perror("waitpid failed");
+                /* Ignore... */
+            }
+        }
+        gtk_button_set_label(button, "Start replay");
+        replaying = false;
+        gpu_screen_recorder_process = -1;
+        gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), true);
+
+        GNotification *notification = g_notification_new("GPU Screen Recorder");
+        std::string notification_body = "Replay saved to " + replay_output_path;
+        g_notification_set_body(notification, notification_body.c_str());
+        g_notification_set_priority(notification, G_NOTIFICATION_PRIORITY_LOW);
+        g_application_send_notification(&app->parent, "gpu-screen-recorder-replay", notification);
+        return true;
+    }
+
+    const gchar *dir = gtk_button_get_label(directory_chooser_button);
+    int fps = gtk_spin_button_get_value_as_int(fps_entry);
+    int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
+
+    gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
+
+    if(select_window_userdata.selected_window == None) {
+        fprintf(stderr, "No window selected!\n");
+        return true;
+    }
+
+    replaying = true;
+    gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), false);
+
+    std::string window_str = std::to_string(select_window_userdata.selected_window);
+    std::string fps_str = std::to_string(fps);
+    std::string replay_time_str = std::to_string(replay_time);
+
+    replay_output_path = dir;
+    replay_output_path += "/Video_" + get_date_str() + ".mp4";
+
+    pid_t parent_pid = getpid();
+    pid_t pid = fork();
+    if(pid == -1) {
+        perror("failed to fork");
+        exit(3);
+    } else if(pid == 0) { /* child process */
+        if(prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
+            perror("prctl(PR_SET_PDEATHSIG, SIGTERM) failed");
+            exit(3);
+        }
+
+        if(getppid() != parent_pid)
+            exit(3);
+        
+        if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, "-r", replay_time_str.c_str(), "-o", replay_output_path.c_str(), NULL };
+            execvp(args[0], (char* const*)args);
+        } else {
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", replay_output_path.c_str(), NULL };
+            execvp(args[0], (char* const*)args);
+        }
+        perror("failed to launch gpu-screen-recorder");
+    } else { /* parent process */
+        gpu_screen_recorder_process = pid;
+        gtk_button_set_label(button, "Stop replaying and save");
+    }
+
+    g_free(audio_input_str);
+    return true;
+}
 
 static gboolean on_start_recording_button_click(GtkButton *button, gpointer userdata) {
     if(recording) {
@@ -183,6 +313,10 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         recording = false;
         gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), true);
+
+        std::string video_filepath = get_home_dir();
+        video_filepath += "/Videos/Video_" + get_date_str() + ".mp4";
+        gtk_button_set_label(file_chooser_button, video_filepath.c_str());
         return true;
     }
 
@@ -215,20 +349,12 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
         if(getppid() != parent_pid)
             exit(3);
-
-        int output_file = creat(filename, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        if(output_file == -1) {
-            perror(filename);
-            exit(3);
-        }
-        // Redirect stdout to output_file
-        dup2(output_file, STDOUT_FILENO);
         
         if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, "-o", filename, NULL };
             execvp(args[0], (char* const*)args);
         } else {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-o", filename, NULL };
             execvp(args[0], (char* const*)args);
         }
         perror("failed to launch gpu-screen-recorder");
@@ -391,7 +517,6 @@ static void pa_sourcelist_cb(pa_context *ctx, const pa_source_info *source_info,
         return;
 
     gtk_combo_box_text_append_text(audio_input_menu, source_info->name);
-    ++num_audio_input;
 }
 
 static void populate_audio_input_menu_with_pulseaudio_monitors() {
@@ -474,6 +599,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     g_signal_connect(audio_input_menu, "changed", G_CALLBACK(audio_input_change_callback), nullptr);
     gtk_widget_set_hexpand(GTK_WIDGET(audio_input_menu), true);
     gtk_grid_attach(audio_grid, GTK_WIDGET(audio_input_menu), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(audio_input_menu), 0);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 3, 2, 1);
@@ -487,12 +613,60 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_hexpand(GTK_WIDGET(record_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(record_button), 1, 0, 1, 1);
 
+    replay_button = GTK_BUTTON(gtk_button_new_with_label("Replay"));
+    gtk_widget_set_hexpand(GTK_WIDGET(replay_button), true);
+    gtk_grid_attach(start_button_grid, GTK_WIDGET(replay_button), 2, 0, 1, 1);
+
+    gtk_widget_set_sensitive(GTK_WIDGET(replay_button), false);
     gtk_widget_set_sensitive(GTK_WIDGET(record_button), false);
     gtk_widget_set_sensitive(GTK_WIDGET(stream_button), false);
 
-    if(num_audio_input != 0) {
-        gtk_combo_box_set_active(GTK_COMBO_BOX(audio_input_menu), 0);
-    }
+    return GTK_WIDGET(grid);
+}
+
+static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
+    std::string video_filepath = get_home_dir();
+    video_filepath += "/Videos";
+
+    GtkGrid *grid = GTK_GRID(gtk_grid_new());
+    gtk_stack_add_named(stack, GTK_WIDGET(grid), "replay");
+    gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
+    gtk_widget_set_hexpand(GTK_WIDGET(grid), true);
+    gtk_grid_set_row_spacing(grid, 10);
+    gtk_grid_set_column_spacing(grid, 10);
+    gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
+
+    GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 0, 2, 1);
+    gtk_grid_set_column_spacing(file_chooser_grid, 10);
+    GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the replays?");
+    gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_label), 0, 0, 1, 1);
+    directory_chooser_button = GTK_BUTTON(gtk_button_new_with_label(video_filepath.c_str()));
+    gtk_button_set_image(directory_chooser_button, save_icon);
+    gtk_button_set_always_show_image(directory_chooser_button, true);
+    gtk_button_set_image_position(directory_chooser_button, GTK_POS_RIGHT);
+    gtk_widget_set_hexpand(GTK_WIDGET(directory_chooser_button), true);
+    g_signal_connect(directory_chooser_button, "clicked", G_CALLBACK(on_directory_chooser_button_click), nullptr);
+    gtk_grid_attach(file_chooser_grid, GTK_WIDGET(directory_chooser_button), 1, 0, 1, 1);
+
+    GtkGrid *replay_time_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, 1, 2, 1);
+    gtk_grid_attach(replay_time_grid, gtk_label_new("Replay time: "), 0, 0, 1, 1);
+    replay_time_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(10.0, 1200.0, 1.0));
+    gtk_spin_button_set_value(replay_time_entry, 30.0);
+    gtk_widget_set_hexpand(GTK_WIDGET(replay_time_entry), true);
+    gtk_grid_attach(replay_time_grid, GTK_WIDGET(replay_time_entry), 1, 0, 1, 1);
+
+    GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 2, 2, 1);
+    gtk_grid_set_column_spacing(start_button_grid, 10);
+    replay_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
+    gtk_widget_set_hexpand(GTK_WIDGET(replay_back_button), true);
+    gtk_grid_attach(start_button_grid, GTK_WIDGET(replay_back_button), 0, 0, 1, 1);
+    GtkButton *start_replay_button = GTK_BUTTON(gtk_button_new_with_label("Start replay"));
+    gtk_widget_set_hexpand(GTK_WIDGET(start_replay_button), true);
+    g_signal_connect(start_replay_button, "clicked", G_CALLBACK(on_start_replay_button_click), app);
+    gtk_grid_attach(start_button_grid, GTK_WIDGET(start_replay_button), 1, 0, 1, 1);
 
     return GTK_WIDGET(grid);
 }
@@ -511,7 +685,7 @@ static GtkWidget* create_recording_page(GtkStack *stack) {
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
     GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the video?");
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_label), 0, 0, 1, 1);
-    file_chooser_button = GTK_BUTTON(gtk_button_new_with_label("video.mp4"));
+    file_chooser_button = GTK_BUTTON(gtk_button_new_with_label(""));
     gtk_button_set_image(file_chooser_button, save_icon);
     gtk_button_set_always_show_image(file_chooser_button, true);
     gtk_button_set_image_position(file_chooser_button, GTK_POS_RIGHT);
@@ -607,14 +781,20 @@ static void activate(GtkApplication *app, gpointer userdata) {
     gtk_stack_set_transition_duration(stack, 300);
     gtk_stack_set_homogeneous(stack, false);
     GtkWidget *common_settings_page = create_common_settings_page(stack, app);
+    GtkWidget *replay_page = create_replay_page(app, stack);
     GtkWidget *recording_page = create_recording_page(stack);
     GtkWidget *streaming_page = create_streaming_page(stack);
     gtk_stack_set_visible_child(stack, common_settings_page);
 
     page_navigation_userdata.stack = stack;
     page_navigation_userdata.common_settings_page = common_settings_page;
+    page_navigation_userdata.replay_page = replay_page;
     page_navigation_userdata.recording_page = recording_page;
     page_navigation_userdata.streaming_page = streaming_page;
+
+    g_signal_connect(replay_button, "clicked", G_CALLBACK(on_start_replay_click), &page_navigation_userdata);
+    g_signal_connect(replay_back_button, "clicked", G_CALLBACK(on_streaming_recording_page_back_click), &page_navigation_userdata);
+
     g_signal_connect(record_button, "clicked", G_CALLBACK(on_start_recording_click), &page_navigation_userdata);
     g_signal_connect(record_back_button, "clicked", G_CALLBACK(on_streaming_recording_page_back_click), &page_navigation_userdata);
 
