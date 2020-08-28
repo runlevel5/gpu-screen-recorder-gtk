@@ -190,9 +190,6 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
 
     gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
-    if(!audio_input_str) {
-        fprintf(stderr, "No audio input selected!\n");
-    }
 
     if(select_window_userdata.selected_window == None) {
         fprintf(stderr, "No window selected!\n");
@@ -227,8 +224,13 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         // Redirect stdout to output_file
         dup2(output_file, STDOUT_FILENO);
         
-        const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, NULL };
-        execvp(args[0], (char* const*)args);
+        if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, NULL };
+            execvp(args[0], (char* const*)args);
+        } else {
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), NULL };
+            execvp(args[0], (char* const*)args);
+        }
         perror("failed to launch gpu-screen-recorder");
     } else { /* parent process */
         gpu_screen_recorder_process = pid;
@@ -304,9 +306,6 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
 
     gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
-    if(!audio_input_str) {
-        fprintf(stderr, "No audio input selected!\n");
-    }
 
     if(select_window_userdata.selected_window == None) {
         fprintf(stderr, "No window selected!\n");
@@ -341,8 +340,13 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         // Redirect stdout to output_file
         dup2(pipe_write_end, STDOUT_FILENO);
         
-        const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-f", fps_str.c_str(), "-a", audio_input_str, NULL };
-        execvp(args[0], (char* const*)args);
+        if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-f", fps_str.c_str(), "-a", audio_input_str, NULL };
+            execvp(args[0], (char* const*)args);
+        } else {
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-f", fps_str.c_str(), NULL };
+            execvp(args[0], (char* const*)args);
+        }
         perror("failed to launch gpu-screen-recorder");
         exit(127);
     } else { /* parent process */
@@ -465,6 +469,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(grid, GTK_WIDGET(audio_grid), 0, 2, 2, 1);
     gtk_grid_attach(audio_grid, gtk_label_new("Audio input: "), 0, 0, 1, 1);
     audio_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append_text(audio_input_menu, "None");
     populate_audio_input_menu_with_pulseaudio_monitors();
     g_signal_connect(audio_input_menu, "changed", G_CALLBACK(audio_input_change_callback), nullptr);
     gtk_widget_set_hexpand(GTK_WIDGET(audio_input_menu), true);
