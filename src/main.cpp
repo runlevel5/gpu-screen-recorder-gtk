@@ -394,7 +394,7 @@ static pid_t launch_ffmpeg_rtmp_process(const char *url, int *pipe_write_end) {
         dup2(pipes[PIPE_READ_END], STDIN_FILENO);
         close(pipes[PIPE_WRITE_END]);
         
-        const char *args[] = { "ffmpeg", "-i", "pipe:0", "-c:v", "copy", "-f", "flv", "-max_muxing_queue_size", "4096", "--", url, NULL };
+        const char *args[] = { "ffmpeg", "-i", "pipe:0", "-c:v", "copy", "-f", "flv", "--", url, NULL };
         execvp(args[0], (char* const*)args);
         perror("failed to launch ffmpeg");
         exit(127);
