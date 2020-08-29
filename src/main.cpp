@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include <X11/Xlib.h>
+#include <X11/XKBlib.h>
 #include <X11/cursorfont.h>
 #include <assert.h>
 #include <string>
@@ -18,6 +19,7 @@ typedef struct {
 } SelectWindowUserdata;
 
 typedef struct {
+    GtkApplication *app;
     GtkStack *stack;
     GtkWidget *common_settings_page;
     GtkWidget *replay_page;
@@ -40,6 +42,9 @@ static GtkButton *replay_button;
 static GtkButton *replay_back_button;
 static GtkButton *record_back_button;
 static GtkButton *stream_back_button;
+static GtkButton *start_recording_button;
+static GtkButton *start_replay_button;
+static GtkButton *start_streaming_button;
 static GtkEntry *stream_id_entry;
 static GtkSpinButton *replay_time_entry;
 static bool replaying = false;
@@ -82,7 +87,9 @@ static void enable_stream_record_button_if_info_filled() {
 static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpointer userdata) {
     SelectWindowUserdata *select_window_userdata = (SelectWindowUserdata*)userdata;
     XEvent *ev = (XEvent*)xevent;
-    assert(ev->type == ButtonPress);
+    //assert(ev->type == ButtonPress);
+    if(ev->type != ButtonPress)
+        return GDK_FILTER_CONTINUE;
 
     Window target_win = ev->xbutton.subwindow;
 
@@ -636,8 +643,12 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
+    GtkWidget *hotkey_label = gtk_label_new("Press Alt+F1 to start/stop replay");
+    gtk_grid_attach(grid, hotkey_label, 0, 0, 2, 1);
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 2, 1);
+
     GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 0, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 2, 2, 1);
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
     GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the replays?");
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_label), 0, 0, 1, 1);
@@ -650,7 +661,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(directory_chooser_button), 1, 0, 1, 1);
 
     GtkGrid *replay_time_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, 1, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, 3, 2, 1);
     gtk_grid_attach(replay_time_grid, gtk_label_new("Replay time: "), 0, 0, 1, 1);
     replay_time_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(10.0, 1200.0, 1.0));
     gtk_spin_button_set_value(replay_time_entry, 30.0);
@@ -658,12 +669,12 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(replay_time_grid, GTK_WIDGET(replay_time_entry), 1, 0, 1, 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 2, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 4, 2, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     replay_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(replay_back_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(replay_back_button), 0, 0, 1, 1);
-    GtkButton *start_replay_button = GTK_BUTTON(gtk_button_new_with_label("Start replay"));
+    start_replay_button = GTK_BUTTON(gtk_button_new_with_label("Start replay"));
     gtk_widget_set_hexpand(GTK_WIDGET(start_replay_button), true);
     g_signal_connect(start_replay_button, "clicked", G_CALLBACK(on_start_replay_button_click), app);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(start_replay_button), 1, 0, 1, 1);
@@ -680,8 +691,12 @@ static GtkWidget* create_recording_page(GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
+    GtkWidget *hotkey_label = gtk_label_new("Press Alt+F1 to start/stop recording");
+    gtk_grid_attach(grid, hotkey_label, 0, 0, 2, 1);
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 2, 1);
+
     GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 0, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 2, 2, 1);
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
     GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the video?");
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_label), 0, 0, 1, 1);
@@ -694,12 +709,12 @@ static GtkWidget* create_recording_page(GtkStack *stack) {
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_button), 1, 0, 1, 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 1, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 3, 2, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     record_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(record_back_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(record_back_button), 0, 0, 1, 1);
-    GtkButton *start_recording_button = GTK_BUTTON(gtk_button_new_with_label("Start recording"));
+    start_recording_button = GTK_BUTTON(gtk_button_new_with_label("Start recording"));
     gtk_widget_set_hexpand(GTK_WIDGET(start_recording_button), true);
     g_signal_connect(start_recording_button, "clicked", G_CALLBACK(on_start_recording_button_click), nullptr);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(start_recording_button), 1, 0, 1, 1);
@@ -720,8 +735,12 @@ static GtkWidget* create_streaming_page(GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
+    GtkWidget *hotkey_label = gtk_label_new("Press Alt+F1 to start/stop streaming");
+    gtk_grid_attach(grid, hotkey_label, 0, 0, 2, 1);
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 2, 1);
+
     GtkGrid *stream_service_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(stream_service_grid), 0, 0, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(stream_service_grid), 0, 2, 2, 1);
     gtk_grid_attach(stream_service_grid, gtk_label_new("Stream service: "), 0, 0, 1, 1);
     stream_service_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append_text(stream_service_input_menu, "Twitch");
@@ -732,19 +751,19 @@ static GtkWidget* create_streaming_page(GtkStack *stack) {
     gtk_grid_attach(stream_service_grid, GTK_WIDGET(stream_service_input_menu), 1, 0, 1, 1);
 
     GtkGrid *stream_id_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(stream_id_grid), 0, 1, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(stream_id_grid), 0, 3, 2, 1);
     gtk_grid_attach(stream_id_grid, gtk_label_new("Stream id: "), 0, 0, 1, 1);
     stream_id_entry = GTK_ENTRY(gtk_entry_new());
     gtk_widget_set_hexpand(GTK_WIDGET(stream_id_entry), true);
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_id_entry), 1, 0, 1, 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 2, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 4, 2, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     stream_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(stream_back_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(stream_back_button), 0, 0, 1, 1);
-    GtkButton *start_streaming_button = GTK_BUTTON(gtk_button_new_with_label("Start streaming"));
+    start_streaming_button = GTK_BUTTON(gtk_button_new_with_label("Start streaming"));
     gtk_widget_set_hexpand(GTK_WIDGET(start_streaming_button), true);
     g_signal_connect(start_streaming_button, "clicked", G_CALLBACK(on_start_streaming_button_click), nullptr);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(start_streaming_button), 1, 0, 1, 1);
@@ -764,6 +783,73 @@ static gboolean on_destroy_window(GtkWidget *widget, GdkEvent *event, gpointer d
     if(ffmpeg_process != -1)
         kill(ffmpeg_process, SIGKILL);
     return true;
+}
+
+typedef gboolean (*KeyPressHandler)(GtkButton *button, gpointer userdata);
+static void keypress_toggle_recording(bool recording_state, GtkButton *record_button, KeyPressHandler keypress_handler, GtkApplication *app) {
+    if(!gtk_widget_get_sensitive(GTK_WIDGET(record_button)))
+        return;
+
+    if(!recording_state) {
+        keypress_handler(record_button, app);
+    } else if(recording_state) {
+        keypress_handler(record_button, app);
+    }
+}
+
+static bool hotkey_pressed = false;
+static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent *event, gpointer userdata) {
+    PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
+    XEvent *ev = (XEvent*)xevent;
+    Display *display = gdk_x11_get_default_xdisplay();
+
+    if((ev->type == KeyPress || ev->type == KeyRelease) && XKeycodeToKeysym(display, ev->xkey.keycode, 0) == XK_F1 && (ev->xkey.state & Mod1Mask)) {
+        if(ev->type == KeyPress) {
+            if(hotkey_pressed)
+                return GDK_FILTER_CONTINUE;
+            hotkey_pressed = true;
+        } else if(ev->type == KeyRelease) {
+            hotkey_pressed = false;
+            return GDK_FILTER_CONTINUE;
+        }
+
+        GtkWidget *visible_page = gtk_stack_get_visible_child(page_navigation_userdata->stack);
+        if(visible_page == page_navigation_userdata->recording_page) {
+            keypress_toggle_recording(recording, start_recording_button, on_start_recording_button_click, page_navigation_userdata->app);
+        } else if(visible_page == page_navigation_userdata->streaming_page) {
+            keypress_toggle_recording(streaming, start_streaming_button, on_start_streaming_button_click, page_navigation_userdata->app);
+        } else if(visible_page == page_navigation_userdata->replay_page) {
+            keypress_toggle_recording(replaying, start_replay_button, on_start_replay_button_click, page_navigation_userdata->app);
+        }
+    }
+
+    return GDK_FILTER_CONTINUE;
+}
+
+static int xerror_dummy(Display *dpy, XErrorEvent *ee) {
+    return 0;
+}
+
+static void grabkeys(Display *display) {
+	unsigned int numlockmask = 0;
+    KeyCode numlock_keycode = XKeysymToKeycode(display, XK_Num_Lock);
+    XModifierKeymap *modmap = XGetModifierMapping(display);
+    for(int i = 0; i < 8; ++i) {
+        for(int j = 0; j < modmap->max_keypermod; ++j) {
+            if(modmap->modifiermap[i * modmap->max_keypermod + j] == numlock_keycode)
+                numlockmask = (1 << i); 
+        }
+    }
+	XFreeModifiermap(modmap);
+
+    XErrorHandler prev_error_handler = XSetErrorHandler(xerror_dummy);
+    
+	Window root_window = DefaultRootWindow(display);
+    unsigned int modifiers[] = { 0, LockMask, numlockmask, numlockmask|LockMask };
+    for(int i = 0; i < 4; ++i)
+        XGrabKey(display, XKeysymToKeycode(display, XK_F1), Mod1Mask|modifiers[i], root_window, False, GrabModeAsync, GrabModeAsync);
+    
+    XSetErrorHandler(prev_error_handler);
 }
 
 static void activate(GtkApplication *app, gpointer userdata) { 
@@ -786,6 +872,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
     GtkWidget *streaming_page = create_streaming_page(stack);
     gtk_stack_set_visible_child(stack, common_settings_page);
 
+    page_navigation_userdata.app = app;
     page_navigation_userdata.stack = stack;
     page_navigation_userdata.common_settings_page = common_settings_page;
     page_navigation_userdata.replay_page = replay_page;
@@ -800,6 +887,14 @@ static void activate(GtkApplication *app, gpointer userdata) {
 
     g_signal_connect(stream_button, "clicked", G_CALLBACK(on_start_streaming_click), &page_navigation_userdata);
     g_signal_connect(stream_back_button, "clicked", G_CALLBACK(on_streaming_recording_page_back_click), &page_navigation_userdata);
+
+    Display *display = gdk_x11_get_default_xdisplay();
+    grabkeys(display);
+    GdkWindow *root_window = gdk_get_default_root_window();
+    //gdk_window_set_events(root_window, GDK_BUTTON_PRESS_MASK);
+    gdk_window_add_filter(root_window, hotkey_filter_callback, &page_navigation_userdata);
+    Bool sup = False;
+    XkbSetDetectableAutoRepeat(display, True, &sup);
 
     gtk_widget_show_all(window);
 }
