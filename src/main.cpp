@@ -863,8 +863,8 @@ static void activate(GtkApplication *app, gpointer userdata) {
 
     GtkStack *stack = GTK_STACK(gtk_stack_new());
     gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(stack));
-    gtk_stack_set_transition_type(stack, GTK_STACK_TRANSITION_TYPE_SLIDE_LEFT_RIGHT);
-    gtk_stack_set_transition_duration(stack, 300);
+    gtk_stack_set_transition_type(stack, GTK_STACK_TRANSITION_TYPE_NONE);
+    gtk_stack_set_transition_duration(stack, 0);
     gtk_stack_set_homogeneous(stack, false);
     GtkWidget *common_settings_page = create_common_settings_page(stack, app);
     GtkWidget *replay_page = create_replay_page(app, stack);
