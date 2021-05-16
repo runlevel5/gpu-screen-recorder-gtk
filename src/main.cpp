@@ -9,11 +9,14 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <pwd.h>
+#include <libgen.h>
 
 typedef struct {
     Display *display;
+    GtkApplication *app;
     GtkButton *select_window_button;
     Window selected_window;
 } SelectWindowUserdata;
@@ -60,6 +63,8 @@ static const char* get_home_dir() {
         passwd *pw = getpwuid(getuid());
         home_dir = pw->pw_dir;
     }
+    if(!home_dir)
+        home_dir = "/tmp";
     return home_dir;
 }
 
@@ -69,6 +74,46 @@ static std::string get_date_str() {
     struct tm *t = localtime(&now);
     strftime(str, sizeof(str)-1, "%Y-%m-%d_%H-%M-%S", t);
     return str;
+}
+
+static int create_directory_recursive(char *path) {
+    int path_len = strlen(path);
+    char *p = path;
+    char *end = path + path_len;
+    for(;;) {
+        char *slash_p = strchr(p, '/');
+
+        // Skips first '/', we don't want to try and create the root directory
+        if(slash_p == path) {
+            ++p;
+            continue;
+        }
+
+        if(!slash_p)
+            slash_p = end;
+
+        char prev_char = *slash_p;
+        *slash_p = '\0';
+        int err = mkdir(path, S_IRWXU);
+        *slash_p = prev_char;
+
+        if(err == -1 && errno != EEXIST)
+            return err;
+
+        if(slash_p == end)
+            break;
+        else
+            p = slash_p + 1;
+    }
+    return 0;
+}
+
+static void show_notification(GtkApplication *app, const char *title, const char *body, GNotificationPriority priority) {
+    fprintf(stderr, "Notification: title: %s, body: %s\n", title, body);
+    GNotification *notification = g_notification_new(title);
+    g_notification_set_body(notification, body);
+    g_notification_set_priority(notification, priority);
+    g_application_send_notification(&app->parent, "gpu-screen-recorder", notification);
 }
 
 static void enable_stream_record_button_if_info_filled() {
@@ -101,6 +146,7 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpoin
     int status = XUngrabPointer(select_window_userdata->display, CurrentTime);
     if(!status) {
         fprintf(stderr, "failed to ungrab pointer!\n");
+        show_notification(select_window_userdata->app, "GPU Screen Recorder", "Failed to ungrab pointer!", G_NOTIFICATION_PRIORITY_URGENT);
         exit(1);
     }
 
@@ -227,30 +273,50 @@ static gboolean on_directory_chooser_button_click(GtkButton *button, gpointer us
     return true;
 }
 
+static bool kill_gpu_screen_recorder_get_result() {
+    bool exit_success = true;
+    if(gpu_screen_recorder_process != -1) {
+        int status;
+        int wait_result = waitpid(gpu_screen_recorder_process, &status, WNOHANG);
+        if(wait_result == -1) {
+            perror("waitpid failed");
+            exit_success = false;
+        } else if(wait_result == 0) {
+            // the process is still running
+            kill(gpu_screen_recorder_process, SIGINT);
+            if(waitpid(gpu_screen_recorder_process, &status, 0) == -1) {
+                perror("waitpid failed");
+                exit_success = false;
+            } else {
+                exit_success = WIFEXITED(status) && WEXITSTATUS(status) == 0;
+            }
+        } else {
+            exit_success = WIFEXITED(status) && WEXITSTATUS(status) == 0;
+        }
+    }
+    return exit_success;
+}
+
 /* TODO: XSetErrorHandler to prevent program crash, show notifications or inline error message instead of fprintf(stderr), more validations... */
 
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
 
     if(replaying) {
-        if(gpu_screen_recorder_process != -1) {
-            kill(gpu_screen_recorder_process, SIGINT);
-            int status;
-            if(waitpid(gpu_screen_recorder_process, &status, 0) == -1) {
-                perror("waitpid failed");
-                /* Ignore... */
-            }
-        }
+        bool exit_success = kill_gpu_screen_recorder_get_result();
+
         gtk_button_set_label(button, "Start replay");
         replaying = false;
         gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), true);
 
-        GNotification *notification = g_notification_new("GPU Screen Recorder");
-        std::string notification_body = "Replay saved to " + replay_output_path;
-        g_notification_set_body(notification, notification_body.c_str());
-        g_notification_set_priority(notification, G_NOTIFICATION_PRIORITY_LOW);
-        g_application_send_notification(&app->parent, "gpu-screen-recorder-replay", notification);
+        if(exit_success) {
+            std::string notification_body = "The replay was saved to " + replay_output_path;
+            show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_LOW);
+        } else {
+            std::string notification_body = "Failed to save the reply to " + replay_output_path;
+            show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
+        }
         return true;
     }
 
@@ -258,15 +324,18 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
     int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
 
-    gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
+    char dir_tmp[PATH_MAX];
+    strcpy(dir_tmp, dir);
+    if(create_directory_recursive(dir_tmp) != 0) {
+        std::string notification_body = std::string("Failed to start replay. Failed to create ") + dir_tmp;
+        show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
+        return true;
+    }
 
     if(select_window_userdata.selected_window == None) {
         fprintf(stderr, "No window selected!\n");
         return true;
     }
-
-    replaying = true;
-    gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), false);
 
     std::string window_str = std::to_string(select_window_userdata.selected_window);
     std::string fps_str = std::to_string(fps);
@@ -275,19 +344,23 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     replay_output_path = dir;
     replay_output_path += "/Video_" + get_date_str() + ".mp4";
 
+    gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
+
     pid_t parent_pid = getpid();
     pid_t pid = fork();
     if(pid == -1) {
         perror("failed to fork");
-        exit(3);
+        show_notification(app, "GPU Screen Recorder", "Failed to start replay (failed to fork)", G_NOTIFICATION_PRIORITY_URGENT);
+        g_free(audio_input_str);
+        return true;
     } else if(pid == 0) { /* child process */
         if(prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
             perror("prctl(PR_SET_PDEATHSIG, SIGTERM) failed");
-            exit(3);
+            _exit(3);
         }
 
         if(getppid() != parent_pid)
-            exit(3);
+            _exit(3);
         
         if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
             const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, "-r", replay_time_str.c_str(), "-o", replay_output_path.c_str(), NULL };
@@ -297,29 +370,37 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
             execvp(args[0], (char* const*)args);
         }
         perror("failed to launch gpu-screen-recorder");
+        _exit(127);
     } else { /* parent process */
         gpu_screen_recorder_process = pid;
         gtk_button_set_label(button, "Stop replaying and save");
     }
 
+    replaying = true;
+    gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), false);
     g_free(audio_input_str);
     return true;
 }
 
 static gboolean on_start_recording_button_click(GtkButton *button, gpointer userdata) {
+    GtkApplication *app = (GtkApplication*)userdata;
+    const gchar *filename = gtk_button_get_label(file_chooser_button);
+
     if(recording) {
-        if(gpu_screen_recorder_process != -1) {
-            kill(gpu_screen_recorder_process, SIGINT);
-            int status;
-            if(waitpid(gpu_screen_recorder_process, &status, 0) == -1) {
-                perror("waitpid failed");
-                /* Ignore... */
-            }
-        }
+        bool exit_success = kill_gpu_screen_recorder_get_result();
+
         gtk_button_set_label(button, "Start recording");
         recording = false;
         gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), true);
+
+        if(exit_success) {
+            std::string notification_body = std::string("The recording was saved to ") + filename;
+            show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_LOW);
+        } else {
+            std::string notification_body = std::string("Failed to save the recording to ") + filename;
+            show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
+        }
 
         std::string video_filepath = get_home_dir();
         video_filepath += "/Videos/Video_" + get_date_str() + ".mp4";
@@ -327,35 +408,42 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         return true;
     }
 
-    const gchar *filename = gtk_button_get_label(file_chooser_button);
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
 
-    gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
+    char dir_tmp[PATH_MAX];
+    strcpy(dir_tmp, filename);
+    char *dir = dirname(dir_tmp);
+    if(create_directory_recursive(dir) != 0) {
+        std::string notification_body = std::string("Failed to start recording. Failed to create ") + dir_tmp;
+        show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
+        return true;
+    }
 
     if(select_window_userdata.selected_window == None) {
         fprintf(stderr, "No window selected!\n");
         return true;
     }
 
-    recording = true;
-    gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), false);
-
     std::string window_str = std::to_string(select_window_userdata.selected_window);
     std::string fps_str = std::to_string(fps);
+
+    gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
 
     pid_t parent_pid = getpid();
     pid_t pid = fork();
     if(pid == -1) {
         perror("failed to fork");
-        exit(3);
+        show_notification(app, "GPU Screen Recorder", "Failed to start recording (failed to fork)", G_NOTIFICATION_PRIORITY_URGENT);
+        g_free(audio_input_str);
+        return true;
     } else if(pid == 0) { /* child process */
         if(prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
             perror("prctl(PR_SET_PDEATHSIG, SIGTERM) failed");
-            exit(3);
+            _exit(3);
         }
 
         if(getppid() != parent_pid)
-            exit(3);
+            _exit(3);
         
         if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
             const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, "-o", filename, NULL };
@@ -365,11 +453,14 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
             execvp(args[0], (char* const*)args);
         }
         perror("failed to launch gpu-screen-recorder");
+        _exit(127);
     } else { /* parent process */
         gpu_screen_recorder_process = pid;
         gtk_button_set_label(button, "Stop recording");
     }
 
+    recording = true;
+    gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), false);
     g_free(audio_input_str);
     return true;
 }
@@ -381,22 +472,24 @@ static pid_t launch_ffmpeg_rtmp_process(const char *url, int *pipe_write_end) {
     int pipes[2];
     if(pipe(pipes) == -1) {
         perror("failed to create pipe");
-        exit(3);
+        return -1;
     }
 
     pid_t parent_pid = getpid();
     pid_t pid = fork();
     if(pid == -1) {
         perror("failed to fork");
-        exit(3);
+        close(pipes[0]);
+        close(pipes[1]);
+        return -1;
     } else if(pid == 0) { /* child process */
         if(prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
             perror("prctl(PR_SET_PDEATHSIG, SIGTERM) failed");
-            exit(3);
+            _exit(3);
         }
 
         if(getppid() != parent_pid)
-            exit(3);
+            _exit(3);
 
         dup2(pipes[PIPE_READ_END], STDIN_FILENO);
         close(pipes[PIPE_WRITE_END]);
@@ -404,7 +497,7 @@ static pid_t launch_ffmpeg_rtmp_process(const char *url, int *pipe_write_end) {
         const char *args[] = { "ffmpeg", "-i", "pipe:0", "-c:v", "copy", "-f", "flv", "--", url, NULL };
         execvp(args[0], (char* const*)args);
         perror("failed to launch ffmpeg");
-        exit(127);
+        _exit(127);
     } else { /* parent process */
         *pipe_write_end = pipes[PIPE_WRITE_END];
         close(pipes[PIPE_READ_END]);
@@ -414,15 +507,10 @@ static pid_t launch_ffmpeg_rtmp_process(const char *url, int *pipe_write_end) {
 }
 
 static gboolean on_start_streaming_button_click(GtkButton *button, gpointer userdata) {
+    GtkApplication *app = (GtkApplication*)userdata;
+
     if(streaming) {
-        if(gpu_screen_recorder_process != -1) {
-            kill(gpu_screen_recorder_process, SIGINT);
-            int status;
-            if(waitpid(gpu_screen_recorder_process, &status, 0) == -1) {
-                perror("waitpid failed");
-                /* Ignore... */
-            }
-        }
+        bool exit_success = kill_gpu_screen_recorder_get_result();
 
         if(ffmpeg_process != -1)
             kill(ffmpeg_process, SIGKILL);
@@ -432,21 +520,23 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         gpu_screen_recorder_process = -1;
         ffmpeg_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(stream_back_button), true);
+
+        if(exit_success) {
+            show_notification(app, "GPU Screen Recorder", "Stopped streaming", G_NOTIFICATION_PRIORITY_LOW);
+        } else {
+            show_notification(app, "GPU Screen Recorder", "The streaming failed with an error", G_NOTIFICATION_PRIORITY_URGENT);
+        }
+
         return true;
     }
 
     const char *stream_id_str = gtk_entry_get_text(stream_id_entry);
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
 
-    gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
-
     if(select_window_userdata.selected_window == None) {
         fprintf(stderr, "No window selected!\n");
         return true;
     }
-
-    streaming = true;
-    gtk_widget_set_sensitive(GTK_WIDGET(stream_back_button), false);
 
     std::string window_str = std::to_string(select_window_userdata.selected_window);
     std::string fps_str = std::to_string(fps);
@@ -455,20 +545,32 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     std::string stream_url = "rtmp://live.twitch.tv/app/";
     stream_url += stream_id_str;
     ffmpeg_process = launch_ffmpeg_rtmp_process(stream_url.c_str(), &pipe_write_end);
+    if(ffmpeg_process == -1) {
+        show_notification(app, "GPU Screen Recorder", "Failed to start streaming (failed to launch ffmpeg rtmp process)", G_NOTIFICATION_PRIORITY_URGENT);
+        return true;
+    }
+
+    gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
 
     pid_t parent_pid = getpid();
     pid_t pid = fork();
     if(pid == -1) {
         perror("failed to fork");
-        exit(3);
+        show_notification(app, "GPU Screen Recorder", "Failed to start streaming (failed to fork)", G_NOTIFICATION_PRIORITY_URGENT);
+        g_free(audio_input_str);
+        if(ffmpeg_process != -1) {
+            kill(ffmpeg_process, SIGKILL);
+            ffmpeg_process = -1;
+        }
+        return true;
     } else if(pid == 0) { /* child process */
         if(prctl(PR_SET_PDEATHSIG, SIGTERM) == -1) {
             perror("prctl(PR_SET_PDEATHSIG, SIGTERM) failed");
-            exit(3);
+            _exit(3);
         }
 
         if(getppid() != parent_pid)
-            exit(3);
+            _exit(3);
 
         // Redirect stdout to output_file
         dup2(pipe_write_end, STDOUT_FILENO);
@@ -481,13 +583,15 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
             execvp(args[0], (char* const*)args);
         }
         perror("failed to launch gpu-screen-recorder");
-        exit(127);
+        _exit(127);
     } else { /* parent process */
         gpu_screen_recorder_process = pid;
         close(pipe_write_end);
         gtk_button_set_label(button, "Stop streaming");
     }
 
+    streaming = true;
+    gtk_widget_set_sensitive(GTK_WIDGET(stream_back_button), false);
     g_free(audio_input_str);
     return true;
 }
@@ -682,7 +786,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     return GTK_WIDGET(grid);
 }
 
-static GtkWidget* create_recording_page(GtkStack *stack) {
+static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "recording");
     gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
@@ -716,7 +820,7 @@ static GtkWidget* create_recording_page(GtkStack *stack) {
     gtk_grid_attach(start_button_grid, GTK_WIDGET(record_back_button), 0, 0, 1, 1);
     start_recording_button = GTK_BUTTON(gtk_button_new_with_label("Start recording"));
     gtk_widget_set_hexpand(GTK_WIDGET(start_recording_button), true);
-    g_signal_connect(start_recording_button, "clicked", G_CALLBACK(on_start_recording_button_click), nullptr);
+    g_signal_connect(start_recording_button, "clicked", G_CALLBACK(on_start_recording_button_click), app);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(start_recording_button), 1, 0, 1, 1);
 
     return GTK_WIDGET(grid);
@@ -726,7 +830,7 @@ static void stream_service_change_callback(GtkComboBox *widget, gpointer userdat
     enable_stream_record_button_if_info_filled();
 }
 
-static GtkWidget* create_streaming_page(GtkStack *stack) {
+static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "streaming");
     gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
@@ -765,7 +869,7 @@ static GtkWidget* create_streaming_page(GtkStack *stack) {
     gtk_grid_attach(start_button_grid, GTK_WIDGET(stream_back_button), 0, 0, 1, 1);
     start_streaming_button = GTK_BUTTON(gtk_button_new_with_label("Start streaming"));
     gtk_widget_set_hexpand(GTK_WIDGET(start_streaming_button), true);
-    g_signal_connect(start_streaming_button, "clicked", G_CALLBACK(on_start_streaming_button_click), nullptr);
+    g_signal_connect(start_streaming_button, "clicked", G_CALLBACK(on_start_streaming_button_click), app);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(start_streaming_button), 1, 0, 1, 1);
 
     return GTK_WIDGET(grid);
@@ -852,11 +956,38 @@ static void grabkeys(Display *display) {
     XSetErrorHandler(prev_error_handler);
 }
 
+static gboolean handle_child_process_death(gpointer userdata) {
+    if(ffmpeg_process != -1) {
+        int status;
+        if(waitpid(ffmpeg_process, &status, WNOHANG) != 0) {
+            if(recording) {
+                on_start_recording_button_click(start_recording_button, userdata);
+            }
+        }
+    }
+
+    if(gpu_screen_recorder_process != -1) {
+        int status;
+        if(waitpid(gpu_screen_recorder_process, &status, WNOHANG) != 0) {
+            if(replaying) {
+                on_start_replay_button_click(start_replay_button, userdata);
+            } else if(recording) {
+                on_start_recording_button_click(start_recording_button, userdata);
+            } else if(streaming) {
+                on_start_streaming_button_click(start_streaming_button, userdata);
+            }
+        }
+    }
+    return G_SOURCE_CONTINUE;
+}
+
 static void activate(GtkApplication *app, gpointer userdata) { 
     GtkWidget *window = gtk_application_window_new(app);
     g_signal_connect(window, "destroy", G_CALLBACK(on_destroy_window), nullptr);
     gtk_window_set_title(GTK_WINDOW(window), "GPU Screen Recorder");
     gtk_window_set_resizable(GTK_WINDOW(window), false);
+
+    select_window_userdata.app = app;
 
     crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);
     save_icon = gtk_image_new_from_stock("gtk-save", GTK_ICON_SIZE_BUTTON);
@@ -868,8 +999,8 @@ static void activate(GtkApplication *app, gpointer userdata) {
     gtk_stack_set_homogeneous(stack, false);
     GtkWidget *common_settings_page = create_common_settings_page(stack, app);
     GtkWidget *replay_page = create_replay_page(app, stack);
-    GtkWidget *recording_page = create_recording_page(stack);
-    GtkWidget *streaming_page = create_streaming_page(stack);
+    GtkWidget *recording_page = create_recording_page(app, stack);
+    GtkWidget *streaming_page = create_streaming_page(app, stack);
     gtk_stack_set_visible_child(stack, common_settings_page);
 
     page_navigation_userdata.app = app;
@@ -895,6 +1026,8 @@ static void activate(GtkApplication *app, gpointer userdata) {
     gdk_window_add_filter(root_window, hotkey_filter_callback, &page_navigation_userdata);
     Bool sup = False;
     XkbSetDetectableAutoRepeat(display, True, &sup);
+
+    g_timeout_add(1000, handle_child_process_death, app);
 
     gtk_widget_show_all(window);
 }
