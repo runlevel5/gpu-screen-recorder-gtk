@@ -38,7 +38,7 @@ static GtkSpinButton *fps_entry;
 static GtkComboBoxText *audio_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
 static GtkButton *file_chooser_button;
-static GtkButton *directory_chooser_button;
+static GtkButton *replay_file_chooser_button;
 static GtkButton *stream_button;
 static GtkButton *record_button;
 static GtkButton *replay_button;
@@ -53,7 +53,6 @@ static GtkSpinButton *replay_time_entry;
 static bool replaying = false;
 static bool recording = false;
 static bool streaming = false;
-static std::string replay_output_path;
 static pid_t gpu_screen_recorder_process = -1;
 static pid_t ffmpeg_process = -1;
 
@@ -150,7 +149,7 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpoin
         exit(1);
     }
 
-    std::string window_name = "Window ID: " + std::to_string(target_win) + " | Name: ";
+    std::string window_name;
     XTextProperty wm_name_prop;
     if(XGetWMName(select_window_userdata->display, target_win, &wm_name_prop) && wm_name_prop.nitems > 0) {
         char **list_return = NULL;
@@ -212,6 +211,10 @@ static gboolean on_select_window_button_click(GtkButton *button, gpointer userda
 static gboolean on_start_replay_click(GtkButton *button, gpointer userdata) {
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->replay_page);
+
+    std::string video_filepath = get_home_dir();
+    video_filepath += "/Videos/Video_" + get_date_str() + ".mp4";
+    gtk_button_set_label(replay_file_chooser_button, video_filepath.c_str());
     return true;
 }
 
@@ -237,8 +240,8 @@ static gboolean on_streaming_recording_page_back_click(GtkButton *button, gpoint
     return true;
 }
 
-static gboolean on_file_chooser_button_click(GtkButton *button, gpointer userdata) {
-    GtkWidget *file_chooser_dialog = gtk_file_chooser_dialog_new("Where do you want to save the video?", nullptr, GTK_FILE_CHOOSER_ACTION_SAVE,
+static gboolean file_choose_button_click_handler(GtkButton *button, const char *title) {
+    GtkWidget *file_chooser_dialog = gtk_file_chooser_dialog_new(title, nullptr, GTK_FILE_CHOOSER_ACTION_SAVE,
         "Cancel", GTK_RESPONSE_CANCEL,
         "Save", GTK_RESPONSE_ACCEPT,
         nullptr);
@@ -255,22 +258,12 @@ static gboolean on_file_chooser_button_click(GtkButton *button, gpointer userdat
     return true;
 }
 
-static gboolean on_directory_chooser_button_click(GtkButton *button, gpointer userdata) {
-    GtkWidget *file_chooser_dialog = gtk_file_chooser_dialog_new("Where do you want to save the replays?", nullptr, GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
-        "Cancel", GTK_RESPONSE_CANCEL,
-        "Save", GTK_RESPONSE_ACCEPT,
-        nullptr);
-    //gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(file_chooser_dialog), "video.mp4");
+static gboolean on_file_chooser_button_click(GtkButton *button, gpointer userdata) {
+    return file_choose_button_click_handler(button, "Where do you want to save the video?");
+}
 
-    int res = gtk_dialog_run(GTK_DIALOG(file_chooser_dialog));
-    if(res == GTK_RESPONSE_ACCEPT) {
-        char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(file_chooser_dialog));
-        printf("directory: %s\n", filename);
-        gtk_button_set_label(button, filename);
-        g_free(filename);
-    }
-    gtk_widget_destroy(file_chooser_dialog);
-    return true;
+static gboolean on_replay_file_chooser_button_click(GtkButton *button, gpointer userdata) {
+    return file_choose_button_click_handler(button, "Where do you want to save the replay?");
 }
 
 static bool kill_gpu_screen_recorder_get_result() {
@@ -301,6 +294,7 @@ static bool kill_gpu_screen_recorder_get_result() {
 
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
+    const gchar *filename = gtk_button_get_label(replay_file_chooser_button);
 
     if(replaying) {
         bool exit_success = kill_gpu_screen_recorder_get_result();
@@ -311,23 +305,27 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), true);
 
         if(exit_success) {
-            std::string notification_body = "The replay was saved to " + replay_output_path;
+            std::string notification_body = std::string("The replay was saved to ") + filename;
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_LOW);
         } else {
-            std::string notification_body = "Failed to save the reply to " + replay_output_path;
+            std::string notification_body = std::string("Failed to save the replay to ") + filename;
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
         }
+
+        std::string video_filepath = get_home_dir();
+        video_filepath += "/Videos/Video_" + get_date_str() + ".mp4";
+        gtk_button_set_label(replay_file_chooser_button, video_filepath.c_str());
         return true;
     }
 
-    const gchar *dir = gtk_button_get_label(directory_chooser_button);
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
     int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
 
     char dir_tmp[PATH_MAX];
-    strcpy(dir_tmp, dir);
-    if(create_directory_recursive(dir_tmp) != 0) {
-        std::string notification_body = std::string("Failed to start replay. Failed to create ") + dir_tmp;
+    strcpy(dir_tmp, filename);
+    char *dir = dirname(dir_tmp);
+    if(create_directory_recursive(dir) != 0) {
+        std::string notification_body = std::string("Failed to start recording. Failed to create ") + dir_tmp;
         show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
         return true;
     }
@@ -340,9 +338,6 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     std::string window_str = std::to_string(select_window_userdata.selected_window);
     std::string fps_str = std::to_string(fps);
     std::string replay_time_str = std::to_string(replay_time);
-
-    replay_output_path = dir;
-    replay_output_path += "/Video_" + get_date_str() + ".mp4";
 
     gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
 
@@ -363,10 +358,10 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
             _exit(3);
         
         if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, "-r", replay_time_str.c_str(), "-o", replay_output_path.c_str(), NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-a", audio_input_str, "-r", replay_time_str.c_str(), "-o", filename, NULL };
             execvp(args[0], (char* const*)args);
         } else {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", replay_output_path.c_str(), NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", filename, NULL };
             execvp(args[0], (char* const*)args);
         }
         perror("failed to launch gpu-screen-recorder");
@@ -754,15 +749,15 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 2, 2, 1);
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
-    GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the replays?");
+    GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the replay?");
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_label), 0, 0, 1, 1);
-    directory_chooser_button = GTK_BUTTON(gtk_button_new_with_label(video_filepath.c_str()));
-    gtk_button_set_image(directory_chooser_button, save_icon);
-    gtk_button_set_always_show_image(directory_chooser_button, true);
-    gtk_button_set_image_position(directory_chooser_button, GTK_POS_RIGHT);
-    gtk_widget_set_hexpand(GTK_WIDGET(directory_chooser_button), true);
-    g_signal_connect(directory_chooser_button, "clicked", G_CALLBACK(on_directory_chooser_button_click), nullptr);
-    gtk_grid_attach(file_chooser_grid, GTK_WIDGET(directory_chooser_button), 1, 0, 1, 1);
+    replay_file_chooser_button = GTK_BUTTON(gtk_button_new_with_label(video_filepath.c_str()));
+    gtk_button_set_image(replay_file_chooser_button, save_icon);
+    gtk_button_set_always_show_image(replay_file_chooser_button, true);
+    gtk_button_set_image_position(replay_file_chooser_button, GTK_POS_RIGHT);
+    gtk_widget_set_hexpand(GTK_WIDGET(replay_file_chooser_button), true);
+    g_signal_connect(replay_file_chooser_button, "clicked", G_CALLBACK(on_replay_file_chooser_button_click), nullptr);
+    gtk_grid_attach(file_chooser_grid, GTK_WIDGET(replay_file_chooser_button), 1, 0, 1, 1);
 
     GtkGrid *replay_time_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, 3, 2, 1);
@@ -1033,6 +1028,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
 }
 
 int main(int argc, char **argv) {
+    setlocale(LC_ALL, "C");
     GtkApplication *app = gtk_application_new("org.dec05eba.gpu-screen-recorder", G_APPLICATION_FLAGS_NONE);
     g_signal_connect(app, "activate", G_CALLBACK(activate), nullptr);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
