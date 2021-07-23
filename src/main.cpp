@@ -3,6 +3,7 @@
 #include <X11/Xlib.h>
 #include <X11/XKBlib.h>
 #include <X11/cursorfont.h>
+#include <X11/extensions/Xrandr.h>
 #include <assert.h>
 #include <string>
 #include <pulse/pulseaudio.h>
@@ -13,6 +14,7 @@
 #include <fcntl.h>
 #include <pwd.h>
 #include <libgen.h>
+#include <functional>
 
 typedef struct {
     Display *display;
@@ -35,6 +37,7 @@ static PageNavigationUserdata page_navigation_userdata;
 static GtkWidget *save_icon;
 static Cursor crosshair_cursor;
 static GtkSpinButton *fps_entry;
+static GtkComboBoxText *record_area_selection_menu;
 static GtkComboBoxText *audio_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
 static GtkButton *file_chooser_button;
@@ -107,6 +110,38 @@ static int create_directory_recursive(char *path) {
     return 0;
 }
 
+static const XRRModeInfo* get_mode_info(const XRRScreenResources *sr, RRMode id) {
+    for(int i = 0; i < sr->nmode; ++i) {
+        if(sr->modes[i].id == id)
+            return &sr->modes[i];
+    }    
+    return nullptr;
+}
+
+static void for_each_active_monitor_output(Display *display, std::function<void(const XRROutputInfo*, const XRRCrtcInfo*, const XRRModeInfo*)> callback_func) {
+    XRRScreenResources *screen_res = XRRGetScreenResources(display, DefaultRootWindow(display));
+    if(!screen_res)
+        return;
+
+    for(int i = 0; i < screen_res->noutput; ++i) {
+        XRROutputInfo *out_info = XRRGetOutputInfo(display, screen_res, screen_res->outputs[i]);
+        if(out_info && out_info->crtc && out_info->connection == RR_Connected) {
+            XRRCrtcInfo *crt_info = XRRGetCrtcInfo(display, screen_res, out_info->crtc);
+            if(crt_info && crt_info->mode) {
+                const XRRModeInfo *mode_info = get_mode_info(screen_res, crt_info->mode);
+                if(mode_info)
+                    callback_func(out_info, crt_info, mode_info);
+            }
+            if(crt_info)
+                XRRFreeCrtcInfo(crt_info);
+        }
+        if(out_info)
+            XRRFreeOutputInfo(out_info);
+    }    
+
+    XRRFreeScreenResources(screen_res);
+}
+
 static void show_notification(GtkApplication *app, const char *title, const char *body, GNotificationPriority priority) {
     fprintf(stderr, "Notification: title: %s, body: %s\n", title, body);
     GNotification *notification = g_notification_new(title);
@@ -119,7 +154,8 @@ static void enable_stream_record_button_if_info_filled() {
     if(gtk_combo_box_get_active(GTK_COMBO_BOX(audio_input_menu)) == -1)
         return;
 
-    if(select_window_userdata.selected_window == None)
+    const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    if(strcmp(selected_window_area, "window") == 0 && select_window_userdata.selected_window == None)
         return;
     
     gtk_widget_set_sensitive(GTK_WIDGET(replay_button), true);
@@ -330,12 +366,14 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         return true;
     }
 
-    if(select_window_userdata.selected_window == None) {
-        fprintf(stderr, "No window selected!\n");
-        return true;
+    std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    if(window_str == "window") {
+        if(select_window_userdata.selected_window == None) {
+            fprintf(stderr, "No window selected!\n");
+            return true;
+        }
+        window_str = std::to_string(select_window_userdata.selected_window);
     }
-
-    std::string window_str = std::to_string(select_window_userdata.selected_window);
     std::string fps_str = std::to_string(fps);
     std::string replay_time_str = std::to_string(replay_time);
 
@@ -414,12 +452,14 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         return true;
     }
 
-    if(select_window_userdata.selected_window == None) {
-        fprintf(stderr, "No window selected!\n");
-        return true;
+    std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    if(window_str == "window") {
+        if(select_window_userdata.selected_window == None) {
+            fprintf(stderr, "No window selected!\n");
+            return true;
+        }
+        window_str = std::to_string(select_window_userdata.selected_window);
     }
-
-    std::string window_str = std::to_string(select_window_userdata.selected_window);
     std::string fps_str = std::to_string(fps);
 
     gchar* audio_input_str = gtk_combo_box_text_get_active_text(audio_input_menu);
@@ -528,12 +568,14 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     const char *stream_id_str = gtk_entry_get_text(stream_id_entry);
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
 
-    if(select_window_userdata.selected_window == None) {
-        fprintf(stderr, "No window selected!\n");
-        return true;
+    std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    if(window_str == "window") {
+        if(select_window_userdata.selected_window == None) {
+            fprintf(stderr, "No window selected!\n");
+            return true;
+        }
+        window_str = std::to_string(select_window_userdata.selected_window);
     }
-
-    std::string window_str = std::to_string(select_window_userdata.selected_window);
     std::string fps_str = std::to_string(fps);
 
     int pipe_write_end;
@@ -667,8 +709,19 @@ static void populate_audio_input_menu_with_pulseaudio_monitors() {
     pa_mainloop_free(main_loop);
 }
 
+static void record_area_item_change_callback(GtkComboBox *widget, gpointer userdata) {
+    GtkGrid *select_window_grid = (GtkGrid*)userdata;
+    const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    gtk_widget_set_visible(GTK_WIDGET(select_window_grid), strcmp(selected_window_area, "window") == 0);
+    enable_stream_record_button_if_info_filled();
+}
+
 static void audio_input_change_callback(GtkComboBox *widget, gpointer userdata) {
     enable_stream_record_button_if_info_filled();
+}
+
+static bool is_nv_fbc_installed() {
+    return access("/usr/lib/libnvidia-fbc.so.1", F_OK) == 0 || access("/usr/local/lib/libnvidia-fbc.so.1", F_OK) == 0;
 }
 
 static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app) {
@@ -680,16 +733,59 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
+    int grid_row = 0;
+    int record_area_row = 0;
+
+    GtkFrame *record_area_frame = GTK_FRAME(gtk_frame_new("Record area"));
+    gtk_grid_attach(grid, GTK_WIDGET(record_area_frame), 0, grid_row++, 2, 1);
+
+    GtkGrid *record_area_grid = GTK_GRID(gtk_grid_new());
+    gtk_widget_set_vexpand(GTK_WIDGET(record_area_grid), true);
+    gtk_widget_set_hexpand(GTK_WIDGET(record_area_grid), true);
+    gtk_grid_set_row_spacing(record_area_grid, 10);
+    gtk_grid_set_column_spacing(record_area_grid, 10);
+    gtk_widget_set_margin(GTK_WIDGET(record_area_grid), 10, 10, 10, 10);
+    gtk_container_add(GTK_CONTAINER(record_area_frame), GTK_WIDGET(record_area_grid));
+
+    record_area_selection_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
+    if(is_nv_fbc_installed()) {
+        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
+        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
+            std::string label = "Monitor ";
+            label.append(output_info->name, output_info->nameLen);
+            label += " (";
+            label.append(mode_info->name, mode_info->nameLength);
+            label += ")";
+
+            // Leak on purpose, what are you gonna do? stab me?
+            char *id = (char*)malloc(output_info->nameLen + 1);
+            if(!id) {
+                fprintf(stderr, "Failed to allocate memory\n");
+                abort();
+            }
+            memcpy(id, output_info->name, output_info->nameLen);
+            id[output_info->nameLen] = '\0';
+
+            gtk_combo_box_text_append(record_area_selection_menu, id, label.c_str());
+        });
+    }
+    gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), 0);
+    gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 2, 1);
+
     GtkGrid *select_window_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(select_window_grid), 0, 0, 2, 1);
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_grid), 0, record_area_row++, 2, 1);
     gtk_grid_attach(select_window_grid, gtk_label_new("Window: "), 0, 0, 1, 1);
     GtkButton *select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
     gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
     g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
     gtk_grid_attach(select_window_grid, GTK_WIDGET(select_window_button), 1, 0, 1, 1);
 
+    g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), select_window_grid);
+
     GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, 1, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(fps_grid, gtk_label_new("Frame rate: "), 0, 0, 1, 1);
     fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(10.0, 250.0, 1.0));
     gtk_spin_button_set_value(fps_entry, 60.0);
@@ -697,7 +793,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
 
     GtkGrid *audio_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(audio_grid), 0, 2, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(audio_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(audio_grid, gtk_label_new("Audio input: "), 0, 0, 1, 1);
     audio_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append_text(audio_input_menu, "None");
@@ -708,7 +804,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_set_active(GTK_COMBO_BOX(audio_input_menu), 0);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 3, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, grid_row++, 2, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
 
     stream_button = GTK_BUTTON(gtk_button_new_with_label("Stream"));
@@ -900,9 +996,8 @@ static bool hotkey_pressed = false;
 static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent *event, gpointer userdata) {
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     XEvent *ev = (XEvent*)xevent;
-    Display *display = gdk_x11_get_default_xdisplay();
 
-    if((ev->type == KeyPress || ev->type == KeyRelease) && XKeycodeToKeysym(display, ev->xkey.keycode, 0) == XK_F1 && (ev->xkey.state & Mod1Mask)) {
+    if((ev->type == KeyPress || ev->type == KeyRelease) && XLookupKeysym(&ev->xkey, 0) == XK_F1 && (ev->xkey.state & Mod1Mask)) {
         if(ev->type == KeyPress) {
             if(hotkey_pressed)
                 return GDK_FILTER_CONTINUE;
