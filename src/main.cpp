@@ -750,7 +750,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     record_area_selection_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
     if(is_nv_fbc_installed()) {
-        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
+        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (hevc)");
         for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
@@ -787,7 +787,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(fps_grid, gtk_label_new("Frame rate: "), 0, 0, 1, 1);
-    fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(10.0, 250.0, 1.0));
+    fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 250.0, 1.0));
     gtk_spin_button_set_value(fps_entry, 60.0);
     gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
     gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
@@ -858,7 +858,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     GtkGrid *replay_time_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, 3, 2, 1);
     gtk_grid_attach(replay_time_grid, gtk_label_new("Replay time: "), 0, 0, 1, 1);
-    replay_time_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(10.0, 1200.0, 1.0));
+    replay_time_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 1200.0, 1.0));
     gtk_spin_button_set_value(replay_time_entry, 30.0);
     gtk_widget_set_hexpand(GTK_WIDGET(replay_time_entry), true);
     gtk_grid_attach(replay_time_grid, GTK_WIDGET(replay_time_entry), 1, 0, 1, 1);
