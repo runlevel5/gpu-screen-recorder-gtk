@@ -574,9 +574,17 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     }
     std::string fps_str = std::to_string(fps);
 
+    std::string stream_url;
+    const gchar *stream_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
+    if(strcmp(stream_service, "twitch") == 0) {
+        stream_url = "rtmp://live.twitch.tv/app/";
+        stream_url += stream_id_str;
+    } else if(strcmp(stream_service, "youtube") == 0) {
+        stream_url = "rtmp://a.rtmp.youtube.com/live2/";
+        stream_url += stream_id_str;
+    }
+
     int pipe_write_end;
-    std::string stream_url = "rtmp://live.twitch.tv/app/";
-    stream_url += stream_id_str;
     ffmpeg_process = launch_ffmpeg_rtmp_process(stream_url.c_str(), &pipe_write_end);
     if(ffmpeg_process == -1) {
         show_notification(app, "GPU Screen Recorder", "Failed to start streaming (failed to launch ffmpeg rtmp process)", G_NOTIFICATION_PRIORITY_URGENT);
@@ -704,9 +712,9 @@ static void populate_audio_input_menu_with_pulseaudio_monitors() {
 }
 
 static void record_area_item_change_callback(GtkComboBox *widget, gpointer userdata) {
-    GtkGrid *select_window_grid = (GtkGrid*)userdata;
+    GtkWidget *select_window_buttom = (GtkWidget*)userdata;
     const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
-    gtk_widget_set_visible(GTK_WIDGET(select_window_grid), strcmp(selected_window_area, "window") == 0);
+    gtk_widget_set_visible(select_window_buttom, strcmp(selected_window_area, "window") == 0);
     enable_stream_record_button_if_info_filled();
 }
 
@@ -768,15 +776,12 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 2, 1);
 
-    GtkGrid *select_window_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_grid), 0, record_area_row++, 2, 1);
-    gtk_grid_attach(select_window_grid, gtk_label_new("Window: "), 0, 0, 1, 1);
     GtkButton *select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
     gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
     g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
-    gtk_grid_attach(select_window_grid, GTK_WIDGET(select_window_button), 1, 0, 1, 1);
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 2, 1);
 
-    g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), select_window_grid);
+    g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), select_window_button);
 
     GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, grid_row++, 2, 1);
@@ -932,8 +937,8 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(grid, GTK_WIDGET(stream_service_grid), 0, 2, 2, 1);
     gtk_grid_attach(stream_service_grid, gtk_label_new("Stream service: "), 0, 0, 1, 1);
     stream_service_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append_text(stream_service_input_menu, "Twitch");
-    //gtk_combo_box_text_append_text(stream_service_input_menu, "Custom");
+    gtk_combo_box_text_append(stream_service_input_menu, "twitch", "Twitch");
+    gtk_combo_box_text_append(stream_service_input_menu, "youtube", "Youtube");
     g_signal_connect(stream_service_input_menu, "changed", G_CALLBACK(stream_service_change_callback), nullptr);
     gtk_combo_box_set_active(GTK_COMBO_BOX(stream_service_input_menu), 0);
     gtk_widget_set_hexpand(GTK_WIDGET(stream_service_input_menu), true);
@@ -941,7 +946,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
 
     GtkGrid *stream_id_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(stream_id_grid), 0, 3, 2, 1);
-    gtk_grid_attach(stream_id_grid, gtk_label_new("Stream id: "), 0, 0, 1, 1);
+    gtk_grid_attach(stream_id_grid, gtk_label_new("Stream key: "), 0, 0, 1, 1);
     stream_id_entry = GTK_ENTRY(gtk_entry_new());
     gtk_widget_set_hexpand(GTK_WIDGET(stream_id_entry), true);
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_id_entry), 1, 0, 1, 1);
