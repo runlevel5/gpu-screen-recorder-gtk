@@ -1,7 +1,7 @@
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include <X11/Xlib.h>
-#include <X11/XKBlib.h>
+#include <X11/Xatom.h>
 #include <X11/cursorfont.h>
 #include <X11/extensions/Xrandr.h>
 #include <assert.h>
@@ -163,6 +163,61 @@ static void enable_stream_record_button_if_info_filled() {
     gtk_widget_set_sensitive(GTK_WIDGET(stream_button), true);
 }
 
+static bool window_has_atom(Display *display, Window window, Atom atom) {
+    Atom type;
+    unsigned long len, bytes_left;
+    int format;
+    unsigned char *properties = nullptr;
+    if(XGetWindowProperty(display, window, atom, 0, 1024, False, AnyPropertyType, &type, &format, &len, &bytes_left, &properties) < Success)
+        return false;
+
+    if(properties)
+        XFree(properties);
+
+    return type != None;
+}
+
+static Window window_get_target_window(Display *display, Window window) {
+    if(window == None)
+        return None;
+
+    Atom wm_state_atom = XInternAtom(display, "_NET_WM_STATE", False);
+    if(!wm_state_atom)
+        return None;
+
+    if(window_has_atom(display, window, wm_state_atom))
+        return window;
+
+    Window root;
+    Window parent;
+    Window *children = nullptr;
+    unsigned int num_children = 0;
+    if(!XQueryTree(display, window, &root, &parent, &children, &num_children) || !children)
+        return None;
+
+    Window found_window = None;
+    for(int i = num_children - 1; i >= 0; --i) {
+        if(children[i] && window_has_atom(display, children[i], wm_state_atom)) {
+            found_window = children[i];
+            goto finished;
+        }
+    }
+
+    for(int i = num_children - 1; i >= 0; --i) {
+        if(children[i]) {
+            Window win = window_get_target_window(display, children[i]);
+            if(win) {
+                found_window = win;
+                goto finished;
+            }
+        }
+    }
+
+    finished:
+    XFree(children);
+    return found_window;
+}
+
 /* TODO: Look at xwininfo source to figure out how to make this work for different types of window managers */
 static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpointer userdata) {
     SelectWindowUserdata *select_window_userdata = (SelectWindowUserdata*)userdata;
@@ -172,17 +227,23 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpoin
         return GDK_FILTER_CONTINUE;
 
     Window target_win = ev->xbutton.subwindow;
-
-    if(target_win == None) {
-        fprintf(stderr, "Selected the root window! (no window selected)\n");
-        return GDK_FILTER_CONTINUE;
-    }
+    Window new_window = window_get_target_window(select_window_userdata->display, target_win);
+    if(new_window)
+        target_win = new_window;
 
     int status = XUngrabPointer(select_window_userdata->display, CurrentTime);
     if(!status) {
         fprintf(stderr, "failed to ungrab pointer!\n");
         show_notification(select_window_userdata->app, "GPU Screen Recorder", "Failed to ungrab pointer!", G_NOTIFICATION_PRIORITY_URGENT);
         exit(1);
+    }
+
+    if(target_win == None) {
+        show_notification(select_window_userdata->app, "GPU Screen Recorder", "No window selected!", G_NOTIFICATION_PRIORITY_URGENT);
+        GdkScreen *screen = gdk_screen_get_default();
+        GdkWindow *root_window = gdk_screen_get_root_window(screen);
+        gdk_window_remove_filter(root_window, filter_callback, select_window_userdata);
+        return GDK_FILTER_REMOVE;
     }
 
     std::string window_name;
@@ -203,7 +264,7 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpoin
         window_name += "(no name)";
     }
 
-    fprintf(stderr, "window name: %s\n", window_name.c_str());
+    fprintf(stderr, "window name: %s, window id: %ld\n", window_name.c_str(), target_win);
     gtk_button_set_label(select_window_userdata->select_window_button, window_name.c_str());
     select_window_userdata->selected_window = target_win;
 
@@ -1042,6 +1103,7 @@ static void grabkeys(Display *display) {
     for(int i = 0; i < 4; ++i)
         XGrabKey(display, XKeysymToKeycode(display, XK_F1), Mod1Mask|modifiers[i], root_window, False, GrabModeAsync, GrabModeAsync);
     
+    XSync(display, False);
     XSetErrorHandler(prev_error_handler);
 }
 
@@ -1113,8 +1175,6 @@ static void activate(GtkApplication *app, gpointer userdata) {
     GdkWindow *root_window = gdk_get_default_root_window();
     //gdk_window_set_events(root_window, GDK_BUTTON_PRESS_MASK);
     gdk_window_add_filter(root_window, hotkey_filter_callback, &page_navigation_userdata);
-    Bool sup = False;
-    XkbSetDetectableAutoRepeat(display, True, &sup);
 
     g_timeout_add(1000, handle_child_process_death, app);
 
