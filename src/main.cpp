@@ -37,6 +37,8 @@ static PageNavigationUserdata page_navigation_userdata;
 static GtkWidget *save_icon;
 static Cursor crosshair_cursor;
 static GtkSpinButton *fps_entry;
+static GtkSpinButton *area_width_entry;
+static GtkSpinButton *area_height_entry;
 static GtkComboBoxText *record_area_selection_menu;
 static GtkComboBoxText *audio_input_menu;
 static GtkComboBoxText *quality_input_menu;
@@ -269,6 +271,12 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpoin
     gtk_button_set_label(select_window_userdata->select_window_button, window_name.c_str());
     select_window_userdata->selected_window = target_win;
 
+    XWindowAttributes attr;
+    if(XGetWindowAttributes(select_window_userdata->display, select_window_userdata->selected_window, &attr)) {
+        gtk_spin_button_set_value(area_width_entry, attr.width);
+        gtk_spin_button_set_value(area_height_entry, attr.height);
+    }
+
     GdkScreen *screen = gdk_screen_get_default();
     GdkWindow *root_window = gdk_screen_get_root_window(screen);
     gdk_window_remove_filter(root_window, filter_callback, select_window_userdata);
@@ -418,6 +426,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
     int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
+    int record_width = gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = gtk_spin_button_get_value_as_int(area_height_entry);
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, filename);
@@ -456,12 +466,15 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
         if(getppid() != parent_pid)
             _exit(3);
+
+        char area[64];
+        snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
         
         if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-a", audio_input_str, "-r", replay_time_str.c_str(), "-o", filename, NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-s", area, "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-a", audio_input_str, "-r", replay_time_str.c_str(), "-o", filename, NULL };
             execvp(args[0], (char* const*)args);
         } else {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", filename, NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-s", area, "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", filename, NULL };
             execvp(args[0], (char* const*)args);
         }
         perror("failed to launch gpu-screen-recorder");
@@ -503,6 +516,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     }
 
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
+    int record_width = gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = gtk_spin_button_get_value_as_int(area_height_entry);
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, filename);
@@ -540,12 +555,15 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
         if(getppid() != parent_pid)
             _exit(3);
+
+        char area[64];
+        snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
         
         if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-a", audio_input_str, "-o", filename, NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-s", area, "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-a", audio_input_str, "-o", filename, NULL };
             execvp(args[0], (char* const*)args);
         } else {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-o", filename, NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-s", area, "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-o", filename, NULL };
             execvp(args[0], (char* const*)args);
         }
         perror("failed to launch gpu-screen-recorder");
@@ -627,6 +645,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
     const char *stream_id_str = gtk_entry_get_text(stream_id_entry);
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
+    int record_width = gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = gtk_spin_button_get_value_as_int(area_height_entry);
 
     std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
     if(window_str == "window") {
@@ -679,12 +699,15 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
         // Redirect stdout to output_file
         dup2(pipe_write_end, STDOUT_FILENO);
+
+        char area[64];
+        snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
         
         if(audio_input_str && strcmp(audio_input_str, "None") != 0) {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-f", fps_str.c_str(), "-a", audio_input_str, NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-s", area, "-c", "flv", "-q", quality_input_str, "-f", fps_str.c_str(), "-a", audio_input_str, NULL };
             execvp(args[0], (char* const*)args);
         } else {
-            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-f", fps_str.c_str(), NULL };
+            const char *args[] = { "gpu-screen-recorder", "-w", window_str.c_str(), "-s", area, "-c", "flv", "-q", quality_input_str, "-f", fps_str.c_str(), NULL };
             execvp(args[0], (char* const*)args);
         }
         perror("failed to launch gpu-screen-recorder");
@@ -781,6 +804,25 @@ static void record_area_item_change_callback(GtkComboBox *widget, gpointer userd
     const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
     gtk_widget_set_visible(select_window_buttom, strcmp(selected_window_area, "window") == 0);
     enable_stream_record_button_if_info_filled();
+
+    if(strcmp(selected_window_area, "window") == 0) {
+        XWindowAttributes attr;
+        if(select_window_userdata.selected_window && XGetWindowAttributes(gdk_x11_get_default_xdisplay(), select_window_userdata.selected_window, &attr)) {
+            gtk_spin_button_set_value(area_width_entry, attr.width);
+            gtk_spin_button_set_value(area_height_entry, attr.height);
+        }
+    } else if(strcmp(selected_window_area, "screen") == 0) {
+        int screen = DefaultScreen(gdk_x11_get_default_xdisplay());
+        gtk_spin_button_set_value(area_width_entry, DisplayWidth(gdk_x11_get_default_xdisplay(), screen));
+        gtk_spin_button_set_value(area_height_entry, DisplayHeight(gdk_x11_get_default_xdisplay(), screen));
+    } else {
+        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [selected_window_area](const XRROutputInfo *output_info, const XRRCrtcInfo *crtc_info, const XRRModeInfo*) {
+            if(strncmp(selected_window_area, output_info->name, output_info->nameLen) == 0) {
+                gtk_spin_button_set_value(area_width_entry, crtc_info->width);
+                gtk_spin_button_set_value(area_height_entry, crtc_info->height);
+            }
+        });
+    }
 }
 
 static void audio_input_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -817,13 +859,13 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     record_area_selection_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
     if(is_nv_fbc_installed()) {
-        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (hevc)");
+        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (HEVC, NvFBC)");
         for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
             label += " (";
             label.append(mode_info->name, mode_info->nameLength);
-            label += ")";
+            label += ", NvFBC)";
 
             // Leak on purpose, what are you gonna do? stab me?
             char *id = (char*)malloc(output_info->nameLen + 1);
@@ -839,14 +881,33 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     }
     gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), 0);
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
-    gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 2, 1);
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 3, 1);
 
     GtkButton *select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
     gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
     g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
-    gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 2, 1);
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 3, 1);
 
     g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), select_window_button);
+
+    GtkLabel *area_size_label = GTK_LABEL(gtk_label_new("Area size: "));
+    gtk_label_set_xalign(area_size_label, 0.0f);
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_label), 0, record_area_row++, 2, 1);
+
+    GtkGrid *area_size_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
+
+    area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+    gtk_spin_button_set_value(area_width_entry, 1920.0);
+    gtk_widget_set_hexpand(GTK_WIDGET(area_width_entry), true);
+    gtk_grid_attach(area_size_grid, GTK_WIDGET(area_width_entry), 0, 0, 1, 1);
+
+    gtk_grid_attach(area_size_grid, gtk_label_new("x"), 1, 0, 1, 1);
+
+    area_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+    gtk_spin_button_set_value(area_height_entry, 1080.0);
+    gtk_widget_set_hexpand(GTK_WIDGET(area_height_entry), true);
+    gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 0, 1, 1);
 
     GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, grid_row++, 2, 1);
