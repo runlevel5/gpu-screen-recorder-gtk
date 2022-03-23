@@ -4,7 +4,9 @@ This screen recorder can be used for recording your desktop offline, for live st
 where only the last few seconds are saved.
 
 ## Note
-Might now work when using a compositor such as picom when using the glx backend.
+Might now work when using a compositor such as picom when using the glx backend. Using the xrender backend with picom fixes this issue.\
+Does not work when using gtk client side decorations (such as on Pop OS). Either disable those (if possible), install gtk-nocsd or record the whole monitor/screen if you have NvFBC.\
+NvFBC doesn't work with PRIME, so if you are using PRIME then you can't record the monitor/screen, you have to record a single window.
 
 ## Installation
 Run `./build.sh` or if you are running Arch Linux, then you can find gpu screen recorder gtk on aur under the name gpu-screen-recorder-gtk-git (`yay -S gpu-screen-recorder-gtk-git`).\
