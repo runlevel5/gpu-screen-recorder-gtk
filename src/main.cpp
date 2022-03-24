@@ -811,7 +811,7 @@ static void record_area_item_change_callback(GtkComboBox *widget, gpointer userd
             gtk_spin_button_set_value(area_width_entry, attr.width);
             gtk_spin_button_set_value(area_height_entry, attr.height);
         }
-    } else if(strcmp(selected_window_area, "screen") == 0) {
+    } else if(strcmp(selected_window_area, "screen") == 0 || strcmp(selected_window_area, "screen-direct") == 0) {
         int screen = DefaultScreen(gdk_x11_get_default_xdisplay());
         gtk_spin_button_set_value(area_width_entry, DisplayWidth(gdk_x11_get_default_xdisplay(), screen));
         gtk_spin_button_set_value(area_height_entry, DisplayHeight(gdk_x11_get_default_xdisplay(), screen));
@@ -860,6 +860,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
     if(is_nv_fbc_installed()) {
         gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (HEVC, NvFBC)");
+        gtk_combo_box_text_append(record_area_selection_menu, "screen-direct", "All monitors, direct mode (HEVC, NvFBC, VRR workaround)");
         for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
