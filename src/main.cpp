@@ -972,7 +972,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
-    GtkWidget *hotkey_label = gtk_label_new("Press Alt+F1 to save the replay");
+    GtkWidget *hotkey_label = gtk_label_new("Press Shift+Alt+F1 to start/stop the replay and Alt+F1 to save");
     gtk_grid_attach(grid, hotkey_label, 0, 0, 3, 1);
     gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 3, 1);
 
@@ -1155,6 +1155,8 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent *event
             keypress_toggle_recording(recording, start_recording_button, on_start_recording_button_click, page_navigation_userdata->app);
         } else if(visible_page == page_navigation_userdata->streaming_page) {
             keypress_toggle_recording(streaming, start_streaming_button, on_start_streaming_button_click, page_navigation_userdata->app);
+        } else if(visible_page == page_navigation_userdata->replay_page && (ev->xkey.state & ShiftMask)) {
+            keypress_toggle_recording(replaying, start_replay_button, on_start_replay_button_click, page_navigation_userdata->app);
         } else if(visible_page == page_navigation_userdata->replay_page && replaying && gpu_screen_recorder_process != -1) {
             on_replay_save_button_click(nullptr, page_navigation_userdata->app);
         }
@@ -1183,8 +1185,10 @@ static void grabkeys(Display *display) {
     
 	Window root_window = DefaultRootWindow(display);
     unsigned int modifiers[] = { 0, LockMask, numlockmask, numlockmask|LockMask };
-    for(int i = 0; i < 4; ++i)
+    for(int i = 0; i < 4; ++i) {
         XGrabKey(display, XKeysymToKeycode(display, XK_F1), Mod1Mask|modifiers[i], root_window, False, GrabModeAsync, GrabModeAsync);
+        XGrabKey(display, XKeysymToKeycode(display, XK_F1), Mod1Mask|ShiftMask|modifiers[i], root_window, False, GrabModeAsync, GrabModeAsync);
+    }
     
     XSync(display, False);
     XSetErrorHandler(prev_error_handler);
