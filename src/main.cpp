@@ -37,6 +37,8 @@ static PageNavigationUserdata page_navigation_userdata;
 static GtkWidget *save_icon;
 static Cursor crosshair_cursor;
 static GtkSpinButton *fps_entry;
+static GtkLabel *area_size_label;
+static GtkGrid *area_size_grid;
 static GtkSpinButton *area_width_entry;
 static GtkSpinButton *area_height_entry;
 static GtkComboBoxText *record_area_selection_menu;
@@ -395,6 +397,14 @@ static bool kill_gpu_screen_recorder_get_result() {
     return exit_success;
 }
 
+static Window get_window_with_input_focus(Display *display) {
+    Window window = None;
+    int rev;
+    if(!XGetInputFocus(display, &window, &rev))
+        window = None;
+    return window;
+}
+
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
     const gchar *dir = gtk_button_get_label(replay_file_chooser_button);
@@ -434,6 +444,17 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
             return true;
         }
         window_str = std::to_string(select_window_userdata.selected_window);
+    } else if(window_str == "focused") {
+        XWindowAttributes attr;
+        Window focused_window = get_window_with_input_focus(gdk_x11_get_default_xdisplay());
+        if(!focused_window || !XGetWindowAttributes(gdk_x11_get_default_xdisplay(), focused_window, &attr)) {
+            show_notification(app, "GPU Screen Recorder", "No window is focused!", G_NOTIFICATION_PRIORITY_URGENT);
+            return true;
+        }
+
+        window_str = std::to_string(focused_window);
+        record_width = attr.width;
+        record_height = attr.height;
     }
     std::string fps_str = std::to_string(fps);
     std::string replay_time_str = std::to_string(replay_time);
@@ -532,6 +553,17 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
             return true;
         }
         window_str = std::to_string(select_window_userdata.selected_window);
+    } else if(window_str == "focused") {
+        XWindowAttributes attr;
+        Window focused_window = get_window_with_input_focus(gdk_x11_get_default_xdisplay());
+        if(!focused_window || !XGetWindowAttributes(gdk_x11_get_default_xdisplay(), focused_window, &attr)) {
+            show_notification(app, "GPU Screen Recorder", "No window is focused!", G_NOTIFICATION_PRIORITY_URGENT);
+            return true;
+        }
+
+        window_str = std::to_string(focused_window);
+        record_width = attr.width;
+        record_height = attr.height;
     }
     std::string fps_str = std::to_string(fps);
 
@@ -652,6 +684,17 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
             return true;
         }
         window_str = std::to_string(select_window_userdata.selected_window);
+    } else if(window_str == "focused") {
+        XWindowAttributes attr;
+        Window focused_window = get_window_with_input_focus(gdk_x11_get_default_xdisplay());
+        if(!focused_window || !XGetWindowAttributes(gdk_x11_get_default_xdisplay(), focused_window, &attr)) {
+            show_notification(app, "GPU Screen Recorder", "No window is focused!", G_NOTIFICATION_PRIORITY_URGENT);
+            return true;
+        }
+
+        window_str = std::to_string(focused_window);
+        record_width = attr.width;
+        record_height = attr.height;
     }
     std::string fps_str = std::to_string(fps);
 
@@ -800,6 +843,8 @@ static void record_area_item_change_callback(GtkComboBox *widget, gpointer userd
     GtkWidget *select_window_buttom = (GtkWidget*)userdata;
     const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
     gtk_widget_set_visible(select_window_buttom, strcmp(selected_window_area, "window") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(selected_window_area, "focused") != 0);
+    gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(selected_window_area, "focused") != 0);
     enable_stream_record_button_if_info_filled();
 
     if(strcmp(selected_window_area, "window") == 0) {
@@ -808,6 +853,8 @@ static void record_area_item_change_callback(GtkComboBox *widget, gpointer userd
             gtk_spin_button_set_value(area_width_entry, attr.width);
             gtk_spin_button_set_value(area_height_entry, attr.height);
         }
+    } else if(strcmp(selected_window_area, "focused") == 0) {
+        //
     } else if(strcmp(selected_window_area, "screen") == 0 || strcmp(selected_window_area, "screen-direct") == 0) {
         int screen = DefaultScreen(gdk_x11_get_default_xdisplay());
         gtk_spin_button_set_value(area_width_entry, DisplayWidth(gdk_x11_get_default_xdisplay(), screen));
@@ -855,6 +902,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 
     record_area_selection_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
+    gtk_combo_box_text_append(record_area_selection_menu, "focused", "Focused window");
     if(is_nv_fbc_installed()) {
         gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (HEVC, NvFBC)");
         gtk_combo_box_text_append(record_area_selection_menu, "screen-direct", "All monitors, direct mode (HEVC, NvFBC, VRR workaround)");
@@ -888,11 +936,11 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 
     g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), select_window_button);
 
-    GtkLabel *area_size_label = GTK_LABEL(gtk_label_new("Area size: "));
+    area_size_label = GTK_LABEL(gtk_label_new("Area size: "));
     gtk_label_set_xalign(area_size_label, 0.0f);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_label), 0, record_area_row++, 2, 1);
 
-    GtkGrid *area_size_grid = GTK_GRID(gtk_grid_new());
+    area_size_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
 
     area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
