@@ -978,9 +978,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(grid, GTK_WIDGET(quality_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(quality_grid, gtk_label_new("Quality: "), 0, 0, 1, 1);
     quality_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(quality_input_menu, "medium", "Medium");
-    gtk_combo_box_text_append(quality_input_menu, "high", "High");
-    gtk_combo_box_text_append(quality_input_menu, "ultra", "Ultra");
+    gtk_combo_box_text_append(quality_input_menu, "medium", "High");
+    gtk_combo_box_text_append(quality_input_menu, "high", "Ultra");
+    gtk_combo_box_text_append(quality_input_menu, "ultra", "Placebo");
     gtk_widget_set_hexpand(GTK_WIDGET(quality_input_menu), true);
     gtk_grid_attach(quality_grid, GTK_WIDGET(quality_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(quality_input_menu), 0);
