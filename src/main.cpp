@@ -183,7 +183,7 @@ static bool window_has_atom(Display *display, Window window, Atom atom) {
     return type != None;
 }
 
-static Window window_get_target_window(Display *display, Window window) {
+static Window window_get_target_window_child(Display *display, Window window) {
     if(window == None)
         return None;
 
@@ -211,7 +211,7 @@ static Window window_get_target_window(Display *display, Window window) {
 
     for(int i = num_children - 1; i >= 0; --i) {
         if(children[i]) {
-            Window win = window_get_target_window(display, children[i]);
+            Window win = window_get_target_window_child(display, children[i]);
             if(win) {
                 found_window = win;
                 goto finished;
@@ -224,6 +224,33 @@ static Window window_get_target_window(Display *display, Window window) {
     return found_window;
 }
 
+static Window window_get_target_window_parent(Display *display, Window window) {
+    if(window == None || window == XDefaultRootWindow(display))
+        return None;
+
+    Atom wm_state_atom = XInternAtom(display, "WM_STATE", False);
+    if(!wm_state_atom)
+        return None;
+
+    if(window_has_atom(display, window, wm_state_atom))
+        return window;
+
+    Window root;
+    Window parent = None;
+    Window *children = nullptr;
+    unsigned int num_children = 0;
+    if(!XQueryTree(display, window, &root, &parent, &children, &num_children))
+        return None;
+
+    if(children)
+        XFree(children);
+
+    if(!parent)
+        return None;
+
+    return window_get_target_window_parent(display, parent);
+}
+
 /* TODO: Look at xwininfo source to figure out how to make this work for different types of window managers */
 static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpointer userdata) {
     SelectWindowUserdata *select_window_userdata = (SelectWindowUserdata*)userdata;
@@ -233,7 +260,7 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpoin
         return GDK_FILTER_CONTINUE;
 
     Window target_win = ev->xbutton.subwindow;
-    Window new_window = window_get_target_window(select_window_userdata->display, target_win);
+    Window new_window = window_get_target_window_child(select_window_userdata->display, target_win);
     if(new_window)
         target_win = new_window;
 
@@ -402,7 +429,7 @@ static Window get_window_with_input_focus(Display *display) {
     int rev;
     if(!XGetInputFocus(display, &window, &rev))
         window = None;
-    return window;
+    return window_get_target_window_parent(display, window);
 }
 
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
