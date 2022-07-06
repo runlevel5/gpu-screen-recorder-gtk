@@ -2,5 +2,5 @@
 
 dependencies="gtk+-3.0 x11 xrandr libpulse"
 includes="$(pkg-config --cflags $dependencies)"
-libs="$(pkg-config --libs $dependencies)"
+libs="$(pkg-config --libs $dependencies) -ldl"
 g++ -o gpu-screen-recorder-gtk -O2 src/main.cpp -s $includes $libs
