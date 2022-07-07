@@ -1267,7 +1267,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
     select_window_userdata.app = app;
 
     crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);
-    save_icon = gtk_image_new_from_stock("gtk-save", GTK_ICON_SIZE_BUTTON);
+    save_icon = gtk_image_new_from_icon_name("gtk-save", GTK_ICON_SIZE_BUTTON);
 
     GtkStack *stack = GTK_STACK(gtk_stack_new());
     gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(stack));
