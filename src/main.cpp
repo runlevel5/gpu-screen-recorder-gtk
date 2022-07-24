@@ -1,3 +1,4 @@
+#include "config.hpp"
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include <X11/Xlib.h>
@@ -13,8 +14,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
-#include <pwd.h>
-#include <libgen.h>
 #include <functional>
 #include <vector>
 
@@ -65,16 +64,15 @@ static bool replaying = false;
 static bool recording = false;
 static bool streaming = false;
 static pid_t gpu_screen_recorder_process = -1;
+static Config config;
 
-static const char* get_home_dir() {
-    const char *home_dir = getenv("HOME");
-    if(!home_dir) {
-        passwd *pw = getpwuid(getuid());
-        home_dir = pw->pw_dir;
-    }
-    if(!home_dir)
-        home_dir = "/tmp";
-    return home_dir;
+static bool is_directory(const char *filepath) {
+    struct stat file_stat;
+    memset(&file_stat, 0, sizeof(file_stat));
+    int ret = stat(filepath, &file_stat);
+    if(ret == 0)
+        return S_ISDIR(file_stat.st_mode);
+    return false;
 }
 
 static std::string get_date_str() {
@@ -83,38 +81,6 @@ static std::string get_date_str() {
     struct tm *t = localtime(&now);
     strftime(str, sizeof(str)-1, "%Y-%m-%d_%H-%M-%S", t);
     return str;
-}
-
-static int create_directory_recursive(char *path) {
-    int path_len = strlen(path);
-    char *p = path;
-    char *end = path + path_len;
-    for(;;) {
-        char *slash_p = strchr(p, '/');
-
-        // Skips first '/', we don't want to try and create the root directory
-        if(slash_p == path) {
-            ++p;
-            continue;
-        }
-
-        if(!slash_p)
-            slash_p = end;
-
-        char prev_char = *slash_p;
-        *slash_p = '\0';
-        int err = mkdir(path, S_IRWXU);
-        *slash_p = prev_char;
-
-        if(err == -1 && errno != EEXIST)
-            return err;
-
-        if(slash_p == end)
-            break;
-        else
-            p = slash_p + 1;
-    }
-    return 0;
 }
 
 static const XRRModeInfo* get_mode_info(const XRRScreenResources *sr, RRMode id) {
@@ -358,8 +324,8 @@ static gboolean on_start_recording_click(GtkButton *button, gpointer userdata) {
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
 
-    std::string video_filepath = get_home_dir();
-    video_filepath += "/Videos/Video_" + get_date_str() + ".mp4";
+    std::string video_filepath = config.record_config.save_directory;
+    video_filepath += "/Video_" + get_date_str() + ".mp4";
     gtk_button_set_label(file_chooser_button, video_filepath.c_str());
     return true;
 }
@@ -788,14 +754,21 @@ static void pa_state_cb(pa_context *c, void *userdata) {
     }
 }
 
+struct AudioInput {
+    std::string name;
+    std::string description;
+};
+
 static void pa_sourcelist_cb(pa_context *ctx, const pa_source_info *source_info, int eol, void *userdata) {
     if(eol > 0)
         return;
 
-    gtk_combo_box_text_append(audio_input_menu, source_info->name, source_info->description);
+    std::vector<AudioInput> *inputs = (std::vector<AudioInput>*)userdata;
+    inputs->push_back({ source_info->name, source_info->description });
 }
 
-static void populate_audio_input_menu_with_pulseaudio_monitors() {
+static std::vector<AudioInput> get_pulseaudio_inputs() {
+    std::vector<AudioInput> inputs;
     pa_mainloop *main_loop = pa_mainloop_new();
 
     pa_context *ctx = pa_context_new(pa_mainloop_get_api(main_loop), "gpu-screen-recorder-gtk");
@@ -815,7 +788,7 @@ static void populate_audio_input_menu_with_pulseaudio_monitors() {
 
         switch(state) {
             case 0: {
-                pa_op = pa_context_get_source_info_list(ctx, pa_sourcelist_cb, nullptr);
+                pa_op = pa_context_get_source_info_list(ctx, pa_sourcelist_cb, &inputs);
                 ++state;
                 break;
             }
@@ -828,7 +801,7 @@ static void populate_audio_input_menu_with_pulseaudio_monitors() {
             pa_context_disconnect(ctx);
             pa_context_unref(ctx);
             pa_mainloop_free(main_loop);
-            return;
+            return inputs;
         }
 
         pa_mainloop_iterate(main_loop, 1, NULL);
@@ -970,7 +943,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(audio_grid, gtk_label_new("Audio input: "), 0, 0, 1, 1);
     audio_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(audio_input_menu, "None", "None");
-    populate_audio_input_menu_with_pulseaudio_monitors();
+    for(const AudioInput &audio_input : get_pulseaudio_inputs()) {
+        gtk_combo_box_text_append(audio_input_menu, audio_input.name.c_str(), audio_input.description.c_str());
+    }
     g_signal_connect(audio_input_menu, "changed", G_CALLBACK(audio_input_change_callback), nullptr);
     gtk_widget_set_hexpand(GTK_WIDGET(audio_input_menu), true);
     gtk_grid_attach(audio_grid, GTK_WIDGET(audio_input_menu), 1, 0, 1, 1);
@@ -1168,6 +1143,28 @@ static gboolean on_destroy_window(GtkWidget *widget, GdkEvent *event, gpointer d
             /* Ignore... */
         }
     }
+
+    const gchar *record_filename = gtk_button_get_label(file_chooser_button);
+
+    char dir_tmp[PATH_MAX];
+    strcpy(dir_tmp, record_filename);
+    char *record_dir = dirname(dir_tmp);
+
+    config.main_config.record_area_option = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    config.main_config.fps = gtk_spin_button_get_value_as_int(fps_entry);
+    config.main_config.audio_input = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_input_menu));
+    config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
+
+    config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
+    config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
+
+    config.record_config.save_directory = record_dir;
+
+    config.replay_config.save_directory = gtk_button_get_label(replay_file_chooser_button);
+    config.replay_config.replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
+
+    save_config(config);
+
     return true;
 }
 
@@ -1258,7 +1255,80 @@ static gboolean handle_child_process_death(gpointer userdata) {
     return G_SOURCE_CONTINUE;
 }
 
-static void activate(GtkApplication *app, gpointer userdata) { 
+static void load_config() {
+    config = read_config();
+
+    if(strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
+        //
+    } else if(strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
+        //
+    } else if(strcmp(config.main_config.record_area_option.c_str(), "screen") == 0 || strcmp(config.main_config.record_area_option.c_str(), "screen-direct") == 0) {
+        //
+    } else {
+        bool found_monitor = false;
+        int monitor_name_size = strlen(config.main_config.record_area_option.c_str());
+        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&](const XRROutputInfo *output_info, const XRRCrtcInfo *crtc_info, const XRRModeInfo*) {
+            if(monitor_name_size == output_info->nameLen && strncmp(config.main_config.record_area_option.c_str(), output_info->name, output_info->nameLen) == 0) {
+                found_monitor = true;
+            }
+        });
+
+        if(!found_monitor)
+            config.main_config.record_area_option = "window";
+    }
+
+    if(config.main_config.fps < 1)
+        config.main_config.fps = 1;
+    else if(config.main_config.fps > 5000)
+        config.main_config.fps = 5000;
+
+    if(config.main_config.audio_input != "None") {
+        bool found_audio_input = false;
+        for(const AudioInput &audio_input : get_pulseaudio_inputs()) {
+            if(config.main_config.audio_input == audio_input.name) {
+                found_audio_input = true;
+                break;
+            }
+        }
+
+        if(!found_audio_input)
+            config.main_config.audio_input = "None";
+    }
+
+    if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "ultra")
+        config.main_config.quality = "medium";
+
+    if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube")
+        config.streaming_config.streaming_service = "twitch";
+
+    if(config.record_config.save_directory.empty() || !is_directory(config.record_config.save_directory.c_str()))
+        config.record_config.save_directory = get_home_dir() + "/Videos";
+
+    if(config.replay_config.save_directory.empty() || !is_directory(config.replay_config.save_directory.c_str()))
+        config.replay_config.save_directory = get_home_dir() + "/Videos";
+
+    if(config.replay_config.replay_time < 5)
+        config.replay_config.replay_time = 5;
+    else if(config.replay_config.replay_time> 1200)
+        config.replay_config.replay_time = 1200;
+
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(record_area_selection_menu), config.main_config.record_area_option.c_str());
+    gtk_spin_button_set_value(fps_entry, config.main_config.fps);
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_input_menu), config.main_config.audio_input.c_str());
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(quality_input_menu), config.main_config.quality.c_str());
+
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
+    gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
+
+    std::string video_filepath = config.record_config.save_directory;
+    video_filepath += "/Video_" + get_date_str() + ".mp4";
+    gtk_button_set_label(file_chooser_button, video_filepath.c_str());
+
+    gtk_button_set_label(replay_file_chooser_button, config.replay_config.save_directory.c_str());
+    gtk_spin_button_set_value(replay_time_entry, config.replay_config.replay_time);
+}
+
+static void activate(GtkApplication *app, gpointer userdata) {
     GtkWidget *window = gtk_application_window_new(app);
     g_signal_connect(window, "destroy", G_CALLBACK(on_destroy_window), nullptr);
     gtk_window_set_title(GTK_WINDOW(window), "GPU Screen Recorder");
@@ -1304,6 +1374,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
 
     g_timeout_add(1000, handle_child_process_death, app);
 
+    load_config();
     gtk_widget_show_all(window);
 }
 
