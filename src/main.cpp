@@ -60,6 +60,7 @@ static GtkButton *start_replay_button;
 static GtkButton *start_streaming_button;
 static GtkEntry *stream_id_entry;
 static GtkSpinButton *replay_time_entry;
+static GtkButton *select_window_button;
 static bool replaying = false;
 static bool recording = false;
 static bool streaming = false;
@@ -81,6 +82,29 @@ static std::string get_date_str() {
     struct tm *t = localtime(&now);
     strftime(str, sizeof(str)-1, "%Y-%m-%d_%H-%M-%S", t);
     return str;
+}
+
+static void save_configs() {
+    const gchar *record_filename = gtk_button_get_label(file_chooser_button);
+
+    char dir_tmp[PATH_MAX];
+    strcpy(dir_tmp, record_filename);
+    char *record_dir = dirname(dir_tmp);
+
+    config.main_config.record_area_option = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    config.main_config.fps = gtk_spin_button_get_value_as_int(fps_entry);
+    config.main_config.audio_input = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_input_menu));
+    config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
+
+    config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
+    config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
+
+    config.record_config.save_directory = record_dir;
+
+    config.replay_config.save_directory = gtk_button_get_label(replay_file_chooser_button);
+    config.replay_config.replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
+
+    save_config(config);
 }
 
 static const XRRModeInfo* get_mode_info(const XRRScreenResources *sr, RRMode id) {
@@ -421,6 +445,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         return true;
     }
 
+    save_configs();
+
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
     int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
     int record_width = gtk_spin_button_get_value_as_int(area_width_entry);
@@ -539,6 +565,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         return true;
     }
 
+    save_configs();
+
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
     int record_width = gtk_spin_button_get_value_as_int(area_width_entry);
     int record_height = gtk_spin_button_get_value_as_int(area_height_entry);
@@ -641,6 +669,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
         return true;
     }
+
+    save_configs();
 
     const char *stream_id_str = gtk_entry_get_text(stream_id_entry);
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
@@ -904,7 +934,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 3, 1);
 
-    GtkButton *select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
+    select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
     gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
     g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 3, 1);
@@ -1143,28 +1173,7 @@ static gboolean on_destroy_window(GtkWidget *widget, GdkEvent *event, gpointer d
             /* Ignore... */
         }
     }
-
-    const gchar *record_filename = gtk_button_get_label(file_chooser_button);
-
-    char dir_tmp[PATH_MAX];
-    strcpy(dir_tmp, record_filename);
-    char *record_dir = dirname(dir_tmp);
-
-    config.main_config.record_area_option = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
-    config.main_config.fps = gtk_spin_button_get_value_as_int(fps_entry);
-    config.main_config.audio_input = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_input_menu));
-    config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
-
-    config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
-    config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
-
-    config.record_config.save_directory = record_dir;
-
-    config.replay_config.save_directory = gtk_button_get_label(replay_file_chooser_button);
-    config.replay_config.replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
-
-    save_config(config);
-
+    save_configs();
     return true;
 }
 
@@ -1277,6 +1286,10 @@ static void load_config() {
             config.main_config.record_area_option = "window";
     }
 
+    gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
+
     if(config.main_config.fps < 1)
         config.main_config.fps = 1;
     else if(config.main_config.fps > 5000)
@@ -1374,8 +1387,8 @@ static void activate(GtkApplication *app, gpointer userdata) {
 
     g_timeout_add(1000, handle_child_process_death, app);
 
-    load_config();
     gtk_widget_show_all(window);
+    load_config();
 }
 
 int main(int argc, char **argv) {
