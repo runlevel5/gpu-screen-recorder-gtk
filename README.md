@@ -7,7 +7,6 @@ where only the last few seconds are saved.
 Might now work when using a compositor such as picom when using the glx backend. Using the xrender backend with picom fixes this issue.\
 Does not work when using gtk client side decorations (such as on Pop OS). Either disable those (if possible), install gtk-nocsd or record the whole monitor/screen if you have NvFBC.\
 NvFBC doesn't work with PRIME, so if you are using PRIME then you can't record the monitor/screen, you have to record a single window.\
-Videos are recorded with variable frame rate and as a result, the video can't be played with vlc or edited with kdenlive (and video editors that use the same libraries). This is a bug in vlc/kdenlive. The video works fine with mpv and youtube. This will be fixed in the future.
 
 ## Installation
 Run `./build.sh` or if you are running Arch Linux, then you can find gpu screen recorder gtk on aur under the name gpu-screen-recorder-gtk-git (`yay -S gpu-screen-recorder-gtk-git`).\
