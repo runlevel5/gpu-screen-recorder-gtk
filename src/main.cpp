@@ -1204,6 +1204,10 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_list_box_set_selection_mode (GTK_LIST_BOX (audio_input_used_list), GTK_SELECTION_NONE);
     gtk_grid_attach(audio_grid, audio_input_used_list, 0, audio_input_area_row++, 2, 1);
 
+    GtkWidget *selected_audio_inputs_label = gtk_label_new("Selected audio inputs:");
+    gtk_widget_set_halign(selected_audio_inputs_label, GTK_ALIGN_START);
+    gtk_grid_attach(add_audio_grid, selected_audio_inputs_label, 0, ++audio_input_area_row, 2, 1);
+
     GtkGrid *quality_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(quality_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
