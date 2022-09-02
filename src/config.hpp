@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include <string>
 #include <string.h>
 #include <functional>
@@ -13,7 +14,7 @@
 struct MainConfig {
     std::string record_area_option;
     int fps = 60;
-    std::string audio_input;
+    std::vector<std::string> audio_input;
     std::string quality;
 };
 
@@ -196,7 +197,7 @@ static Config read_config() {
                 config.main_config.fps = 60;
             }
         } else if(key == "main.audio_input") {
-            config.main_config.audio_input.assign(value.str, value.size);
+            config.main_config.audio_input.emplace_back(value.str, value.size);
         } else if(key == "main.quality") {
             config.main_config.quality.assign(value.str, value.size);
         } else if(key == "streaming.service") {
@@ -243,7 +244,9 @@ static void save_config(const Config &config) {
 
     fprintf(file, "main.record_area_option %s\n", config.main_config.record_area_option.c_str());
     fprintf(file, "main.fps %d\n", config.main_config.fps);
-    fprintf(file, "main.audio_input %s\n", config.main_config.audio_input.c_str());
+    for(const std::string &audio_input : config.main_config.audio_input) {
+        fprintf(file, "main.audio_input %s\n", audio_input.c_str());
+    }
     fprintf(file, "main.quality %s\n", config.main_config.quality.c_str());
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());

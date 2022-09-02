@@ -1,3 +1,2 @@
 Capture stderr (ignore fps: 250) and show that in notification on error.
 Make sure the resolution is allowed for streaming.
-Allow specifying multiple audio inputs.
