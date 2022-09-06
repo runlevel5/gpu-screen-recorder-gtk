@@ -70,6 +70,23 @@ static pid_t gpu_screen_recorder_process = -1;
 static Config config;
 static int num_audio_inputs_addable = 0;
 
+struct AudioRow {
+    GtkWidget *row;
+    GtkWidget *track_number_label;
+    GtkWidget *label;
+    std::string id;
+};
+
+static void used_audio_input_loop_callback(GtkWidget *row, gpointer userdata) {
+    const AudioRow *audio_row = (AudioRow*)g_object_get_data(G_OBJECT(row), "audio-row");
+    std::function<void(const AudioRow*)> &callback = *(std::function<void(const AudioRow*)>*)userdata;
+    callback(audio_row);
+}
+
+static void for_each_used_audio_input(GtkListBox *list_box, std::function<void(const AudioRow*)> callback) {
+    gtk_container_foreach(GTK_CONTAINER(list_box), used_audio_input_loop_callback, &callback);
+}
+
 static GtkTargetEntry entries[] = {
     { "GTK_LIST_BOX_ROW", GTK_TARGET_SAME_APP, 0 }
 };
@@ -106,6 +123,17 @@ static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelecti
                           sizeof(gpointer));
 }
 
+static void update_used_audio_input_track_ids() {
+    int track_number = 1;
+    for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&](const AudioRow *audio_row) {
+        char track_number_str[32];
+        snprintf(track_number_str, sizeof(track_number_str), "%d:", track_number);
+        GtkWidget *track_number_label = ((AudioRow*)g_object_get_data(G_OBJECT(audio_row->row), "audio-row"))->track_number_label;
+        gtk_label_set_text(GTK_LABEL(track_number_label), track_number_str);
+        ++track_number;
+    });
+}
+
 static void drag_data_received (GtkWidget *widget, GdkDragContext *context,
     gint x, gint y,
     GtkSelectionData *selection_data,
@@ -125,22 +153,8 @@ static void drag_data_received (GtkWidget *widget, GdkDragContext *context,
     gtk_container_remove(GTK_CONTAINER(list_box), source);
     gtk_list_box_insert(GTK_LIST_BOX(list_box), source, pos);
     g_object_unref(source);
-}
 
-struct AudioRow {
-    GtkWidget *row;
-    GtkWidget *label;
-    std::string id;
-};
-
-static void used_audio_input_loop_callback(GtkWidget *row, gpointer userdata) {
-    const AudioRow *audio_row = (AudioRow*)g_object_get_data(G_OBJECT(row), "audio-row");
-    std::function<void(const AudioRow*)> &callback = *(std::function<void(const AudioRow*)>*)userdata;
-    callback(audio_row);
-}
-
-static void for_each_used_audio_input(GtkListBox *list_box, std::function<void(const AudioRow*)> callback) {
-    gtk_container_foreach(GTK_CONTAINER(list_box), used_audio_input_loop_callback, &callback);
+    update_used_audio_input_track_ids();
 }
 
 static void enable_stream_record_button_if_info_filled() {
@@ -197,6 +211,7 @@ static GtkWidget* create_used_audio_input_row(const char *id, const char *text) 
 
     AudioRow *audio_row = new AudioRow();
     audio_row->row = row;
+    audio_row->track_number_label = track_number_label;
     audio_row->label = label;
     audio_row->id = id;
     g_object_set_data(G_OBJECT(row), "audio-row", audio_row);
@@ -212,6 +227,7 @@ static GtkWidget* create_used_audio_input_row(const char *id, const char *text) 
             gtk_widget_set_sensitive(add_audio_input_button, true);
         }
 
+        update_used_audio_input_track_ids();
         enable_stream_record_button_if_info_filled();
         delete audio_row;
         return true;
@@ -1092,8 +1108,8 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
     gtk_combo_box_text_append(record_area_selection_menu, "focused", "Focused window");
     if(is_nv_fbc_installed()) {
-        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (HEVC, NvFBC)");
-        gtk_combo_box_text_append(record_area_selection_menu, "screen-direct", "All monitors, direct mode (HEVC, NvFBC, VRR workaround)");
+        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (NvFBC)");
+        gtk_combo_box_text_append(record_area_selection_menu, "screen-direct", "All monitors, direct mode (NvFBC, VRR workaround)");
         for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
