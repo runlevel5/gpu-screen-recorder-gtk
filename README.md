@@ -9,6 +9,7 @@ Does not work when using gtk client side decorations (such as on Pop OS). Either
 NvFBC doesn't work with PRIME, so if you are using PRIME then you can't record the monitor/screen, you have to record a single window.\
 
 ## Installation
+This program depends on [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
 Run `./build.sh` or if you are running Arch Linux, then you can find gpu screen recorder gtk on aur under the name gpu-screen-recorder-gtk-git (`yay -S gpu-screen-recorder-gtk-git`).\
 Dependencies needed when building using `build.sh`: `gtk3 libx11 libxrandr libpulse`.\
 If you use a distro that isn't user friendly, such as fedora, then you can install gpu-screen-recorder-gtk with flatpak here: [gpu-screen-recorder-flatpak](https://git.dec05eba.com/gpu-screen-recorder-flatpak/about/) (Note: this install method is slow).\
