@@ -46,6 +46,7 @@ static GtkComboBoxText *record_area_selection_menu;
 static GtkComboBoxText *audio_input_menu_todo;
 static GtkComboBoxText *quality_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
+static GtkLabel *stream_key_label;
 static GtkButton *file_chooser_button;
 static GtkButton *replay_file_chooser_button;
 static GtkButton *stream_button;
@@ -421,7 +422,7 @@ static Window window_get_target_window_child(Display *display, Window window) {
 }
 
 static Window window_get_target_window_parent(Display *display, Window window) {
-    if(window == None || window == XDefaultRootWindow(display))
+    if(window == None || window == DefaultRootWindow(display))
         return None;
 
     Atom wm_state_atom = XInternAtom(display, "WM_STATE", False);
@@ -620,12 +621,33 @@ static bool kill_gpu_screen_recorder_get_result() {
     return exit_success;
 }
 
+static Window get_input_focus(Display *display) {
+    Window focused_window = None;
+
+    Atom net_active_window_atom = XInternAtom(display, "_NET_ACTIVE_WINDOW", False);
+    Atom type;
+    unsigned long len, bytes_left;
+    int format;
+    unsigned char *properties = NULL;
+    if(XGetWindowProperty(display, DefaultRootWindow(display), net_active_window_atom, 0, 1024, False, XA_WINDOW, &type, &format, &len, &bytes_left, &properties) == Success) {
+        if(properties) {
+            if(len > 0)
+                focused_window = *(Window*)properties;
+            XFree(properties);
+        }
+    }
+
+    if(!focused_window) {
+        int rev;
+        if(!XGetInputFocus(display, &focused_window, &rev))
+            focused_window = None;
+    }
+
+    return focused_window;
+}
+
 static Window get_window_with_input_focus(Display *display) {
-    Window window = None;
-    int rev;
-    if(!XGetInputFocus(display, &window, &rev))
-        window = None;
-    return window_get_target_window_parent(display, window);
+    return window_get_target_window_parent(display, get_input_focus(display));
 }
 
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
@@ -911,6 +933,10 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     } else if(strcmp(stream_service, "youtube") == 0) {
         stream_url = "rtmp://a.rtmp.youtube.com/live2/";
         stream_url += stream_id_str;
+    } else if(strcmp(stream_service, "custom") == 0) {
+        stream_url = stream_id_str;
+        if(stream_url.size() < 7 || strncmp(stream_url.c_str(), "rtmp://", 7) != 0)
+            stream_url = "rtmp://" + stream_url;
     }
 
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
@@ -1043,9 +1069,9 @@ static std::vector<AudioInput> get_pulseaudio_inputs() {
 }
 
 static void record_area_item_change_callback(GtkComboBox *widget, gpointer userdata) {
-    GtkWidget *select_window_buttom = (GtkWidget*)userdata;
-    const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
-    gtk_widget_set_visible(select_window_buttom, strcmp(selected_window_area, "window") == 0);
+    GtkWidget *select_window_button = (GtkWidget*)userdata;
+    const gchar *selected_window_area = gtk_combo_box_get_active_id(widget);
+    gtk_widget_set_visible(select_window_button, strcmp(selected_window_area, "window") == 0);
     gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(selected_window_area, "window") == 0);
     gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(selected_window_area, "window") == 0);
     enable_stream_record_button_if_info_filled();
@@ -1071,6 +1097,12 @@ static void record_area_item_change_callback(GtkComboBox *widget, gpointer userd
             }
         });
     }
+}
+
+static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
+    (void)userdata;
+    const gchar *selected_stream_service = gtk_combo_box_get_active_id(widget);
+    gtk_label_set_text(stream_key_label, strcmp(selected_stream_service, "custom") == 0 ? "Url: " : "Stream key: ");
 }
 
 static bool is_nv_fbc_installed() {
@@ -1385,13 +1417,16 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     stream_service_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(stream_service_input_menu, "twitch", "Twitch");
     gtk_combo_box_text_append(stream_service_input_menu, "youtube", "Youtube");
+    gtk_combo_box_text_append(stream_service_input_menu, "custom", "Custom");
     gtk_combo_box_set_active(GTK_COMBO_BOX(stream_service_input_menu), 0);
     gtk_widget_set_hexpand(GTK_WIDGET(stream_service_input_menu), true);
+    g_signal_connect(stream_service_input_menu, "changed", G_CALLBACK(stream_service_item_change_callback), NULL);
     gtk_grid_attach(stream_service_grid, GTK_WIDGET(stream_service_input_menu), 1, 0, 1, 1);
 
     GtkGrid *stream_id_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(stream_id_grid), 0, 3, 2, 1);
-    gtk_grid_attach(stream_id_grid, gtk_label_new("Stream key: "), 0, 0, 1, 1);
+    stream_key_label = GTK_LABEL(gtk_label_new("Stream key: "));
+    gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_key_label), 0, 0, 1, 1);
     stream_id_entry = GTK_ENTRY(gtk_entry_new());
     gtk_widget_set_hexpand(GTK_WIDGET(stream_id_entry), true);
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_id_entry), 1, 0, 1, 1);
@@ -1563,8 +1598,11 @@ static void load_config() {
     if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "ultra")
         config.main_config.quality = "medium";
 
-    if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube")
+    if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube" && config.streaming_config.streaming_service != "custom")
         config.streaming_config.streaming_service = "twitch";
+
+    if(config.streaming_config.streaming_service == "custom")
+        gtk_label_set_text(stream_key_label, "Url: ");
 
     if(config.record_config.save_directory.empty() || !is_directory(config.record_config.save_directory.c_str()))
         config.record_config.save_directory = get_home_dir() + "/Videos";
