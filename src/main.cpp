@@ -575,8 +575,10 @@ static gboolean file_choose_button_click_handler(GtkButton *button, const char *
         "Save", GTK_RESPONSE_ACCEPT,
         nullptr);
 
-    if(file_action != GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER)
-        gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(file_chooser_dialog), "video.mp4");
+    if(file_action != GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER) {
+        const std::string name = "Video_" + get_date_str() + ".mp4";
+        gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(file_chooser_dialog), name.c_str());
+    }
 
     int res = gtk_dialog_run(GTK_DIALOG(file_chooser_dialog));
     if(res == GTK_RESPONSE_ACCEPT) {
@@ -590,11 +592,15 @@ static gboolean file_choose_button_click_handler(GtkButton *button, const char *
 }
 
 static gboolean on_file_chooser_button_click(GtkButton *button, gpointer userdata) {
-    return file_choose_button_click_handler(button, "Where do you want to save the video?", GTK_FILE_CHOOSER_ACTION_SAVE);
+    gboolean res = file_choose_button_click_handler(button, "Where do you want to save the video?", GTK_FILE_CHOOSER_ACTION_SAVE);
+    config.record_config.save_directory = gtk_button_get_label(button);
+    return res;
 }
 
 static gboolean on_replay_file_chooser_button_click(GtkButton *button, gpointer userdata) {
-    return file_choose_button_click_handler(button, "Where do you want to save the replays?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+    gboolean res = file_choose_button_click_handler(button, "Where do you want to save the replays?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+    config.replay_config.save_directory = gtk_button_get_label(button);
+    return res;
 }
 
 static bool kill_gpu_screen_recorder_get_result() {
@@ -783,8 +789,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
         }
 
-        std::string video_filepath = get_home_dir();
-        video_filepath += "/Videos/Video_" + get_date_str() + ".mp4";
+        std::string video_filepath = config.record_config.save_directory;
+        video_filepath += "/Video_" + get_date_str() + ".mp4";
         gtk_button_set_label(file_chooser_button, video_filepath.c_str());
         return true;
     }
