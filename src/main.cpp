@@ -269,11 +269,11 @@ static void for_each_item_in_combo_box(GtkComboBox *combo_box, std::function<boo
     } while(gtk_tree_model_iter_next(tree_model, &tree_iter));
 }
 
-static gint combo_box_text_get_row_by_id(GtkComboBox *combo_box, const char *id, std::string &text) {
+static gint combo_box_text_get_row_by_label(GtkComboBox *combo_box, const char *label, std::string &id) {
     gint found_index = -1;
-    for_each_item_in_combo_box(combo_box, [&found_index, &id, &text](gint row_index, const gchar *row_id, const gchar *row_text) {
-        if(strcmp(row_id, id) == 0) {
-            text = row_text;
+    for_each_item_in_combo_box(combo_box, [&found_index, &label, &id](gint row_index, const gchar *row_id, const gchar *row_text) {
+        if(strcmp(row_text, label) == 0) {
+            id = row_id;
             found_index = row_index;
             return false;
         }
@@ -311,7 +311,7 @@ static void save_configs() {
 
     config.main_config.audio_input.clear();
     for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [](const AudioRow *audio_row) {
-        config.main_config.audio_input.push_back(audio_row->id);
+        config.main_config.audio_input.push_back(gtk_label_get_text(GTK_LABEL(audio_row->label)));
     });
     config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
 
@@ -1551,14 +1551,14 @@ static gboolean handle_child_process_death(gpointer userdata) {
     return G_SOURCE_CONTINUE;
 }
 
-// Only adds the item if |id| matches an item in the audio input menu
-static void add_audio_input_track(const char *id) {
-    std::string audio_input_name;
-    const gint audio_input_row = combo_box_text_get_row_by_id(GTK_COMBO_BOX(audio_input_menu_todo), id, audio_input_name);
+// Only adds the item if |name| matches an item in the audio input menu
+static void add_audio_input_track(const char *name) {
+    std::string audio_input_id;
+    const gint audio_input_row = combo_box_text_get_row_by_label(GTK_COMBO_BOX(audio_input_menu_todo), name, audio_input_id);
     if(audio_input_row == -1)
         return;
 
-    GtkWidget *row = create_used_audio_input_row(id, audio_input_name.c_str());
+    GtkWidget *row = create_used_audio_input_row(audio_input_id.c_str(), name);
     gtk_widget_show_all(row);
     gtk_list_box_insert (GTK_LIST_BOX(audio_input_used_list), row, -1);
     gtk_combo_box_text_remove(audio_input_menu_todo, audio_input_row);
