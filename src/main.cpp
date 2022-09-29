@@ -1266,9 +1266,8 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(grid, GTK_WIDGET(quality_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
     quality_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(quality_input_menu, "medium", "High");
-    gtk_combo_box_text_append(quality_input_menu, "high", "Ultra");
-    gtk_combo_box_text_append(quality_input_menu, "ultra", "Placebo");
+    gtk_combo_box_text_append(quality_input_menu, "very_high", "Very High");
+    gtk_combo_box_text_append(quality_input_menu, "ultra", "Ultra");
     gtk_widget_set_hexpand(GTK_WIDGET(quality_input_menu), true);
     gtk_grid_attach(quality_grid, GTK_WIDGET(quality_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(quality_input_menu), 0);
@@ -1601,8 +1600,8 @@ static void load_config() {
     else if(config.main_config.fps > 5000)
         config.main_config.fps = 5000;
 
-    if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "ultra")
-        config.main_config.quality = "medium";
+    if(config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
+        config.main_config.quality = "very_high";
 
     if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube" && config.streaming_config.streaming_service != "custom")
         config.streaming_config.streaming_service = "twitch";
