@@ -39,7 +39,7 @@ struct Config {
     ReplayConfig replay_config;
 };
 
-std::string get_home_dir() {
+static std::string get_home_dir() {
     const char *home_dir = getenv("HOME");
     if(!home_dir) {
         passwd *pw = getpwuid(getuid());
@@ -52,6 +52,18 @@ std::string get_home_dir() {
     }
 
     return home_dir;
+}
+
+static std::string get_config_dir() {
+    std::string config_dir;
+    const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
+    if(xdg_config_home) {
+        config_dir = xdg_config_home;
+    } else {
+        config_dir = get_home_dir() + "/.config";
+    }
+    config_dir += "/gpu-screen-recorder";
+    return config_dir;
 }
 
 static int create_directory_recursive(char *path) {
@@ -173,9 +185,7 @@ static bool string_to_int(std::string str, int &value) {
 static Config read_config() {
     Config config;
 
-    std::string config_path = get_home_dir();
-    config_path += "/.config/gpu-screen-recorder/config";
-
+    const std::string config_path = get_config_dir() + "/config";
     std::string file_content;
     if(!file_get_content(config_path.c_str(), file_content)) {
         fprintf(stderr, "Warning: Failed to read config file: %s\n", config_path.c_str());
@@ -224,8 +234,7 @@ static Config read_config() {
 }
 
 static void save_config(const Config &config) {
-    std::string config_path = get_home_dir();
-    config_path += "/.config/gpu-screen-recorder/config";
+    const std::string config_path = get_config_dir() + "/config";
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, config_path.c_str());
