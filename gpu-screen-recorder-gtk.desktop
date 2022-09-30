@@ -3,6 +3,7 @@ Type=Application
 Name=GPU Screen Recorder
 GenericName=Screen recorder
 Comment=A gpu based screen recorder / streaming program
+Icon=gpu-screen-recorder
 Exec=gpu-screen-recorder-gtk
 Terminal=false
 Keywords=gpu-screen-recorder;screen recorder;streaming;twitch;replay;
