@@ -163,14 +163,14 @@ static void enable_stream_record_button_if_info_filled() {
     if(strcmp(selected_window_area, "window") == 0 && select_window_userdata.selected_window == None)
         return;
 
-    bool allow_streaming = false;
-    for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&allow_streaming](const AudioRow *audio_row) {
-        allow_streaming = true;
+    int num_audio_tracks = 0;
+    for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&num_audio_tracks](const AudioRow *audio_row) {
+        ++num_audio_tracks;
     });
     
     gtk_widget_set_sensitive(GTK_WIDGET(replay_button), true);
     gtk_widget_set_sensitive(GTK_WIDGET(record_button), true);
-    gtk_widget_set_sensitive(GTK_WIDGET(stream_button), allow_streaming);
+    gtk_widget_set_sensitive(GTK_WIDGET(stream_button), num_audio_tracks <= 1);
 }
 
 static GtkWidget* create_used_audio_input_row(const char *id, const char *text) {
@@ -1266,7 +1266,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(grid, GTK_WIDGET(quality_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
     quality_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(quality_input_menu, "very_high", "Very High");
+    gtk_combo_box_text_append(quality_input_menu, "medium", "Medium");
+    gtk_combo_box_text_append(quality_input_menu, "high", "High (Recommended for live streaming)");
+    gtk_combo_box_text_append(quality_input_menu, "very_high", "Very High (Recommended)");
     gtk_combo_box_text_append(quality_input_menu, "ultra", "Ultra");
     gtk_widget_set_hexpand(GTK_WIDGET(quality_input_menu), true);
     gtk_grid_attach(quality_grid, GTK_WIDGET(quality_input_menu), 1, 0, 1, 1);
@@ -1600,7 +1602,7 @@ static void load_config() {
     else if(config.main_config.fps > 5000)
         config.main_config.fps = 5000;
 
-    if(config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
+    if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
         config.main_config.quality = "very_high";
 
     if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube" && config.streaming_config.streaming_service != "custom")
