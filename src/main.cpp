@@ -941,7 +941,13 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         stream_url += stream_id_str;
     } else if(strcmp(stream_service, "custom") == 0) {
         stream_url = stream_id_str;
-        if(stream_url.size() < 7 || strncmp(stream_url.c_str(), "rtmp://", 7) != 0)
+        if(stream_url.size() >= 7 && strncmp(stream_url.c_str(), "rtmp://", 7) == 0)
+        {}
+        else if(stream_url.size() >= 8 && strncmp(stream_url.c_str(), "rtmps://", 8) == 0)
+        {}
+        else if(stream_url.size() >= 6 && strncmp(stream_url.c_str(), "srt://", 6) == 0)
+        {}
+        else
             stream_url = "rtmp://" + stream_url;
     }
 
