@@ -6,7 +6,10 @@
     <developer_name>dec05eba</developer_name>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>GPL-3.0</project_license>
-    <url type="homepage">https://git.dec05eba.com/gpu-screen-recorder-gtk/about/</url>
+    <url type="homepage">https://git.dec05eba.com/gpu-screen-recorder/about/</url>
+    <url type="bugtracker">https://git.dec05eba.com/?p=about</url>
+    <url type="contribute">https://git.dec05eba.com/?p=about</url>
+    <url type="donation">https://git.dec05eba.com/?p=about</url>
 
     <supports>
         <control>pointing</control>
@@ -25,11 +28,16 @@
     <launchable type="desktop-id">com.dec05eba.gpu_screen_recorder.desktop</launchable>
     <screenshots>
         <screenshot type="default">
-            <image>https://raw.githubusercontent.com/dec05eba/flathub/gpu_screen_recorder/resources/screenshot1.png</image>
+            <image>https://raw.githubusercontent.com/flathub/com.dec05eba.gpu_screen_recorder/master/resources/screenshot1.png</image>
         </screenshot>
     </screenshots>
 
     <releases>
+        <release version="1.1.2" date="2022-10-07">
+            <description>
+            <p>Fix possible crash</p>
+            </description>
+        </release>
         <release version="1.1.1" date="2022-10-05">
             <description>
             <p>Fix possible pulseaudio crash</p>
