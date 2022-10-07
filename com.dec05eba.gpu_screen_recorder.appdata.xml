@@ -35,7 +35,7 @@
     <releases>
         <release version="1.1.2" date="2022-10-07">
             <description>
-            <p>Fix possible crash</p>
+            <p>Fix crash caused by invalid memory write when recording audio</p>
             </description>
         </release>
         <release version="1.1.1" date="2022-10-05">
