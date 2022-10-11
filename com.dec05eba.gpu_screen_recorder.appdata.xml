@@ -33,6 +33,11 @@
     </screenshots>
 
     <releases>
+        <release version="1.1.4" date="2022-10-11">
+            <description>
+            <p>Tune options to try and reduce file size</p>
+            </description>
+        </release>
         <release version="1.1.3" date="2022-10-08">
             <description>
             <p>Better tune quality options for different resolutions</p>
