@@ -1,14 +1,19 @@
 gtk frontend for [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/).
 
-This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay,
+This is a screen recorder that has minimal impact on system performance by recording a window using the GPU only,
+similar to shadowplay on windows. This is the fastest screen recording tool for Linux.
+
+This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia shadowplay-like instant replay,
 where only the last few seconds are saved.
 
-## Note
-Recording a window doesn't work when using picom in glx mode. However it works in xrender mode or when recording the a monitor/screen (which uses NvFBC).\
-Does not work when using gtk client side decorations (such as on Pop OS). Either disable those (if possible), install gtk-nocsd or record the whole monitor/screen if you have NvFBC.\
-NvFBC doesn't work with PRIME, so if you are using PRIME then you can't record the monitor/screen, you have to record a single window.\
+More info at [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/).
 
-All recording modes record in hevc (h265) in a mp4 format, except live streaming that records in h264 in a flv format.
+## Note
+This software works only on x11.\
+Recording a window doesn't work when using picom in glx mode. However it works in xrender mode or when recording the a monitor/screen (which uses NvFBC).\
+For screen capture to work with PRIME (laptops with a nvidia gpu), you must set the primary GPU to use your dedicated nvidia graphics card. You can do this by selecting "NVIDIA (Performance Mode) in nvidia settings:\
+![](https://dec05eba.com/images/nvidia-settings-prime.png)\
+and then rebooting your laptop.
 
 ## Installation
 This program depends on [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
