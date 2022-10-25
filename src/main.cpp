@@ -557,6 +557,13 @@ static gboolean on_start_recording_click(GtkButton *button, gpointer userdata) {
     return true;
 }
 
+void on_stream_key_icon_click(GtkWidget *widget, gpointer data) {
+    gboolean visible = gtk_entry_get_visibility(GTK_ENTRY(widget));
+
+    gtk_entry_set_visibility(GTK_ENTRY(widget), !visible);
+    gtk_entry_set_icon_from_icon_name(GTK_ENTRY(widget), GTK_ENTRY_ICON_SECONDARY, visible ? "view-reveal-symbolic.symbolic" : "view-conceal-symbolic.symbolic");
+}
+
 static gboolean on_start_streaming_click(GtkButton *button, gpointer userdata) {
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->streaming_page);
@@ -1441,6 +1448,11 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     stream_key_label = GTK_LABEL(gtk_label_new("Stream key: "));
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_key_label), 0, 0, 1, 1);
     stream_id_entry = GTK_ENTRY(gtk_entry_new());
+    gtk_entry_set_visibility(stream_id_entry, FALSE);
+    gtk_entry_set_input_purpose(stream_id_entry, GTK_INPUT_PURPOSE_PASSWORD);
+    gtk_entry_set_icon_from_icon_name(stream_id_entry, GTK_ENTRY_ICON_SECONDARY, "view-reveal-symbolic.symbolic");
+    gtk_entry_set_icon_activatable(stream_id_entry, GTK_ENTRY_ICON_SECONDARY, TRUE);
+    g_signal_connect(stream_id_entry, "icon-press", G_CALLBACK(on_stream_key_icon_click), nullptr);
     gtk_widget_set_hexpand(GTK_WIDGET(stream_id_entry), true);
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_id_entry), 1, 0, 1, 1);
 
