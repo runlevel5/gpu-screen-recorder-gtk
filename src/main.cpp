@@ -46,8 +46,10 @@ static GtkComboBoxText *record_area_selection_menu;
 static GtkComboBoxText *audio_input_menu_todo;
 static GtkComboBoxText *quality_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
+static GtkComboBoxText *record_container;
+static GtkComboBoxText *replay_container;
 static GtkLabel *stream_key_label;
-static GtkButton *file_chooser_button;
+static GtkButton *record_file_chooser_button;
 static GtkButton *replay_file_chooser_button;
 static GtkButton *stream_button;
 static GtkButton *record_button;
@@ -70,6 +72,18 @@ static bool streaming = false;
 static pid_t gpu_screen_recorder_process = -1;
 static Config config;
 static int num_audio_inputs_addable = 0;
+static std::string record_file_current_filename;
+
+struct Container {
+    const char *container_name;
+    const char *file_extension;
+};
+
+static const Container supported_containers[] = {
+    { "mp4", "mp4" },
+    { "flv", "flv" },
+    { "matroska", "mkv" }
+};
 
 struct AudioRow {
     GtkWidget *row;
@@ -300,12 +314,6 @@ static std::string get_date_str() {
 }
 
 static void save_configs() {
-    const gchar *record_filename = gtk_button_get_label(file_chooser_button);
-
-    char dir_tmp[PATH_MAX];
-    strcpy(dir_tmp, record_filename);
-    char *record_dir = dirname(dir_tmp);
-
     config.main_config.record_area_option = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
     config.main_config.fps = gtk_spin_button_get_value_as_int(fps_entry);
 
@@ -318,9 +326,11 @@ static void save_configs() {
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
 
-    config.record_config.save_directory = record_dir;
+    config.record_config.save_directory = gtk_button_get_label(record_file_chooser_button);
+    config.record_config.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_container));
 
     config.replay_config.save_directory = gtk_button_get_label(replay_file_chooser_button);
+    config.replay_config.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(replay_container));
     config.replay_config.replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
 
     save_config(config);
@@ -550,10 +560,6 @@ static gboolean on_start_replay_click(GtkButton *button, gpointer userdata) {
 static gboolean on_start_recording_click(GtkButton *button, gpointer userdata) {
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
-
-    std::string video_filepath = config.record_config.save_directory;
-    video_filepath += "/Video_" + get_date_str() + ".mp4";
-    gtk_button_set_label(file_chooser_button, video_filepath.c_str());
     return true;
 }
 
@@ -590,7 +596,6 @@ static gboolean file_choose_button_click_handler(GtkButton *button, const char *
     int res = gtk_dialog_run(GTK_DIALOG(file_chooser_dialog));
     if(res == GTK_RESPONSE_ACCEPT) {
         char *filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(file_chooser_dialog));
-        printf("filename: %s\n", filename);
         gtk_button_set_label(button, filename);
         g_free(filename);
     }
@@ -598,8 +603,8 @@ static gboolean file_choose_button_click_handler(GtkButton *button, const char *
     return true;
 }
 
-static gboolean on_file_chooser_button_click(GtkButton *button, gpointer userdata) {
-    gboolean res = file_choose_button_click_handler(button, "Where do you want to save the video?", GTK_FILE_CHOOSER_ACTION_SAVE);
+static gboolean on_record_file_choose_button_click(GtkButton *button, gpointer userdata) {
+    gboolean res = file_choose_button_click_handler(button, "Where do you want to save the video?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
     config.record_config.save_directory = gtk_button_get_label(button);
     return res;
 }
@@ -722,13 +727,14 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     std::string fps_str = std::to_string(fps);
     std::string replay_time_str = std::to_string(replay_time);
 
+    const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(replay_container));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", dir
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", dir
     };
 
     for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&args](const AudioRow *audio_row) {
@@ -778,7 +784,7 @@ static gboolean on_replay_save_button_click(GtkButton *button, gpointer userdata
 
 static gboolean on_start_recording_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
-    const gchar *filename = gtk_button_get_label(file_chooser_button);
+    const gchar *dir = gtk_button_get_label(record_file_chooser_button);
 
     if(recording) {
         bool exit_success = kill_gpu_screen_recorder_get_result();
@@ -789,16 +795,12 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), true);
 
         if(exit_success) {
-            std::string notification_body = std::string("The recording was saved to ") + filename;
+            std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
         } else {
-            std::string notification_body = std::string("Failed to save the recording to ") + filename;
+            std::string notification_body = std::string("Failed to save the recording to ") + record_file_current_filename;
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
         }
-
-        std::string video_filepath = config.record_config.save_directory;
-        video_filepath += "/Video_" + get_date_str() + ".mp4";
-        gtk_button_set_label(file_chooser_button, video_filepath.c_str());
         return true;
     }
 
@@ -809,13 +811,14 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     int record_height = gtk_spin_button_get_value_as_int(area_height_entry);
 
     char dir_tmp[PATH_MAX];
-    strcpy(dir_tmp, filename);
-    char *dir = dirname(dir_tmp);
-    if(create_directory_recursive(dir) != 0) {
+    strcpy(dir_tmp, dir);
+    if(create_directory_recursive(dir_tmp) != 0) {
         std::string notification_body = std::string("Failed to start recording. Failed to create ") + dir_tmp;
         show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
         return true;
     }
+
+    record_file_current_filename = std::string(dir_tmp) + "/Video_" + get_date_str() + "." + gtk_combo_box_text_get_active_text(record_container);
 
     bool record_window = false;
     std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
@@ -839,15 +842,17 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         record_height = attr.height;
         record_window = true;
     }
+
     std::string fps_str = std::to_string(fps);
 
+    const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_container));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "mp4", "-q", quality_input_str, "-f", fps_str.c_str(), "-o", filename
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-f", fps_str.c_str(), "-o", record_file_current_filename.c_str()
     };
 
     for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&args](const AudioRow *audio_row) {
@@ -1347,18 +1352,28 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     g_signal_connect(replay_file_chooser_button, "clicked", G_CALLBACK(on_replay_file_chooser_button_click), nullptr);
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(replay_file_chooser_button), 1, 0, 1, 1);
 
+    GtkGrid *container_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, 3, 3, 1);
+    gtk_grid_attach(container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
+    replay_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    for(auto &supported_container : supported_containers) {
+        gtk_combo_box_text_append(replay_container, supported_container.container_name, supported_container.file_extension);
+    }
+    gtk_widget_set_hexpand(GTK_WIDGET(replay_container), true);
+    gtk_grid_attach(container_grid, GTK_WIDGET(replay_container), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(replay_container), 0);
+
     GtkGrid *replay_time_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, 3, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, 4, 3, 1);
     gtk_grid_attach(replay_time_grid, gtk_label_new("Replay time: "), 0, 0, 1, 1);
     replay_time_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 1200.0, 1.0));
     gtk_spin_button_set_value(replay_time_entry, 30.0);
     gtk_widget_set_hexpand(GTK_WIDGET(replay_time_entry), true);
     gtk_grid_attach(replay_time_grid, GTK_WIDGET(replay_time_entry), 1, 0, 1, 1);
 
-
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
 
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 4, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 5, 3, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     replay_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(replay_back_button), true);
@@ -1379,6 +1394,9 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
 }
 
 static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
+    std::string video_filepath = get_home_dir();
+    video_filepath += "/Videos";
+
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "recording");
     gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
@@ -1396,16 +1414,27 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
     GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the video?");
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_label), 0, 0, 1, 1);
-    file_chooser_button = GTK_BUTTON(gtk_button_new_with_label(""));
-    gtk_button_set_image(file_chooser_button, save_icon);
-    gtk_button_set_always_show_image(file_chooser_button, true);
-    gtk_button_set_image_position(file_chooser_button, GTK_POS_RIGHT);
-    gtk_widget_set_hexpand(GTK_WIDGET(file_chooser_button), true);
-    g_signal_connect(file_chooser_button, "clicked", G_CALLBACK(on_file_chooser_button_click), nullptr);
-    gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_button), 1, 0, 1, 1);
+    record_file_chooser_button = GTK_BUTTON(gtk_button_new_with_label(video_filepath.c_str()));
+    gtk_button_set_image(record_file_chooser_button, save_icon);
+    gtk_button_set_always_show_image(record_file_chooser_button, true);
+    gtk_button_set_image_position(record_file_chooser_button, GTK_POS_RIGHT);
+    gtk_widget_set_hexpand(GTK_WIDGET(record_file_chooser_button), true);
+    g_signal_connect(record_file_chooser_button, "clicked", G_CALLBACK(on_record_file_choose_button_click), nullptr);
+    gtk_grid_attach(file_chooser_grid, GTK_WIDGET(record_file_chooser_button), 1, 0, 1, 1);
+
+    GtkGrid *container_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, 3, 2, 1);
+    gtk_grid_attach(container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
+    record_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    for(auto &supported_container : supported_containers) {
+        gtk_combo_box_text_append(record_container, supported_container.container_name, supported_container.file_extension);
+    }
+    gtk_widget_set_hexpand(GTK_WIDGET(record_container), true);
+    gtk_grid_attach(container_grid, GTK_WIDGET(record_container), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(record_container), 0);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 3, 2, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 4, 2, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     record_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(record_back_button), true);
@@ -1650,11 +1679,11 @@ static void load_config() {
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
 
-    std::string video_filepath = config.record_config.save_directory;
-    video_filepath += "/Video_" + get_date_str() + ".mp4";
-    gtk_button_set_label(file_chooser_button, video_filepath.c_str());
+    gtk_button_set_label(record_file_chooser_button, config.record_config.save_directory.c_str());
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(record_container), config.record_config.container.c_str());
 
     gtk_button_set_label(replay_file_chooser_button, config.replay_config.save_directory.c_str());
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(replay_container), config.replay_config.container.c_str());
     gtk_spin_button_set_value(replay_time_entry, config.replay_config.replay_time);
 
     enable_stream_record_button_if_info_filled();

@@ -33,6 +33,11 @@
     </screenshots>
 
     <releases>
+        <release version="1.2.1" date="2022-11-24">
+            <description>
+            <p>Allow choosing between mp4, flv and mkv for record/replay. mkv survives system crashes</p>
+            </description>
+        </release>
         <release version="1.2.0" date="2022-10-27">
             <description>
             <p>Re-enable screen-direct, disable h264 forced fallback and use p6 again</p>

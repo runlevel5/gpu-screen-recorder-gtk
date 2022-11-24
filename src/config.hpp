@@ -25,10 +25,12 @@ struct StreamingConfig {
 
 struct RecordConfig {
     std::string save_directory;
+    std::string container;
 };
 
 struct ReplayConfig {
     std::string save_directory;
+    std::string container;
     int replay_time = 30;
 };
 
@@ -216,8 +218,12 @@ static Config read_config() {
             config.streaming_config.stream_key.assign(value.str, value.size);
         } else if(key == "record.save_directory") {
             config.record_config.save_directory.assign(value.str, value.size);
+        } else if(key == "record.container") {
+            config.record_config.container.assign(value.str, value.size);
         } else if(key == "replay.save_directory") {
             config.replay_config.save_directory.assign(value.str, value.size);
+        } else if(key == "replay.container") {
+            config.replay_config.container.assign(value.str, value.size);
         } else if(key == "replay.time") {
             if(!string_to_int(std::string(value.str, value.size), config.replay_config.replay_time)) {
                 fprintf(stderr, "Warning: Invalid config option replay.time\n");
@@ -262,8 +268,10 @@ static void save_config(const Config &config) {
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());
 
     fprintf(file, "record.save_directory %s\n", config.record_config.save_directory.c_str());
+    fprintf(file, "record.container %s\n", config.record_config.container.c_str());
 
     fprintf(file, "replay.save_directory %s\n", config.replay_config.save_directory.c_str());
+    fprintf(file, "replay.container %s\n", config.replay_config.container.c_str());
     fprintf(file, "replay.time %d\n", config.replay_config.replay_time);
 
     fclose(file);
