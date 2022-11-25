@@ -9,7 +9,7 @@ where only the last few seconds are saved.
 More info at [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/).
 
 ## Note
-This software works only on x11.\
+This software works only on x11 and with an nvidia gpu.\
 Recording a window doesn't work when using picom in glx mode. However it works in xrender mode or when recording the a monitor/screen (which uses NvFBC).\
 For screen capture to work with PRIME (laptops with a nvidia gpu), you must set the primary GPU to use your dedicated nvidia graphics card. You can do this by selecting "NVIDIA (Performance Mode) in nvidia settings:\
 ![](https://dec05eba.com/images/nvidia-settings-prime.png)\
