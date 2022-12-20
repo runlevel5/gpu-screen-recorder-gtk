@@ -35,7 +35,6 @@ typedef struct {
 
 static SelectWindowUserdata select_window_userdata;
 static PageNavigationUserdata page_navigation_userdata;
-static GtkWidget *save_icon;
 static Cursor crosshair_cursor;
 static GtkSpinButton *fps_entry;
 static GtkLabel *area_size_label;
@@ -82,7 +81,8 @@ struct Container {
 static const Container supported_containers[] = {
     { "mp4", "mp4" },
     { "flv", "flv" },
-    { "matroska", "mkv" }
+    { "matroska", "mkv" },
+    { "mov", "mov" }
 };
 
 struct AudioRow {
@@ -582,14 +582,14 @@ static gboolean on_streaming_recording_page_back_click(GtkButton *button, gpoint
     return true;
 }
 
-static gboolean file_choose_button_click_handler(GtkButton *button, const char *title, GtkFileChooserAction file_action) {
+static gboolean file_choose_button_click_handler(GtkButton *button, const char *title, GtkFileChooserAction file_action, std::string container_file_ext) {
     GtkWidget *file_chooser_dialog = gtk_file_chooser_dialog_new(title, nullptr, file_action,
         "Cancel", GTK_RESPONSE_CANCEL,
         "Save", GTK_RESPONSE_ACCEPT,
         nullptr);
 
     if(file_action != GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER) {
-        const std::string name = "Video_" + get_date_str() + ".mp4";
+        const std::string name = "Video_" + get_date_str() + "." + container_file_ext;
         gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(file_chooser_dialog), name.c_str());
     }
 
@@ -604,13 +604,13 @@ static gboolean file_choose_button_click_handler(GtkButton *button, const char *
 }
 
 static gboolean on_record_file_choose_button_click(GtkButton *button, gpointer userdata) {
-    gboolean res = file_choose_button_click_handler(button, "Where do you want to save the video?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+    gboolean res = file_choose_button_click_handler(button, "Where do you want to save the video?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, gtk_combo_box_text_get_active_text(record_container));
     config.record_config.save_directory = gtk_button_get_label(button);
     return res;
 }
 
 static gboolean on_replay_file_chooser_button_click(GtkButton *button, gpointer userdata) {
-    gboolean res = file_choose_button_click_handler(button, "Where do you want to save the replays?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+    gboolean res = file_choose_button_click_handler(button, "Where do you want to save the replays?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, gtk_combo_box_text_get_active_text(replay_container));
     config.replay_config.save_directory = gtk_button_get_label(button);
     return res;
 }
@@ -1339,6 +1339,8 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(grid, hotkey_label, 0, 0, 3, 1);
     gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 3, 1);
 
+    GtkWidget *save_icon = gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_BUTTON);
+
     GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 2, 3, 1);
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
@@ -1408,6 +1410,8 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     GtkWidget *hotkey_label = gtk_label_new("Press Alt+F1 to start/stop recording");
     gtk_grid_attach(grid, hotkey_label, 0, 0, 2, 1);
     gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 2, 1);
+
+    GtkWidget *save_icon = gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_BUTTON);
 
     GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 2, 2, 1);
@@ -1698,7 +1702,6 @@ static void activate(GtkApplication *app, gpointer userdata) {
     select_window_userdata.app = app;
 
     crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);
-    save_icon = gtk_image_new_from_icon_name("gtk-save", GTK_ICON_SIZE_BUTTON);
 
     GtkStack *stack = GTK_STACK(gtk_stack_new());
     gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(stack));
