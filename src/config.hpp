@@ -10,9 +10,12 @@
 #include <stdio.h>
 #include <pwd.h>
 #include <sys/stat.h>
+#include <optional>
 
 struct MainConfig {
     std::string record_area_option;
+    int record_area_width = 0;
+    int record_area_height = 0;
     int fps = 60;
     std::vector<std::string> audio_input;
     std::string quality;
@@ -203,6 +206,16 @@ static Config read_config() {
 
         if(key == "main.record_area_option") {
             config.main_config.record_area_option.assign(value.str, value.size);
+        } else if(key == "main.record_area_width") {
+            if(!string_to_int(std::string(value.str, value.size), config.main_config.record_area_width)) {
+                fprintf(stderr, "Warning: Invalid config option main.record_area_width\n");
+                config.main_config.record_area_width = 0;
+            }
+        } else if(key == "main.record_area_height") {
+            if(!string_to_int(std::string(value.str, value.size), config.main_config.record_area_height)) {
+                fprintf(stderr, "Warning: Invalid config option main.record_area_height\n");
+                config.main_config.record_area_height = 0;
+            }
         } else if(key == "main.fps") {
             if(!string_to_int(std::string(value.str, value.size), config.main_config.fps)) {
                 fprintf(stderr, "Warning: Invalid config option main.fps\n");
@@ -258,6 +271,8 @@ static void save_config(const Config &config) {
     }
 
     fprintf(file, "main.record_area_option %s\n", config.main_config.record_area_option.c_str());
+    fprintf(file, "main.record_area_width %d\n", config.main_config.record_area_width);
+    fprintf(file, "main.record_area_height %d\n", config.main_config.record_area_height);
     fprintf(file, "main.fps %d\n", config.main_config.fps);
     for(const std::string &audio_input : config.main_config.audio_input) {
         fprintf(file, "main.audio_input %s\n", audio_input.c_str());
