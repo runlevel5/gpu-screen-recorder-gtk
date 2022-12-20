@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <pwd.h>
 #include <sys/stat.h>
-#include <optional>
 
 struct MainConfig {
     std::string record_area_option;
