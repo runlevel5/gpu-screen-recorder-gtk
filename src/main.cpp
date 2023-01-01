@@ -1049,14 +1049,14 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
     gtk_combo_box_text_append(record_area_selection_menu, "focused", "Follow focused window");
     if(is_nv_fbc_installed()) {
-        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (NvFBC)");
-        gtk_combo_box_text_append(record_area_selection_menu, "screen-direct", "All monitors, direct mode (NvFBC, VRR workaround)");
+        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
+        gtk_combo_box_text_append(record_area_selection_menu, "screen-direct", "All monitors, direct mode (VRR workaround)");
         for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
             label += " (";
             label.append(mode_info->name, mode_info->nameLength);
-            label += ", NvFBC)";
+            label += ")";
 
             // Leak on purpose, what are you gonna do? stab me?
             char *id = (char*)malloc(output_info->nameLen + 1);
