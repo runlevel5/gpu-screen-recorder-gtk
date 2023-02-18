@@ -1,0 +1,195 @@
+#include "egl.h"
+#include "library_loader.h"
+#include <string.h>
+
+static bool gsr_egl_create_window(gsr_egl *self) {
+    EGLConfig  ecfg;
+    int32_t    num_config = 0;
+    EGLDisplay egl_display = NULL;
+    EGLSurface egl_surface = NULL;
+    EGLContext egl_context = NULL;
+    Window window = None;
+    
+    int32_t attr[] = {
+        EGL_BUFFER_SIZE, 24,
+        EGL_RENDERABLE_TYPE,
+        EGL_OPENGL_ES2_BIT,
+        EGL_NONE
+    };
+
+    int32_t ctxattr[] = {
+        EGL_CONTEXT_CLIENT_VERSION, 2,
+        EGL_NONE
+    };
+
+    window = XCreateWindow(self->dpy, DefaultRootWindow(self->dpy), 0, 0, 1, 1, 0, CopyFromParent, InputOutput, CopyFromParent, 0, NULL);
+
+    if(!window) {
+        fprintf(stderr, "gsr error: gsr_gl_create_window failed: failed to create gl window\n");
+        goto fail;
+    }
+
+    egl_display = self->eglGetDisplay(self->dpy);
+    if(!egl_display) {
+        fprintf(stderr, "gsr error: gsr_egl_create_window failed: eglGetDisplay failed\n");
+        goto fail;
+    }
+
+    if(!self->eglInitialize(egl_display, NULL, NULL)) {
+        fprintf(stderr, "gsr error: gsr_egl_create_window failed: eglInitialize failed\n");
+        goto fail;
+    }
+    
+    if(!self->eglChooseConfig(egl_display, attr, &ecfg, 1, &num_config) || num_config != 1) {
+        fprintf(stderr, "gsr error: gsr_egl_create_window failed: failed to find a matching config\n");
+        goto fail;
+    }
+    
+    egl_surface = self->eglCreateWindowSurface(egl_display, ecfg, (EGLNativeWindowType)window, NULL);
+    if(!egl_surface) {
+        fprintf(stderr, "gsr error: gsr_egl_create_window failed: failed to create window surface\n");
+        goto fail;
+    }
+    
+    egl_context = self->eglCreateContext(egl_display, ecfg, NULL, ctxattr);
+    if(!egl_context) {
+        fprintf(stderr, "gsr error: gsr_egl_create_window failed: failed to create egl context\n");
+        goto fail;
+    }
+
+    self->eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context);
+
+    self->egl_display = egl_display;
+    self->egl_surface = egl_surface;
+    self->egl_context = egl_context;
+    self->window = window;
+    return true;
+
+    fail:
+    if(egl_context)
+        self->eglDestroyContext(egl_display, egl_context);
+    if(egl_surface)
+        self->eglDestroySurface(egl_display, egl_surface);
+    if(egl_display)
+        self->eglTerminate(egl_display);
+    if(window)
+        XDestroyWindow(self->dpy, window);
+    return false;
+}
+
+static bool gsr_egl_load_egl(gsr_egl *self, void *library) {
+    dlsym_assign required_dlsym[] = {
+        { (void**)&self->eglGetDisplay, "eglGetDisplay" },
+        { (void**)&self->eglInitialize, "eglInitialize" },
+        { (void**)&self->eglTerminate, "eglTerminate" },
+        { (void**)&self->eglChooseConfig, "eglChooseConfig" },
+        { (void**)&self->eglCreateWindowSurface, "eglCreateWindowSurface" },
+        { (void**)&self->eglCreateContext, "eglCreateContext" },
+        { (void**)&self->eglMakeCurrent, "eglMakeCurrent" },
+        { (void**)&self->eglDestroyContext, "eglDestroyContext" },
+        { (void**)&self->eglDestroySurface, "eglDestroySurface" },
+
+        { NULL, NULL }
+    };
+
+    if(!dlsym_load_list(library, required_dlsym)) {
+        fprintf(stderr, "gsr error: gsr_egl_load failed: missing required symbols in libEGL.so.1\n");
+        return false;
+    }
+
+    return true;
+}
+
+static bool gsr_egl_load_gl(gsr_egl *self, void *library) {
+    dlsym_assign required_dlsym[] = {
+        { (void**)&self->glGetString, "glGetString" },
+
+        { NULL, NULL }
+    };
+
+    if(!dlsym_load_list(library, required_dlsym)) {
+        fprintf(stderr, "gsr error: gsr_egl_load failed: missing required symbols in libGL.so.1\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool gsr_egl_load(gsr_egl *self, Display *dpy) {
+    memset(self, 0, sizeof(gsr_egl));
+    self->dpy = dpy;
+
+    dlerror(); /* clear */
+    void *egl_lib = dlopen("libEGL.so.1", RTLD_LAZY);
+    if(!egl_lib) {
+        fprintf(stderr, "gsr error: gsr_egl_load: failed to load libEGL.so.1, error: %s\n", dlerror());
+        return false;
+    }
+
+    void *gl_lib = dlopen("libGL.so.1", RTLD_LAZY);
+    if(!egl_lib) {
+        fprintf(stderr, "gsr error: gsr_egl_load: failed to load libGL.so.1, error: %s\n", dlerror());
+        dlclose(egl_lib);
+        memset(self, 0, sizeof(gsr_egl));
+        return false;
+    }
+
+    if(!gsr_egl_load_egl(self, egl_lib)) {
+        dlclose(egl_lib);
+        dlclose(gl_lib);
+        memset(self, 0, sizeof(gsr_egl));
+        return false;
+    }
+
+    if(!gsr_egl_load_gl(self, gl_lib)) {
+        dlclose(egl_lib);
+        dlclose(gl_lib);
+        memset(self, 0, sizeof(gsr_egl));
+        return false;
+    }
+
+    if(!gsr_egl_create_window(self)) {
+        dlclose(egl_lib);
+        dlclose(gl_lib);
+        memset(self, 0, sizeof(gsr_egl));
+        return false;
+    }
+
+    self->egl_library = egl_lib;
+    self->gl_library = gl_lib;
+    return true;
+}
+
+void gsr_egl_unload(gsr_egl *self) {
+    if(self->egl_context) {
+        self->eglDestroyContext(self->egl_display, self->egl_context);
+        self->egl_context = NULL;
+    }
+
+    if(self->egl_surface) {
+        self->eglDestroySurface(self->egl_display, self->egl_surface);
+        self->egl_surface = NULL;
+    }
+
+    if(self->egl_display) {
+        self->eglTerminate(self->egl_display);
+        self->egl_display = NULL;
+    }
+
+    if(self->window) {
+        XDestroyWindow(self->dpy, self->window);
+        self->window = None;
+    }
+
+    if(self->egl_library) {
+        dlclose(self->egl_library);
+        self->egl_library = NULL;
+    }
+
+    if(self->gl_library) {
+        dlclose(self->gl_library);
+        self->gl_library = NULL;
+    }
+
+    memset(self, 0, sizeof(gsr_egl));
+}

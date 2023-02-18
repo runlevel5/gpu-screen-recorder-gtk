@@ -4,5 +4,7 @@ compile_commands.json
 tests/sibs-build/
 tests/compile_commands.json
 
+*.o
+
 .clangd/
 gpu-screen-recorder-gtk

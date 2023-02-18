@@ -11,29 +11,40 @@
 #include <pwd.h>
 #include <sys/stat.h>
 
+struct ConfigHotkey {
+    int64_t keysym = 0;
+    uint32_t modifiers = 0;
+};
+
 struct MainConfig {
     std::string record_area_option;
     int record_area_width = 0;
     int record_area_height = 0;
     int fps = 60;
+    bool merge_audio_tracks = true;
     std::vector<std::string> audio_input;
     std::string quality;
+    std::string codec;
 };
 
 struct StreamingConfig {
     std::string streaming_service;
     std::string stream_key;
+    ConfigHotkey start_recording_hotkey;
 };
 
 struct RecordConfig {
     std::string save_directory;
     std::string container;
+    ConfigHotkey start_recording_hotkey;
 };
 
 struct ReplayConfig {
     std::string save_directory;
     std::string container;
     int replay_time = 30;
+    ConfigHotkey start_recording_hotkey;
+    ConfigHotkey save_recording_hotkey;
 };
 
 struct Config {
@@ -207,39 +218,74 @@ static Config read_config() {
             config.main_config.record_area_option.assign(value.str, value.size);
         } else if(key == "main.record_area_width") {
             if(!string_to_int(std::string(value.str, value.size), config.main_config.record_area_width)) {
-                fprintf(stderr, "Warning: Invalid config option main.record_area_width\n");
+                fprintf(stderr, "Warning: Invalid config option value for main.record_area_width\n");
                 config.main_config.record_area_width = 0;
             }
         } else if(key == "main.record_area_height") {
             if(!string_to_int(std::string(value.str, value.size), config.main_config.record_area_height)) {
-                fprintf(stderr, "Warning: Invalid config option main.record_area_height\n");
+                fprintf(stderr, "Warning: Invalid config option value for main.record_area_height\n");
                 config.main_config.record_area_height = 0;
             }
         } else if(key == "main.fps") {
             if(!string_to_int(std::string(value.str, value.size), config.main_config.fps)) {
-                fprintf(stderr, "Warning: Invalid config option main.fps\n");
+                fprintf(stderr, "Warning: Invalid config option value for main.fps\n");
                 config.main_config.fps = 60;
             }
+        } else if(key == "main.merge_audio_tracks") {
+            if(value == "true")
+                config.main_config.merge_audio_tracks = true;
+            else if(value == "false")
+                config.main_config.merge_audio_tracks = false;
         } else if(key == "main.audio_input") {
             config.main_config.audio_input.emplace_back(value.str, value.size);
         } else if(key == "main.quality") {
             config.main_config.quality.assign(value.str, value.size);
+        } else if(key == "main.codec") {
+            config.main_config.codec.assign(value.str, value.size);
         } else if(key == "streaming.service") {
             config.streaming_config.streaming_service.assign(value.str, value.size);
         } else if(key == "streaming.key") {
             config.streaming_config.stream_key.assign(value.str, value.size);
+        } else if(key == "streaming.start_recording_hotkey") {
+            std::string value_str(value.str, value.size);
+            if(sscanf(value_str.c_str(), "%ld %u", &config.streaming_config.start_recording_hotkey.keysym, &config.streaming_config.start_recording_hotkey.modifiers) != 2) {
+                fprintf(stderr, "Warning: Invalid config option value for streaming.start_recording_hotkey\n");
+                config.streaming_config.start_recording_hotkey.keysym = 0;
+                config.streaming_config.start_recording_hotkey.modifiers = 0;
+            }
         } else if(key == "record.save_directory") {
             config.record_config.save_directory.assign(value.str, value.size);
         } else if(key == "record.container") {
             config.record_config.container.assign(value.str, value.size);
+        } else if(key == "record.start_recording_hotkey") {
+            std::string value_str(value.str, value.size);
+            if(sscanf(value_str.c_str(), "%ld %u", &config.record_config.start_recording_hotkey.keysym, &config.record_config.start_recording_hotkey.modifiers) != 2) {
+                fprintf(stderr, "Warning: Invalid config option value for record.start_recording_hotkey\n");
+                config.record_config.start_recording_hotkey.keysym = 0;
+                config.record_config.start_recording_hotkey.modifiers = 0;
+            }
         } else if(key == "replay.save_directory") {
             config.replay_config.save_directory.assign(value.str, value.size);
         } else if(key == "replay.container") {
             config.replay_config.container.assign(value.str, value.size);
         } else if(key == "replay.time") {
             if(!string_to_int(std::string(value.str, value.size), config.replay_config.replay_time)) {
-                fprintf(stderr, "Warning: Invalid config option replay.time\n");
+                fprintf(stderr, "Warning: Invalid config option value for replay.time\n");
                 config.replay_config.replay_time = 30;
+            }
+        } else if(key == "replay.start_recording_hotkey") {
+            std::string value_str(value.str, value.size);
+            if(sscanf(value_str.c_str(), "%ld %u", &config.replay_config.start_recording_hotkey.keysym, &config.replay_config.start_recording_hotkey.modifiers) != 2) {
+                fprintf(stderr, "Warning: Invalid config option value for replay.start_recording_hotkey\n");
+                config.replay_config.start_recording_hotkey.keysym = 0;
+                config.replay_config.start_recording_hotkey.modifiers = 0;
+            }
+        } else if(key == "replay.save_recording_hotkey") {
+            std::string value_str(value.str, value.size);
+            if(sscanf(value_str.c_str(), "%ld %u", &config.replay_config.save_recording_hotkey.keysym, &config.replay_config.save_recording_hotkey.modifiers) != 2) {
+                fprintf(stderr, "Warning: Invalid config option value for replay.save_recording_hotkey\n");
+                config.replay_config.save_recording_hotkey.keysym = 0;
+                config.replay_config.save_recording_hotkey.modifiers = 0;
             }
         } else {
             fprintf(stderr, "Warning: Invalid config option: %.*s\n", (int)line.size, line.str);
@@ -273,20 +319,26 @@ static void save_config(const Config &config) {
     fprintf(file, "main.record_area_width %d\n", config.main_config.record_area_width);
     fprintf(file, "main.record_area_height %d\n", config.main_config.record_area_height);
     fprintf(file, "main.fps %d\n", config.main_config.fps);
+    fprintf(file, "main.merge_audio_tracks %s\n", config.main_config.merge_audio_tracks ? "true" : "false");
     for(const std::string &audio_input : config.main_config.audio_input) {
         fprintf(file, "main.audio_input %s\n", audio_input.c_str());
     }
     fprintf(file, "main.quality %s\n", config.main_config.quality.c_str());
+    fprintf(file, "main.codec %s\n", config.main_config.codec.c_str());
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());
+    fprintf(file, "streaming.start_recording_hotkey %ld %u\n", config.streaming_config.start_recording_hotkey.keysym, config.streaming_config.start_recording_hotkey.modifiers);
 
     fprintf(file, "record.save_directory %s\n", config.record_config.save_directory.c_str());
     fprintf(file, "record.container %s\n", config.record_config.container.c_str());
+    fprintf(file, "record.start_recording_hotkey %ld %u\n", config.record_config.start_recording_hotkey.keysym, config.record_config.start_recording_hotkey.modifiers);
 
     fprintf(file, "replay.save_directory %s\n", config.replay_config.save_directory.c_str());
     fprintf(file, "replay.container %s\n", config.replay_config.container.c_str());
     fprintf(file, "replay.time %d\n", config.replay_config.replay_time);
+    fprintf(file, "replay.start_recording_hotkey %ld %u\n", config.replay_config.start_recording_hotkey.keysym, config.replay_config.start_recording_hotkey.modifiers);
+    fprintf(file, "replay.save_recording_hotkey %ld %u\n", config.replay_config.save_recording_hotkey.keysym, config.replay_config.save_recording_hotkey.modifiers);
 
     fclose(file);
 }

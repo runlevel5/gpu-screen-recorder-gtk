@@ -1,4 +1,3 @@
 Capture stderr (ignore fps: 250) and show that in notification on error.
 Make sure the resolution is allowed for streaming.
-Allow to change hotkeys.
 Add list of windows to select from. This makes it easier to select another window that is not in the view to be clickable.
