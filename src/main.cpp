@@ -1053,7 +1053,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 static gboolean on_replay_save_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
     kill(gpu_screen_recorder_process, SIGUSR1);
-    //show_notification(app, "GPU Screen Recorder", "Saved replay", G_NOTIFICATION_PRIORITY_NORMAL);
+    show_notification(app, "GPU Screen Recorder", "Saved replay", G_NOTIFICATION_PRIORITY_NORMAL);
     return true;
 }
 
@@ -1071,7 +1071,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
         if(exit_success) {
             std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
-            //show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
+            show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
         } else {
             std::string notification_body = std::string("Failed to save the recording to ") + record_file_current_filename;
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
