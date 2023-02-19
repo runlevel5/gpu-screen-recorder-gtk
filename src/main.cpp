@@ -872,9 +872,9 @@ static gboolean on_start_streaming_click(GtkButton *button, gpointer userdata) {
         ++num_audio_tracks;
     });
 
-    if(num_audio_tracks > 1) {
+    if(num_audio_tracks > 1 && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Streaming doesn't work with more than 1 audio track. Please remove all audio tracks or only use 1 audio track");
+            "Streaming doesn't work with more than 1 audio track. Please remove all audio tracks or only use 1 audio track or select to merge audio tracks");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         return true;
