@@ -820,24 +820,14 @@ static gboolean on_start_replay_click(GtkButton *button, gpointer userdata) {
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->replay_page);
     HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
     if(!hotkey_result.replay_start_stop_hotkey_success) {
-        std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(replay_start_stop_hotkey.hotkey_entry));
-        std::string error_text = "Replay start/stop hotkey " + hotkey_text + " can't be used because it's used by another program. Please choose another hotkey";
         gtk_entry_set_text(GTK_ENTRY(replay_start_stop_hotkey.hotkey_entry), "");
         replay_start_stop_hotkey.keysym = 0;
         replay_start_stop_hotkey.modkey_mask = 0;
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "%s", error_text.c_str());
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
     }
     if(!hotkey_result.replay_save_hotkey_success) {
-        std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(replay_save_hotkey.hotkey_entry));
-        std::string error_text = "Replay save hotkey " + hotkey_text + " can't be used because it's used by another program. Please choose another hotkey";
         gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey.hotkey_entry), "");
         replay_save_hotkey.keysym = 0;
         replay_save_hotkey.modkey_mask = 0;
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "%s", error_text.c_str());
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
     }
     return true;
 }
@@ -847,14 +837,9 @@ static gboolean on_start_recording_click(GtkButton *button, gpointer userdata) {
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
     HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
     if(!hotkey_result.record_hotkey_success) {
-        std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(record_hotkey.hotkey_entry));
-        std::string error_text = "Record start/stop hotkey " + hotkey_text + " can't be used because it's used by another program. Please choose another hotkey";
         gtk_entry_set_text(GTK_ENTRY(record_hotkey.hotkey_entry), "");
         record_hotkey.keysym = 0;
         record_hotkey.modkey_mask = 0;
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "%s", error_text.c_str());
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
     }
     return true;
 }
@@ -884,14 +869,9 @@ static gboolean on_start_streaming_click(GtkButton *button, gpointer userdata) {
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->streaming_page);
     HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
     if(!hotkey_result.streaming_hotkey_success) {
-        std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(streaming_hotkey.hotkey_entry));
-        std::string error_text = "Streaming start/stop hotkey " + hotkey_text + " can't be used because it's used by another program. Please choose another hotkey";
         gtk_entry_set_text(GTK_ENTRY(streaming_hotkey.hotkey_entry), "");
         streaming_hotkey.keysym = 0;
         streaming_hotkey.modkey_mask = 0;
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "%s", error_text.c_str());
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
     }
     return true;
 }
