@@ -37,7 +37,7 @@
             <description>
             <ul>
                 <li>Add VRR record option, only use with VRR as it might have driver issues!</li>
-                <li>Add opus/flac audio options. Opus is only supported by .mp4/.mkv and flac is only supported by .mkv. Automatically changes audio codec if not supported by the container</li>
+                <li>Add opus/flac audio options. opus/flac is only supported by .mp4/.mkv. Automatically changes audio codec if not supported by the container</li>
             </ul>
             </description>
         </release>
