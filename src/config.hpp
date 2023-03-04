@@ -24,7 +24,8 @@ struct MainConfig {
     bool merge_audio_tracks = true;
     std::vector<std::string> audio_input;
     std::string quality;
-    std::string codec;
+    std::string codec; // Video codec
+    std::string audio_codec;
 };
 
 struct StreamingConfig {
@@ -242,6 +243,8 @@ static Config read_config() {
             config.main_config.quality.assign(value.str, value.size);
         } else if(key == "main.codec") {
             config.main_config.codec.assign(value.str, value.size);
+        } else if(key == "main.audio_codec") {
+            config.main_config.audio_codec.assign(value.str, value.size);
         } else if(key == "streaming.service") {
             config.streaming_config.streaming_service.assign(value.str, value.size);
         } else if(key == "streaming.key") {
@@ -325,6 +328,7 @@ static void save_config(const Config &config) {
     }
     fprintf(file, "main.quality %s\n", config.main_config.quality.c_str());
     fprintf(file, "main.codec %s\n", config.main_config.codec.c_str());
+    fprintf(file, "main.audio_codec %s\n", config.main_config.audio_codec.c_str());
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());

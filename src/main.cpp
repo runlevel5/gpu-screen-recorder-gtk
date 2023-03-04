@@ -48,7 +48,8 @@ static GtkSpinButton *area_height_entry;
 static GtkComboBoxText *record_area_selection_menu;
 static GtkComboBoxText *audio_input_menu_todo;
 static GtkComboBoxText *quality_input_menu;
-static GtkComboBoxText *codec_input_menu;
+static GtkComboBoxText *video_codec_input_menu;
+static GtkComboBoxText *audio_codec_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
 static GtkComboBoxText *record_container;
 static GtkComboBoxText *replay_container;
@@ -361,7 +362,8 @@ static void save_configs() {
         config.main_config.audio_input.push_back(gtk_label_get_text(GTK_LABEL(audio_row->label)));
     });
     config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
-    config.main_config.codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(codec_input_menu));
+    config.main_config.codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
+    config.main_config.audio_codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
@@ -991,13 +993,14 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
     const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(replay_container));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
-    const gchar* codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(codec_input_menu));
+    const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
+    const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", codec_input_str, "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", dir
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", dir
     };
 
     std::string merge_audio_tracks_arg_value;
@@ -1111,13 +1114,14 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
     const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_container));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
-    const gchar* codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(codec_input_menu));
+    const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
+    const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", codec_input_str, "-f", fps_str.c_str(), "-o", record_file_current_filename.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-o", record_file_current_filename.c_str()
     };
 
     std::string merge_audio_tracks_arg_value;
@@ -1230,13 +1234,14 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     }
 
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
-    const gchar* codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(codec_input_menu));
+    const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
+    const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-k", codec_input_str, "-f", fps_str.c_str(), "-o", stream_url.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-o", stream_url.c_str()
     };
 
     std::string merge_audio_tracks_arg_value;
@@ -1657,7 +1662,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_text_append(record_area_selection_menu, "focused", "Follow focused window");
     if(nvfbc_installed) {
         gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
-        gtk_combo_box_text_append(record_area_selection_menu, "screen-direct", "All monitors, direct mode (VRR workaround)");
+        gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
         for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
@@ -1811,16 +1816,27 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
     gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
 
-    GtkGrid *codec_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(codec_grid), 0, grid_row++, 2, 1);
-    gtk_grid_attach(codec_grid, gtk_label_new("Codec: "), 0, 0, 1, 1);
-    codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(codec_input_menu, "auto", "Auto (Recommended)");
-    gtk_combo_box_text_append(codec_input_menu, "h264", "H264");
-    gtk_combo_box_text_append(codec_input_menu, "h265", "HEVC");
-    gtk_widget_set_hexpand(GTK_WIDGET(codec_input_menu), true);
-    gtk_grid_attach(codec_grid, GTK_WIDGET(codec_input_menu), 1, 0, 1, 1);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(codec_input_menu), 0);
+    GtkGrid *video_codec_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(video_codec_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
+    video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
+    gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
+    gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
+    gtk_widget_set_hexpand(GTK_WIDGET(video_codec_input_menu), true);
+    gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_input_menu), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(video_codec_input_menu), 0);
+
+    GtkGrid *audio_codec_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(audio_codec_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(audio_codec_grid, gtk_label_new("Audio codec: "), 0, 0, 1, 1);
+    audio_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(audio_codec_input_menu, "opus", "Opus (Recommended)");
+    gtk_combo_box_text_append(audio_codec_input_menu, "aac", "AAC");
+    gtk_combo_box_text_append(audio_codec_input_menu, "flac", "FLAC");
+    gtk_widget_set_hexpand(GTK_WIDGET(audio_codec_input_menu), true);
+    gtk_grid_attach(audio_codec_grid, GTK_WIDGET(audio_codec_input_menu), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(audio_codec_input_menu), 0);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, grid_row++, 2, 1);
@@ -2137,7 +2153,7 @@ static void load_config() {
         //
     } else if(strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
         //
-    } else if(strcmp(config.main_config.record_area_option.c_str(), "screen") == 0 || strcmp(config.main_config.record_area_option.c_str(), "screen-direct") == 0) {
+    } else if(strcmp(config.main_config.record_area_option.c_str(), "screen") == 0 || strcmp(config.main_config.record_area_option.c_str(), "screen-direct-force") == 0) {
         //
     } else {
         bool found_monitor = false;
@@ -2177,8 +2193,11 @@ static void load_config() {
     if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
         config.main_config.quality = "very_high";
 
-    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.quality != "h265")
+    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265")
         config.main_config.codec = "auto";
+
+    if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac" && config.main_config.audio_codec != "flac")
+        config.main_config.audio_codec = "opus";
 
     if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube" && config.streaming_config.streaming_service != "custom")
         config.streaming_config.streaming_service = "twitch";
@@ -2206,7 +2225,8 @@ static void load_config() {
         add_audio_input_track(audio_input.c_str());
     }
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(quality_input_menu), config.main_config.quality.c_str());
-    gtk_combo_box_set_active_id(GTK_COMBO_BOX(codec_input_menu), config.main_config.codec.c_str());
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_codec_input_menu), config.main_config.audio_codec.c_str());
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
@@ -2309,7 +2329,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
     // TODO: Remove once gpu screen recorder supports amd and intel properly
     if(gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "GPU Screen Recorder does currently only support NVIDIA GPUs. You are using a laptop with a NVIDIA gpu then make sure you are running in NVIDIA performance mode, to make sure that everything runs on your NVIDIA GPU");
+            "GPU Screen Recorder does currently only support NVIDIA GPUs. If you are using a laptop with a NVIDIA GPU then make sure you are using your NVIDIA GPU for all graphics (NVIDIA performance mode). Make sure you have done this PROPERLY. You can verify this by using this command:\nglxinfo | grep 'client glx'\nand see if it says NVIDIA Corporation");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
