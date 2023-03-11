@@ -957,7 +957,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         gtk_widget_set_sensitive(GTK_WIDGET(replay_save_button), false);
 
         if(!exit_success)
-            show_notification(app, "GPU Screen Recorder", "gpu-screen-recorder died unexpectedly while recording", G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "Failed to start replay. Either your graphics card doesn't support GPU Screen Recorder or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
 
         return true;
     }
@@ -1076,8 +1076,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
             std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
         } else {
-            std::string notification_body = std::string("Failed to save the recording to ") + record_file_current_filename;
-            show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
         }
         return true;
     }
@@ -1187,7 +1186,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         if(exit_success) {
             show_notification(app, "GPU Screen Recorder", "Stopped streaming", G_NOTIFICATION_PRIORITY_NORMAL);
         } else {
-            show_notification(app, "GPU Screen Recorder", "The streaming failed with an error", G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "Failed to stream video. There is either an error in your streaming config or your graphics card doesn't support GPU Screen Recorder", G_NOTIFICATION_PRIORITY_URGENT);
         }
 
         return true;
@@ -1796,6 +1795,14 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_halign(merge_audio_tracks_button, GTK_ALIGN_START);
     gtk_grid_attach(grid, merge_audio_tracks_button, 0, grid_row++, 2, 1);
 
+    GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(fps_grid, gtk_label_new("Frame rate: "), 0, 0, 1, 1);
+    fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 5000.0, 1.0));
+    gtk_spin_button_set_value(fps_entry, 60.0);
+    gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
+    gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
+
     GtkGrid *quality_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(quality_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
@@ -1807,14 +1814,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_hexpand(GTK_WIDGET(quality_input_menu), true);
     gtk_grid_attach(quality_grid, GTK_WIDGET(quality_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(quality_input_menu), 0);
-
-    GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, grid_row++, 2, 1);
-    gtk_grid_attach(fps_grid, gtk_label_new("Frame rate: "), 0, 0, 1, 1);
-    fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 5000.0, 1.0));
-    gtk_spin_button_set_value(fps_entry, 60.0);
-    gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
-    gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
 
     GtkGrid *video_codec_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(video_codec_grid), 0, grid_row++, 2, 1);
@@ -2329,7 +2328,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
     // TODO: Remove once gpu screen recorder supports amd and intel properly
     if(gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "GPU Screen Recorder does currently only support NVIDIA GPUs. If you are using a laptop with a NVIDIA GPU then make sure you are using your NVIDIA GPU for all graphics (NVIDIA performance mode). Make sure you have done this PROPERLY. You can verify this by using this command:\nglxinfo | grep 'client glx'\nand see if it says NVIDIA Corporation");
+            "GPU Screen Recorder does currently only support NVIDIA GPUs. If you are using a laptop with a NVIDIA GPU then make sure you are using your NVIDIA GPU for all graphics (NVIDIA performance mode). Make sure you have done this PROPERLY. You can verify this by using this command:\nglxinfo | grep 'client glx'\nand see if it says NVIDIA Corporation.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
