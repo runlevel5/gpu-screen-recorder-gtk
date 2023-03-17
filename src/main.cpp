@@ -76,6 +76,11 @@ static GtkWidget *replay_start_stop_hotkey_button;
 static GtkWidget *replay_save_hotkey_button;
 static GtkWidget *streaming_hotkey_button;
 static GtkWidget *merge_audio_tracks_button;
+static GtkGrid *video_codec_grid;
+static GtkGrid *audio_codec_grid;
+static GtkComboBoxText *view_combo_box;
+static GtkGrid *overclock_grid;
+static GtkWidget *overclock_button;
 
 static XIM xim;
 static XIC xic;
@@ -364,6 +369,8 @@ static void save_configs() {
     config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     config.main_config.codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     config.main_config.audio_codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
+    config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
+    config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
@@ -1003,6 +1010,9 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", dir
     };
 
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
+        args.insert(args.end(), { "-oc", "yes" });
+
     std::string merge_audio_tracks_arg_value;
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
         for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&merge_audio_tracks_arg_value](const AudioRow *audio_row) {
@@ -1123,6 +1133,9 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-o", record_file_current_filename.c_str()
     };
 
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
+        args.insert(args.end(), { "-oc", "yes" });
+
     std::string merge_audio_tracks_arg_value;
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
         for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&merge_audio_tracks_arg_value](const AudioRow *audio_row) {
@@ -1242,6 +1255,9 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     std::vector<const char*> args = {
         "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-o", stream_url.c_str()
     };
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
+        args.insert(args.end(), { "-oc", "yes" });
 
     std::string merge_audio_tracks_arg_value;
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
@@ -1440,6 +1456,14 @@ static void record_area_item_change_callback(GtkComboBox *widget, gpointer userd
     gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(selected_window_area, "focused") == 0);
     gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(selected_window_area, "focused") == 0);
     enable_stream_record_button_if_info_filled();
+}
+
+static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdata) {
+    (void)userdata;
+    const gchar *selected_view = gtk_combo_box_get_active_id(widget);
+    gtk_widget_set_visible(GTK_WIDGET(video_codec_grid), strcmp(selected_view, "advanced") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), strcmp(selected_view, "advanced") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), strcmp(selected_view, "advanced") == 0);
 }
 
 static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -1645,6 +1669,17 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     int record_area_row = 0;
     int audio_input_area_row = 0;
 
+    GtkGrid *simple_advanced_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(simple_advanced_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(simple_advanced_grid, gtk_label_new("View: "), 0, 0, 1, 1);
+    view_combo_box = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(view_combo_box, "simple", "Simple");
+    gtk_combo_box_text_append(view_combo_box, "advanced", "Advanced");
+    gtk_widget_set_hexpand(GTK_WIDGET(view_combo_box), true);
+    gtk_grid_attach(simple_advanced_grid, GTK_WIDGET(view_combo_box), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
+    g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
+
     GtkFrame *record_area_frame = GTK_FRAME(gtk_frame_new("Record area"));
     gtk_grid_attach(grid, GTK_WIDGET(record_area_frame), 0, grid_row++, 2, 1);
 
@@ -1815,7 +1850,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(quality_grid, GTK_WIDGET(quality_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(quality_input_menu), 0);
 
-    GtkGrid *video_codec_grid = GTK_GRID(gtk_grid_new());
+    video_codec_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(video_codec_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
     video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
@@ -1826,7 +1861,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(video_codec_input_menu), 0);
 
-    GtkGrid *audio_codec_grid = GTK_GRID(gtk_grid_new());
+    audio_codec_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(audio_codec_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(audio_codec_grid, gtk_label_new("Audio codec: "), 0, 0, 1, 1);
     audio_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
@@ -1836,6 +1871,34 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_hexpand(GTK_WIDGET(audio_codec_input_menu), true);
     gtk_grid_attach(audio_codec_grid, GTK_WIDGET(audio_codec_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(audio_codec_input_menu), 0);
+
+    // TODO: Hide this when gpu is not NVIDIA
+    overclock_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(overclock_grid), 0, grid_row++, 2, 1);
+    overclock_button = gtk_check_button_new_with_label("Overclock memory transfer rate to workaround NVIDIA driver performance bug");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), false);
+    gtk_widget_set_halign(overclock_button, GTK_ALIGN_START);
+    gtk_grid_attach(overclock_grid, overclock_button, 0, 0, 1, 1);
+    GtkButton *overclock_info_button = GTK_BUTTON(gtk_button_new_with_label("?"));
+    gtk_grid_attach(overclock_grid, GTK_WIDGET(overclock_info_button), 1, 0, 1, 1);
+
+    g_signal_connect(overclock_info_button, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer userdata){
+        (void)button;
+        (void)userdata;
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "NVIDIA driver has a \"feature\" (read: bug) where it will downclock memory transfer rate when a program uses CUDA, such as GPU Screen Recorder.\n"
+            "To work around this bug, GPU Screen Recorder can overclock your GPU memory transfer rate to it's normal optimal level. To enable overclocking for optimal performance enable the \"Overclock memory transfer rate to workaround NVIDIA driver performance bug\" option.\n"
+            "You also need to have \"Coolbits\" NVIDIA X setting set to \"12\" to enable overclocking. This setting is automatically installed if you installed GPU Screen Recorder from AUR or from source, but not if you installed GPU Screen Recorder flatpak.\n"
+            "Click <a href=\"https://wiki.archlinux.org/title/NVIDIA/Tips_and_tricks#Enabling_overclocking\">here</a> to see how to set this up manually or if you are using flatpak.\n"
+            "\n"
+            "Note that this only works when Xorg server is running as root, and using this option will only give you a performance boost if the game you are recording is bottlenecked by your GPU.\n"
+            "\n"
+            "Obs! use at your own risk!");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+
+        return true;
+    }), nullptr);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, grid_row++, 2, 1);
@@ -2226,6 +2289,7 @@ static void load_config() {
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(quality_input_menu), config.main_config.quality.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_codec_input_menu), config.main_config.audio_codec.c_str());
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), config.main_config.overclock);
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
@@ -2257,6 +2321,8 @@ static void load_config() {
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(replay_save_hotkey_button), replay_save_hotkey);
     }
 
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
+    view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
     enable_stream_record_button_if_info_filled();
 }
 

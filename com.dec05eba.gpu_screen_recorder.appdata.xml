@@ -33,6 +33,11 @@
     </screenshots>
 
     <releases>
+        <release version="1.3.4" date="2023-03-17">
+            <description>
+            <p>Add option to workaround a NVIDIA driver "bug" that causes framerate to drop a bit when recording (overclock memory transfer rate back to normal)</p>
+            </description>
+        </release>
         <release version="1.3.3" date="2023-03-11">
             <description>
             <p>Make it clear when graphics card is not supported</p>
