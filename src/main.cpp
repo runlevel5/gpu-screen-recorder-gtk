@@ -2378,13 +2378,39 @@ static bool gl_get_gpu_info(Display *dpy, gpu_info *info) {
     return supported;
 }
 
+static bool is_wayland() {
+    return !gdk_x11_get_default_xdisplay();
+}
+
+static bool is_xwayland() {
+    int opcode, event, error;
+    if(XQueryExtension(gdk_x11_get_default_xdisplay(), "XWAYLAND", &opcode, &event, &error))
+        return true;
+
+    bool xwayland_found = false;
+    for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&xwayland_found](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo*) {
+        if(output_info->nameLen >= 8 && strncmp(output_info->name, "XWAYLAND", 8) == 0)
+            xwayland_found = true;
+    });
+    return xwayland_found;
+}
+
 static void activate(GtkApplication *app, gpointer userdata) {
     nvfbc_installed = is_nv_fbc_installed();
+
+    if(is_wayland() || is_xwayland()) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "GPU Screen Recorder only works in a pure X11 session. Xwayland is not supported");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
 
     gpu_info gpu_inf;
     if(!gl_get_gpu_info(gdk_x11_get_default_xdisplay(), &gpu_inf)) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to get OpenGL information. Make sure your are using a nvidia gpu and graphics drivers installed");
+            "Failed to get OpenGL information. Make sure your are using a NVIDIA GPU and that you have NVIDIA proprietary drivers installed");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
@@ -2394,7 +2420,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
     // TODO: Remove once gpu screen recorder supports amd and intel properly
     if(gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "GPU Screen Recorder does currently only support NVIDIA GPUs. If you are using a laptop with a NVIDIA GPU then make sure you are using your NVIDIA GPU for all graphics (NVIDIA performance mode). Make sure you have done this PROPERLY. You can verify this by using this command:\nglxinfo | grep 'client glx'\nand see if it says NVIDIA Corporation.");
+            "GPU Screen Recorder does currently only support NVIDIA GPUs. If you are using a laptop with a NVIDIA GPU then make sure you are using your NVIDIA GPU for all applications, everything. You can do this by switching to NVIDIA performance mode in nvidia settings and then rebooting. Make sure you have done this PROPERLY. You can verify this by using this command:\nglxinfo | grep 'client glx'\nand see if it says NVIDIA Corporation.\nNote: using prime-run won't fix this as it only runs one application on the NVIDIA GPU. All applications, everything needs to run on the NVIDIA GPU for screen capture to work.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
