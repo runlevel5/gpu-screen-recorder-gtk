@@ -1893,7 +1893,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             "\n"
             "Note that this only works when Xorg server is running as root, and using this option will only give you a performance boost if the game you are recording is bottlenecked by your GPU.\n"
             "\n"
-            "Obs! use at your own risk!");
+            "Note! use at your own risk!");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
 
