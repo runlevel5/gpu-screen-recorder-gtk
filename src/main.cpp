@@ -868,7 +868,7 @@ static gboolean on_start_streaming_click(GtkButton *button, gpointer userdata) {
 
     if(num_audio_tracks > 1 && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Streaming doesn't work with more than 1 audio track. Please remove all audio tracks or only use 1 audio track or select to merge audio tracks");
+            "Streaming doesn't work with more than 1 audio track. Please remove all audio tracks or only use 1 audio track or select to merge audio tracks.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         return true;
@@ -1473,9 +1473,30 @@ static void stream_service_item_change_callback(GtkComboBox *widget, gpointer us
 }
 
 static bool is_nv_fbc_installed() {
-    void *lib = dlopen("libnvidia-fbc.so.1", RTLD_NOW);
+    void *lib = dlopen("libnvidia-fbc.so.1", RTLD_LAZY);
     if(lib)
         dlclose(lib);
+    return lib != nullptr;
+}
+
+static bool is_nvenc_installed() {
+    void *lib = dlopen("libnvidia-encode.so.1", RTLD_LAZY);
+    if(lib)
+        dlclose(lib);
+    return lib != nullptr;
+}
+
+static bool is_cuda_installed() {
+    void *lib = dlopen("libcuda.so.1", RTLD_LAZY);
+    if(lib) {
+        dlclose(lib);
+        return true;
+    }
+
+    lib = dlopen("libcuda.so", RTLD_LAZY);
+    if(lib)
+        dlclose(lib);
+
     return lib != nullptr;
 }
 
@@ -1575,7 +1596,7 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent *event
 
             if(hotkey_already_used_by_another_hotkey) {
                 std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(current_hotkey->hotkey_entry));
-                std::string error_text = "Hotkey " + hotkey_text + " can't be used because it's used for something else. Please choose another hotkey";
+                std::string error_text = "Hotkey " + hotkey_text + " can't be used because it's used for something else. Please choose another hotkey.";
                 set_hotkey_text_from_hotkey_data(GTK_ENTRY(current_hotkey->hotkey_entry), *current_hotkey);
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "%s", error_text.c_str());
                 gtk_dialog_run(GTK_DIALOG(dialog));
@@ -1605,7 +1626,7 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent *event
             } else {
                 *current_hotkey = prev_current_hotkey;
                 std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(current_hotkey->hotkey_entry));
-                std::string error_text = "Hotkey " + hotkey_text + " can't be used because it's used by another program. Please choose another hotkey";
+                std::string error_text = "Hotkey " + hotkey_text + " can't be used because it's used by another program. Please choose another hotkey.";
                 set_hotkey_text_from_hotkey_data(GTK_ENTRY(current_hotkey->hotkey_entry), *current_hotkey);
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "%s", error_text.c_str());
                 gtk_dialog_run(GTK_DIALOG(dialog));
@@ -2400,7 +2421,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
 
     if(is_wayland() || is_xwayland()) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "GPU Screen Recorder only works in a pure X11 session. Xwayland is not supported");
+            "GPU Screen Recorder only works in a pure X11 session. Xwayland is not supported.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
@@ -2410,7 +2431,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
     gpu_info gpu_inf;
     if(!gl_get_gpu_info(gdk_x11_get_default_xdisplay(), &gpu_inf)) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to get OpenGL information. Make sure your are using a NVIDIA GPU and that you have NVIDIA proprietary drivers installed");
+            "Failed to get OpenGL information. Make sure your are using a NVIDIA GPU and that you have NVIDIA proprietary drivers installed.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
@@ -2425,6 +2446,26 @@ static void activate(GtkApplication *app, gpointer userdata) {
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
         return;
+    }
+
+    if(gpu_inf.vendor == GPU_VENDOR_NVIDIA) {
+        if(!is_cuda_installed()) {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "CUDA is not installed on your system. GPU Screen Recorder requires CUDA to be installed to work with a NVIDIA GPU.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
+
+        if(!is_nvenc_installed()) {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "NVENC is not installed on your system. GPU Screen Recorder requires NVENC to be installed to work with a NVIDIA GPU.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
     }
 
     window = gtk_application_window_new(app);
