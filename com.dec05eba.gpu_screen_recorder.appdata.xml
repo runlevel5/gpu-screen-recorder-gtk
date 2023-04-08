@@ -18,7 +18,7 @@
 
     <description>
         <p>
-            This is a screen recorder that has minimal impact on system performance by recording a window using the GPU only, similar to shadowplay on windows. This is the fastest screen recording tool for Linux. It's currently limited to NVIDIA GPUs and X11 (Wayland with Xwayland does NOT work).
+            This is a screen recorder that has minimal impact on system performance by recording a window using the GPU only, similar to shadowplay on windows. This is the fastest screen recording tool for Linux. This screen recorder only works on X11 (Wayland with Xwayland is NOT supported).
         </p>
         <p>
             This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few seconds are saved.
@@ -38,6 +38,11 @@
     </screenshots>
 
     <releases>
+        <release version="2.0.0" date="2023-04-08">
+            <description>
+            <p>Add experimental support for AMD/Intel. Quality might not be well tuned yet and the video is in variable framerate mode, which might cause issues with some out of date video editing software or video players</p>
+            </description>
+        </release>
         <release version="1.3.5" date="2023-03-22">
             <description>
             <p>Show error when using wayland (because wayland is not supported)</p>

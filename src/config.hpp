@@ -138,8 +138,8 @@ static bool file_get_content(const char *filepath, std::string &file_content) {
 }
 
 struct StringView {
-    const char *str;
-    size_t size;
+    const char *str = nullptr;
+    size_t size = 0;
 
     bool operator == (const char *other) const {
         int len = strlen(other);

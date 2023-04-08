@@ -1500,6 +1500,28 @@ static bool is_cuda_installed() {
     return lib != nullptr;
 }
 
+static bool is_program_installed(const StringView program_name) {
+    const char *path = getenv("PATH");
+    if(!path)
+        return false;
+
+    bool program_installed = false;
+    char full_program_path[PATH_MAX];
+    string_split_char(path, ':', [&](StringView line) -> bool {
+        snprintf(full_program_path, sizeof(full_program_path), "%.*s/%.*s", (int)line.size, line.str, (int)program_name.size, program_name.str);
+        if(access(full_program_path, F_OK) == 0) {
+            program_installed = true;
+            return false;
+        }
+        return true;
+    });
+    return program_installed;
+}
+
+static bool is_pkexec_installed() {
+    return is_program_installed({ "pkexec", 6 });
+}
+
 typedef gboolean (*KeyPressHandler)(GtkButton *button, gpointer userdata);
 static void keypress_toggle_recording(bool recording_state, GtkButton *record_button, KeyPressHandler keypress_handler, GtkApplication *app) {
     if(!gtk_widget_get_sensitive(GTK_WIDGET(record_button)))
@@ -2416,6 +2438,15 @@ static bool is_xwayland() {
     return xwayland_found;
 }
 
+static const char* gpu_vendor_to_name(gpu_vendor vendor) {
+    switch(vendor) {
+        case GPU_VENDOR_AMD:        return "AMD";
+        case GPU_VENDOR_INTEL:      return "Intel";
+        case GPU_VENDOR_NVIDIA:     return "NVIDIA";
+    }
+    return "";
+}
+
 static void activate(GtkApplication *app, gpointer userdata) {
     nvfbc_installed = is_nv_fbc_installed();
 
@@ -2432,16 +2463,6 @@ static void activate(GtkApplication *app, gpointer userdata) {
     if(!gl_get_gpu_info(gdk_x11_get_default_xdisplay(), &gpu_inf)) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to get OpenGL information. Make sure your are using a NVIDIA GPU and that you have NVIDIA proprietary drivers installed.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
-    }
-
-    // TODO: Remove once gpu screen recorder supports amd and intel properly
-    if(gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
-        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "GPU Screen Recorder does currently only support NVIDIA GPUs. If you are using a laptop with a NVIDIA GPU then make sure you are using your NVIDIA GPU for all applications, everything. You can do this by switching to NVIDIA performance mode in nvidia settings and then rebooting. Make sure you have done this PROPERLY. You can verify this by using this command:\nglxinfo | grep 'client glx'\nand see if it says NVIDIA Corporation.\nNote: using prime-run won't fix this as it only runs one application on the NVIDIA GPU. All applications, everything needs to run on the NVIDIA GPU for screen capture to work.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
@@ -2466,11 +2487,23 @@ static void activate(GtkApplication *app, gpointer userdata) {
             g_application_quit(G_APPLICATION(app));
             return;
         }
+    } else {
+        if(!is_pkexec_installed()) {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "pkexec needs to be installed to record a monitor on systems with AMD/Intel GPU. Please install polkit which provides pkexec.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
     }
+
+    std::string window_title = "GPU Screen Recorder | Running on ";
+    window_title += gpu_vendor_to_name(gpu_inf.vendor);
 
     window = gtk_application_window_new(app);
     g_signal_connect(window, "destroy", G_CALLBACK(on_destroy_window), nullptr);
-    gtk_window_set_title(GTK_WINDOW(window), "GPU Screen Recorder");
+    gtk_window_set_title(GTK_WINDOW(window), window_title.c_str());
     gtk_window_set_resizable(GTK_WINDOW(window), false);
 
     select_window_userdata.app = app;
