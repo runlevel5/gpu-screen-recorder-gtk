@@ -2487,15 +2487,6 @@ static void activate(GtkApplication *app, gpointer userdata) {
             g_application_quit(G_APPLICATION(app));
             return;
         }
-    } else {
-        if(!is_pkexec_installed()) {
-            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "pkexec needs to be installed to record a monitor on systems with AMD/Intel GPU. Please install polkit which provides pkexec.");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(app));
-            return;
-        }
     }
 
     std::string window_title = "GPU Screen Recorder | Running on ";
