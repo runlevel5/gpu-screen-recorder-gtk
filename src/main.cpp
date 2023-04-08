@@ -135,6 +135,17 @@ struct AudioRow {
     std::string id;
 };
 
+typedef enum {
+    GPU_VENDOR_AMD,
+    GPU_VENDOR_INTEL,
+    GPU_VENDOR_NVIDIA
+} gpu_vendor;
+
+typedef struct {
+    gpu_vendor vendor;
+    int gpu_version; /* 0 if unknown */
+} gpu_info;
+
 static void used_audio_input_loop_callback(GtkWidget *row, gpointer userdata) {
     const AudioRow *audio_row = (AudioRow*)g_object_get_data(G_OBJECT(row), "audio-row");
     std::function<void(const AudioRow*)> &callback = *(std::function<void(const AudioRow*)>*)userdata;
@@ -1699,7 +1710,7 @@ static bool audio_inputs_contains(const std::vector<AudioInput> &audio_inputs, c
     return false;
 }
 
-static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app) {
+static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app, const gpu_info &gpu_inf) {
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "common-settings");
     gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
@@ -1737,9 +1748,11 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     record_area_selection_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
     gtk_combo_box_text_append(record_area_selection_menu, "focused", "Follow focused window");
-    if(nvfbc_installed) {
+    const bool allow_screen_capture = nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
+    if(allow_screen_capture) {
         gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
-        gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
+        if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
+            gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
         for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
@@ -1759,7 +1772,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_combo_box_text_append(record_area_selection_menu, id, label.c_str());
         });
     }
-    gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), nvfbc_installed ? 2 : 0);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), allow_screen_capture ? 2 : 0);
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 3, 1);
 
@@ -2251,7 +2264,7 @@ static void add_audio_input_track(const char *name) {
         gtk_widget_set_sensitive(add_audio_input_button, false);
 }
 
-static void load_config() {
+static void load_config(const gpu_info &gpu_inf) {
     config = read_config();
 
     if(strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
@@ -2274,7 +2287,8 @@ static void load_config() {
     }
 
     if(config.main_config.record_area_option.empty()) {
-        if(nvfbc_installed)
+        const bool allow_screen_capture = nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
+        if(allow_screen_capture)
             config.main_config.record_area_option = "screen";
         else
             config.main_config.record_area_option = "window";
@@ -2368,17 +2382,6 @@ static void load_config() {
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
     enable_stream_record_button_if_info_filled();
 }
-
-typedef enum {
-    GPU_VENDOR_AMD,
-    GPU_VENDOR_INTEL,
-    GPU_VENDOR_NVIDIA
-} gpu_vendor;
-
-typedef struct {
-    gpu_vendor vendor;
-    int gpu_version; /* 0 if unknown */
-} gpu_info;
 
 static bool gl_get_gpu_info(Display *dpy, gpu_info *info) {
     gsr_egl gl;
@@ -2506,7 +2509,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
     gtk_stack_set_transition_type(stack, GTK_STACK_TRANSITION_TYPE_NONE);
     gtk_stack_set_transition_duration(stack, 0);
     gtk_stack_set_homogeneous(stack, false);
-    GtkWidget *common_settings_page = create_common_settings_page(stack, app);
+    GtkWidget *common_settings_page = create_common_settings_page(stack, app, gpu_inf);
     GtkWidget *replay_page = create_replay_page(app, stack);
     GtkWidget *recording_page = create_recording_page(app, stack);
     GtkWidget *streaming_page = create_streaming_page(app, stack);
@@ -2537,7 +2540,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
     g_timeout_add(1000, handle_child_process_death, app);
 
     gtk_widget_show_all(window);
-    load_config();
+    load_config(gpu_inf);
 }
 
 int main(int argc, char **argv) {
