@@ -1529,8 +1529,15 @@ static bool is_program_installed(const StringView program_name) {
     return program_installed;
 }
 
+static bool is_inside_flatpak(void) {
+    return getenv("FLATPAK_ID") != NULL;
+}
+
 static bool is_pkexec_installed() {
-    return is_program_installed({ "pkexec", 6 });
+    if(is_inside_flatpak())
+        return system("flatpak-spawn --host pkexec --version") == 0;
+    else
+        return is_program_installed({ "pkexec", 6 });
 }
 
 typedef gboolean (*KeyPressHandler)(GtkButton *button, gpointer userdata);
@@ -2485,6 +2492,15 @@ static void activate(GtkApplication *app, gpointer userdata) {
         if(!is_nvenc_installed()) {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "NVENC is not installed on your system. GPU Screen Recorder requires NVENC to be installed to work with a NVIDIA GPU.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
+    } else {
+        if(!is_pkexec_installed()) {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "pkexec needs to be installed to record a monitor with an AMD/Intel GPU. Please install and run polkit.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(app));
