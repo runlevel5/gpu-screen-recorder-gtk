@@ -1540,6 +1540,10 @@ static bool is_pkexec_installed() {
         return is_program_installed({ "pkexec", 6 });
 }
 
+static bool flatpak_is_installed_as_system(void) {
+    return system("flatpak run --system --command=pwd com.dec05eba.gpu_screen_recorder") == 0;
+}
+
 typedef gboolean (*KeyPressHandler)(GtkButton *button, gpointer userdata);
 static void keypress_toggle_recording(bool recording_state, GtkButton *record_button, KeyPressHandler keypress_handler, GtkApplication *app) {
     if(!gtk_widget_get_sensitive(GTK_WIDGET(record_button)))
@@ -2501,6 +2505,16 @@ static void activate(GtkApplication *app, gpointer userdata) {
         if(!is_pkexec_installed()) {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "pkexec needs to be installed to record a monitor with an AMD/Intel GPU. Please install and run polkit.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
+
+        if(is_inside_flatpak() && !flatpak_is_installed_as_system()) {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel. To install GPU Screen recorder system-wide, you can run this command:\n"
+                "flatpak install flathub --system com.dec05eba.gpu_screen_recorder");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(app));
