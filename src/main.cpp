@@ -1541,7 +1541,7 @@ static bool is_pkexec_installed() {
 }
 
 static bool flatpak_is_installed_as_system(void) {
-    return system("flatpak run --system --command=pwd com.dec05eba.gpu_screen_recorder") == 0;
+    return system("flatpak-spawn --host flatpak run --system --command=pwd com.dec05eba.gpu_screen_recorder") == 0;
 }
 
 typedef gboolean (*KeyPressHandler)(GtkButton *button, gpointer userdata);
