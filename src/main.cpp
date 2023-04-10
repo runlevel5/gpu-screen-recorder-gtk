@@ -1804,11 +1804,13 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
             gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
 
-        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
+        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&](const XRROutputInfo *output_info, const XRRCrtcInfo *crtc_info, const XRRModeInfo*) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
             label += " (";
-            label.append(mode_info->name, mode_info->nameLength);
+            label += std::to_string(crtc_info->width);
+            label += "x";
+            label += std::to_string(crtc_info->height);
             if(gpu_inf.vendor != GPU_VENDOR_NVIDIA)
                 label += ", requires root access";
             label += ")";
@@ -2328,7 +2330,7 @@ static void load_config(const gpu_info &gpu_inf) {
     } else {
         bool found_monitor = false;
         int monitor_name_size = strlen(config.main_config.record_area_option.c_str());
-        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&](const XRROutputInfo *output_info, const XRRCrtcInfo *crtc_info, const XRRModeInfo*) {
+        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo*) {
             if(monitor_name_size == output_info->nameLen && strncmp(config.main_config.record_area_option.c_str(), output_info->name, output_info->nameLen) == 0) {
                 found_monitor = true;
             }
