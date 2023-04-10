@@ -146,6 +146,8 @@ typedef struct {
     int gpu_version; /* 0 if unknown */
 } gpu_info;
 
+static gpu_info gpu_inf;
+
 static void used_audio_input_loop_callback(GtkWidget *row, gpointer userdata) {
     const AudioRow *audio_row = (AudioRow*)g_object_get_data(G_OBJECT(row), "audio-row");
     std::function<void(const AudioRow*)> &callback = *(std::function<void(const AudioRow*)>*)userdata;
@@ -1474,7 +1476,7 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     const gchar *selected_view = gtk_combo_box_get_active_id(widget);
     gtk_widget_set_visible(GTK_WIDGET(video_codec_grid), strcmp(selected_view, "advanced") == 0);
     gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), strcmp(selected_view, "advanced") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), strcmp(selected_view, "advanced") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), strcmp(selected_view, "advanced") == 0 && gpu_inf.vendor == GPU_VENDOR_NVIDIA);
 }
 
 static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -1939,7 +1941,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(audio_codec_grid, GTK_WIDGET(audio_codec_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(audio_codec_input_menu), 0);
 
-    // TODO: Hide this when gpu is not NVIDIA
     overclock_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(overclock_grid), 0, grid_row++, 2, 1);
     overclock_button = gtk_check_button_new_with_label("Overclock memory transfer rate to workaround NVIDIA driver performance bug");
@@ -2473,7 +2474,6 @@ static void activate(GtkApplication *app, gpointer userdata) {
         return;
     }
 
-    gpu_info gpu_inf;
     if(!gl_get_gpu_info(gdk_x11_get_default_xdisplay(), &gpu_inf)) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to get OpenGL information. Make sure your are using a NVIDIA GPU and that you have NVIDIA proprietary drivers installed.");
