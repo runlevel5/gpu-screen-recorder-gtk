@@ -148,6 +148,39 @@ typedef struct {
 
 static gpu_info gpu_inf;
 
+static bool is_program_installed(const StringView program_name) {
+    const char *path = getenv("PATH");
+    if(!path)
+        return false;
+
+    bool program_installed = false;
+    char full_program_path[PATH_MAX];
+    string_split_char(path, ':', [&](StringView line) -> bool {
+        snprintf(full_program_path, sizeof(full_program_path), "%.*s/%.*s", (int)line.size, line.str, (int)program_name.size, program_name.str);
+        if(access(full_program_path, F_OK) == 0) {
+            program_installed = true;
+            return false;
+        }
+        return true;
+    });
+    return program_installed;
+}
+
+static bool is_inside_flatpak(void) {
+    return getenv("FLATPAK_ID") != NULL;
+}
+
+static bool is_pkexec_installed() {
+    if(is_inside_flatpak())
+        return system("flatpak-spawn --host pkexec --version") == 0;
+    else
+        return is_program_installed({ "pkexec", 6 });
+}
+
+static bool flatpak_is_installed_as_system(void) {
+    return system("flatpak-spawn --host flatpak run --system --command=pwd com.dec05eba.gpu_screen_recorder") == 0;
+}
+
 static void used_audio_input_loop_callback(GtkWidget *row, gpointer userdata) {
     const AudioRow *audio_row = (AudioRow*)g_object_get_data(G_OBJECT(row), "audio-row");
     std::function<void(const AudioRow*)> &callback = *(std::function<void(const AudioRow*)>*)userdata;
@@ -837,7 +870,34 @@ static HotkeyResult replace_grabbed_keys_depending_on_active_page() {
     return hotkey_result;
 }
 
+static bool show_pkexec_flatpak_error_if_needed() {
+    std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    if(gpu_inf.vendor != GPU_VENDOR_NVIDIA && window_str != "window" && window_str != "focused") {
+        if(!is_pkexec_installed()) {
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "pkexec needs to be installed to record a monitor with an AMD/Intel GPU. Please install and run polkit. Alternatively, record a single window which doesn't require root access.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            return true;
+        }
+
+        if(is_inside_flatpak() && !flatpak_is_installed_as_system()) {
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel. To install GPU Screen recorder system-wide, you can run this command:\n"
+                "flatpak install flathub --system com.dec05eba.gpu_screen_recorder\n"
+                "Alternatively, record a single window which doesn't have this restriction.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            return true;
+        }
+    }
+    return false;
+}
+
 static gboolean on_start_replay_click(GtkButton *button, gpointer userdata) {
+    if(show_pkexec_flatpak_error_if_needed())
+        return true;
+
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->replay_page);
     HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
@@ -855,6 +915,9 @@ static gboolean on_start_replay_click(GtkButton *button, gpointer userdata) {
 }
 
 static gboolean on_start_recording_click(GtkButton *button, gpointer userdata) {
+    if(show_pkexec_flatpak_error_if_needed())
+        return true;
+
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
     HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
@@ -874,6 +937,9 @@ void on_stream_key_icon_click(GtkWidget *widget, gpointer data) {
 }
 
 static gboolean on_start_streaming_click(GtkButton *button, gpointer userdata) {
+    if(show_pkexec_flatpak_error_if_needed())
+        return true;
+
     int num_audio_tracks = 0;
     for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&num_audio_tracks](const AudioRow*) {
         ++num_audio_tracks;
@@ -1513,39 +1579,6 @@ static bool is_cuda_installed() {
     return lib != nullptr;
 }
 
-static bool is_program_installed(const StringView program_name) {
-    const char *path = getenv("PATH");
-    if(!path)
-        return false;
-
-    bool program_installed = false;
-    char full_program_path[PATH_MAX];
-    string_split_char(path, ':', [&](StringView line) -> bool {
-        snprintf(full_program_path, sizeof(full_program_path), "%.*s/%.*s", (int)line.size, line.str, (int)program_name.size, program_name.str);
-        if(access(full_program_path, F_OK) == 0) {
-            program_installed = true;
-            return false;
-        }
-        return true;
-    });
-    return program_installed;
-}
-
-static bool is_inside_flatpak(void) {
-    return getenv("FLATPAK_ID") != NULL;
-}
-
-static bool is_pkexec_installed() {
-    if(is_inside_flatpak())
-        return system("flatpak-spawn --host pkexec --version") == 0;
-    else
-        return is_program_installed({ "pkexec", 6 });
-}
-
-static bool flatpak_is_installed_as_system(void) {
-    return system("flatpak-spawn --host flatpak run --system --command=pwd com.dec05eba.gpu_screen_recorder") == 0;
-}
-
 typedef gboolean (*KeyPressHandler)(GtkButton *button, gpointer userdata);
 static void keypress_toggle_recording(bool recording_state, GtkButton *record_button, KeyPressHandler keypress_handler, GtkApplication *app) {
     if(!gtk_widget_get_sensitive(GTK_WIDGET(record_button)))
@@ -1763,14 +1796,21 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_text_append(record_area_selection_menu, "focused", "Follow focused window");
     const bool allow_screen_capture = nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
     if(allow_screen_capture) {
-        gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
+        if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
+            gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
+        else
+            gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (requires root access)");
+
         if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
             gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
-        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
+
+        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo *mode_info) {
             std::string label = "Monitor ";
             label.append(output_info->name, output_info->nameLen);
             label += " (";
             label.append(mode_info->name, mode_info->nameLength);
+            if(gpu_inf.vendor != GPU_VENDOR_NVIDIA)
+                label += ", requires root access";
             label += ")";
 
             // Leak on purpose, what are you gonna do? stab me?
@@ -2496,25 +2536,6 @@ static void activate(GtkApplication *app, gpointer userdata) {
         if(!is_nvenc_installed()) {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "NVENC is not installed on your system. GPU Screen Recorder requires NVENC to be installed to work with a NVIDIA GPU.");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(app));
-            return;
-        }
-    } else {
-        if(!is_pkexec_installed()) {
-            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "pkexec needs to be installed to record a monitor with an AMD/Intel GPU. Please install and run polkit.");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(app));
-            return;
-        }
-
-        if(is_inside_flatpak() && !flatpak_is_installed_as_system()) {
-            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel. To install GPU Screen recorder system-wide, you can run this command:\n"
-                "flatpak install flathub --system com.dec05eba.gpu_screen_recorder");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(app));
