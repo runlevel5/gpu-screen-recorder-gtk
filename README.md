@@ -11,7 +11,7 @@ More info at [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/
 ## Note
 This software works only on X11 (Wayland with Xwayland is NOT supported).\
 Recording a window doesn't work when using picom in glx mode. However it works in xrender mode or when recording the a monitor/screen (which uses NvFBC).\
-For screen capture to work with PRIME (laptops with a nvidia gpu), you must set the primary GPU to use your dedicated nvidia graphics card. You can do this by selecting "NVIDIA (Performance Mode) in nvidia settings:\
+For screen capture to work with PRIME (laptops with a nvidia gpu), you must set the primary GPU to use your dedicated nvidia graphics card (if you want to record with your NVIDIA GPU). You can do this by selecting "NVIDIA (Performance Mode) in nvidia settings:\
 ![](https://dec05eba.com/images/nvidia-settings-prime.png)\
 and then rebooting your laptop.
 ### TEMPORARY ISSUES
