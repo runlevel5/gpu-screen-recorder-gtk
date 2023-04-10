@@ -14,6 +14,8 @@ Recording a window doesn't work when using picom in glx mode. However it works i
 For screen capture to work with PRIME (laptops with a nvidia gpu), you must set the primary GPU to use your dedicated nvidia graphics card. You can do this by selecting "NVIDIA (Performance Mode) in nvidia settings:\
 ![](https://dec05eba.com/images/nvidia-settings-prime.png)\
 and then rebooting your laptop.
+### TEMPORARY ISSUES
+1) Recording monitor on AMD/Intel has been temporary disables as issues surrounding it are fixed. For now, record a window instead.
 
 # Performance
 On a system with a i5 4690k CPU and a GTX 1080 GPU:\
