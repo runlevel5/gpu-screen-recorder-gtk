@@ -35,3 +35,8 @@ Note that if you use the flatpak version then you wont be able to use overclocki
 
 ## Screenshots
 ![](https://www.dec05eba.com/images/gpu-screen-recorder.png)
+
+# Donations
+If you really want to donate, you can donate via bitcoin or monero.
+* Bitcoin: bc1qqvuqnwrdyppf707ge27fqz2n9y9gu7lf5ypyuf
+* Monero: 4An9kp2qW1C9Gah7ewv4JzcNFQ5TAX7ineGCqXWK6vQnhsGGcRpNgcn8r9EC3tMcgY7vqCKs3nSRXhejMHBaGvFdN2egYet
