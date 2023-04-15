@@ -1794,7 +1794,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     record_area_selection_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
     gtk_combo_box_text_append(record_area_selection_menu, "focused", "Follow focused window");
-    const bool allow_screen_capture = nvfbc_installed;
+    const bool allow_screen_capture = nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
     if(allow_screen_capture) {
         if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
             gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
@@ -2341,7 +2341,7 @@ static void load_config(const gpu_info &gpu_inf) {
     }
 
     if(config.main_config.record_area_option.empty()) {
-        const bool allow_screen_capture = nvfbc_installed;
+        const bool allow_screen_capture = nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
         if(allow_screen_capture)
             config.main_config.record_area_option = "screen";
         else

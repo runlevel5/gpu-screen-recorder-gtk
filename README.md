@@ -12,7 +12,7 @@ More info at [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/
 This software works only on X11 (Wayland with Xwayland is NOT supported).
 ### TEMPORARY ISSUES
 1) Recording monitor on AMD/Intel has been temporary disables as issues surrounding it are fixed. For now, record a window instead.
-
+2) recording the monitor on steam deck might fail sometimes. This happens even when using ffmpeg directly. This might be a steam deck driver bug. Recording a single window doesn't have this issue.
 # Performance
 On a system with a i5 4690k CPU and a GTX 1080 GPU:\
 When recording Legend of Zelda Breath of the Wild at 4k, fps drops from 30 to 7 when using OBS Studio + nvenc, however when using this screen recorder the fps remains at 30.\
@@ -21,6 +21,8 @@ It is recommended to save the video to a SSD because of the large file size, whi
 Note that if you have a very powerful CPU and a not so powerful GPU and play a game that is bottlenecked by your GPU and barely uses your CPU then a CPU based screen recording (such as OBS with libx264 instead of nvenc) might perform slightly better than GPU Screen Recorder. At least on NVIDIA.
 ## Note about optimal performance on NVIDIA
 NVIDIA driver has a "feature" (read: bug) where it will downclock memory transfer rate when a program uses cuda (or nvenc, which uses cuda), such as GPU Screen Recorder. See https://git.dec05eba.com/gpu-screen-recorder/about/ for more information and how to overcome this.
+## Note about optimal performance on AMD/Intel
+Performance is the same when recording a single window or the monitor, however in some cases, such as when gpu usage is 100%, the video capture rate might be slower than the games fps when recording a single window instead of a monitor. Recording the monitor instead is recommended in such cases.
 
 ## Installation
 This program depends on [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
