@@ -38,6 +38,11 @@
     </screenshots>
 
     <releases>
+        <release version="2.1.0" date="2023-04-15">
+            <description>
+                <p>Enable AMD/Intel monitor capture. Requires the flatpak to be installed system-wide and it requires restricted root access. Record a single window if you dont like these restrictions.</p>
+            </description>
+        </release>
         <release version="2.0.0" date="2023-04-11">
             <description>
                 <p>Add experimental support for AMD/Intel. Quality might not be well tuned yet and the video is in variable framerate mode, which might cause issues with some out of date video editing software or video players. Recording on AMD/intel is currently limited to a window (monitor capture is not possible yet).</p>

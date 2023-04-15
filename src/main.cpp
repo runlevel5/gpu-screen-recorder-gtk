@@ -1812,7 +1812,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             label += "x";
             label += std::to_string(crtc_info->height);
             if(gpu_inf.vendor != GPU_VENDOR_NVIDIA)
-                label += ", requires root access";
+                label += ", requires root access, may perform better";
             label += ")";
 
             // Leak on purpose, what are you gonna do? stab me?
