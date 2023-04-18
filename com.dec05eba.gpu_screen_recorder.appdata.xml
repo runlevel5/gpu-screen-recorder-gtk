@@ -38,9 +38,9 @@
     </screenshots>
 
     <releases>
-        <release version="2.1.0" date="2023-04-15">
+        <release version="2.1.0" date="2023-04-19">
             <description>
-                <p>Enable AMD/Intel monitor capture. Requires the flatpak to be installed system-wide and it requires restricted root access. Record a single window if you dont like these restrictions.</p>
+                <p>Enable AMD/Intel monitor capture. Requires the flatpak to be installed system-wide and it requires restricted root access. Record a single window if you dont like these restrictions. Videos created on AMD/Intel should be played with MPV otherwise it might have issues such as stuttering.</p>
             </description>
         </release>
         <release version="2.0.0" date="2023-04-11">
