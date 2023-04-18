@@ -23,6 +23,9 @@
         <p>
             This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few seconds are saved.
         </p>
+        <p>
+            Videos created on AMD/Intel are in variable framerate format. Use MPV to play such videos, otherwise you might experience stuttering in the video if you are using a buggy video player.
+        </p>
     </description>
 
     <launchable type="desktop-id">com.dec05eba.gpu_screen_recorder.desktop</launchable>
