@@ -26,6 +26,9 @@
         <p>
             Videos created on AMD/Intel are in variable framerate format. Use MPV to play such videos, otherwise you might experience stuttering in the video if you are using a buggy video player.
         </p>
+        <p>
+            Note: AMD/Intel screen capture can fail on distros such as Manjaro because those distros disable hardware accelerated h264/hevc. If you use such a distro, then you have to either use another distro or install mesa from source.
+        </p>
     </description>
 
     <launchable type="desktop-id">com.dec05eba.gpu_screen_recorder.desktop</launchable>
@@ -41,6 +44,11 @@
     </screenshots>
 
     <releases>
+        <release version="2.1.1" date="2023-04-22">
+            <description>
+                <p>AMD/Intel: Add support for capturing cursor when recording a monitor. Fix some cases of capture being glitched when using multiple monitors.</p>
+            </description>
+        </release>
         <release version="2.1.0" date="2023-04-18">
             <description>
                 <p>Enable AMD/Intel monitor capture. Requires the flatpak to be installed system-wide and it requires restricted root access. Record a single window if you dont like these restrictions. Videos created on AMD/Intel should be played with MPV otherwise it might have issues such as stuttering.</p>
