@@ -1799,7 +1799,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
             gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
         else
-            gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (requires root access)");
+            gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (requires root access, may perform better)");
 
         if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
             gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
