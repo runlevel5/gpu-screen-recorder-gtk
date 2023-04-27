@@ -24,10 +24,10 @@
             This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few seconds are saved.
         </p>
         <p>
-            Videos created on AMD/Intel are in variable framerate format. Use MPV to play such videos, otherwise you might experience stuttering in the video if you are using a buggy video player.
-        </p>
-        <p>
-            Note: AMD/Intel screen capture can fail on distros such as Manjaro because those distros disable hardware accelerated h264/hevc. If you use such a distro, then you have to either use another distro or install mesa from source.
+            There are some restrictions when recording on AMD/Intel. Videos created on AMD/Intel are in variable framerate format. Very out of date video players might have an issue playing such videos. I recommend using MPV or a browser to play such videos, otherwise you might experience stuttering in the video.
+            Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: flatpak install flathub --system com.dec05eba.gpu_screen_recorder
+            and pkexec needs to be installed on the system.
+            Some distros such as manjaro disable hardware accelerated H264/HEVC which means GPU Screen Recorder wont work on AMD/Intel and you have to either switch to another distro or install mesa from source (or install mesa-git for example).
         </p>
     </description>
 
@@ -44,6 +44,11 @@
     </screenshots>
 
     <releases>
+        <release version="2.1.2" date="2023-04-27">
+            <description>
+                <p>Attempt to fix possible audio/video sync on NVIDIA after recording for a long time. Temporary disable opus/flac because it breaks when recording multiple audio inputs.</p>
+            </description>
+        </release>
         <release version="2.1.1" date="2023-04-22">
             <description>
                 <p>AMD/Intel: Add support for capturing cursor when recording a monitor. Fix some cases of capture being glitched when using multiple monitors.</p>
