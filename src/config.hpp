@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <libgen.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <pwd.h>
 #include <sys/stat.h>
 

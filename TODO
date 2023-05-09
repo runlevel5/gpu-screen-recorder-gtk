@@ -1,5 +1,4 @@
-Capture stderr (ignore fps: 250) and show that in notification on error.
+Capture stderr (ignore fps: 250) and show that in notification on error. Or redirect stderr to a temporary error file and save that file if recording failed and show where the error output was saved (~/gsr-error.log ?).
 Make sure the resolution is allowed for streaming.
 Add list of windows to select from. This makes it easier to select another window that is not in the view to be clickable.
-Detect switchable graphics, to give proper error if cuda is not installed.
 Disable overclocking and show some kind of sign that overclocking is not possible (if coolbits not set).
