@@ -44,6 +44,11 @@
     </screenshots>
 
     <releases>
+        <release version="2.1.3" date="2023-05-12">
+            <description>
+                <p>Attempt to fix possible issue on some systems with amd/intel where capture region is incorrect when multiple monitors are connected.</p>
+            </description>
+        </release>
         <release version="2.1.2" date="2023-04-27">
             <description>
                 <p>Attempt to fix possible audio/video sync on NVIDIA after recording for a long time. Temporary disable opus/flac because it breaks when recording multiple audio inputs.</p>
