@@ -106,6 +106,7 @@ struct Hotkey {
     uint32_t modkey_mask = 0;
     KeySym keysym = None;
     GtkWidget *hotkey_entry = nullptr;
+    GtkWidget *hotkey_active_label = nullptr;
 };
 
 static Hotkey *current_hotkey = nullptr;
@@ -730,6 +731,11 @@ static int xerror_grab_error(Display*, XErrorEvent*) {
 }
 
 static void ungrab_keyboard(Display *display) {
+    if(current_hotkey) {
+        gtk_grab_remove(current_hotkey->hotkey_entry);
+        gtk_widget_set_visible(current_hotkey->hotkey_active_label, false);
+    }
+
     XErrorHandler prev_error_handler = XSetErrorHandler(xerror_dummy);
     XUngrabKeyboard(display, CurrentTime);
     XSync(display, False);
@@ -1722,6 +1728,7 @@ static gboolean on_hotkey_entry_click(GtkWidget *button, gpointer) {
     hotkey_mode = HotkeyMode::NewHotkey;
 
     pressed_hotkey.hotkey_entry = nullptr;
+    pressed_hotkey.hotkey_active_label = nullptr;
     pressed_hotkey.keysym = None;
     pressed_hotkey.modkey_mask = 0;
     latest_hotkey = pressed_hotkey;
@@ -1736,6 +1743,11 @@ static gboolean on_hotkey_entry_click(GtkWidget *button, gpointer) {
         current_hotkey = &replay_save_hotkey;
     } else {
         current_hotkey = nullptr;
+    }
+
+    if(current_hotkey) {
+        gtk_grab_add(current_hotkey->hotkey_entry);
+        gtk_widget_set_visible(current_hotkey->hotkey_active_label, true);
     }
 
     Display *display = gdk_x11_get_default_xdisplay();
@@ -2032,6 +2044,8 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 }
 
 static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
+    int row = 0;
+
     std::string video_filepath = get_home_dir();
     video_filepath += "/Videos";
 
@@ -2042,6 +2056,9 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_row_spacing(grid, 10);
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
+
+    GtkWidget *hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+    gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
 
     GtkWidget *a = gtk_label_new("Press");
     gtk_widget_set_halign(a, GTK_ALIGN_END);
@@ -2061,25 +2078,28 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_halign(replay_save_hotkey_button, GTK_ALIGN_START);
     g_signal_connect(replay_save_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_save_hotkey_button);
 
-    gtk_grid_attach(grid, a, 0, 0, 1, 1);
-    gtk_grid_attach(grid, replay_start_stop_hotkey_button, 1, 0, 1, 1);
-    gtk_grid_attach(grid, b, 2, 0, 1, 1);
-    gtk_grid_attach(grid, replay_save_hotkey_button, 3, 0, 1, 1);
-    gtk_grid_attach(grid, c, 4, 0, 1, 1);
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 5, 1);
+    gtk_grid_attach(grid, a, 0, row, 1, 1);
+    gtk_grid_attach(grid, replay_start_stop_hotkey_button, 1, row, 1, 1);
+    gtk_grid_attach(grid, b, 2, row, 1, 1);
+    gtk_grid_attach(grid, replay_save_hotkey_button, 3, row, 1, 1);
+    gtk_grid_attach(grid, c, 4, row, 1, 1);
+    ++row;
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
 
     replay_start_stop_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
     replay_start_stop_hotkey.keysym = XK_F1;
     replay_start_stop_hotkey.hotkey_entry = replay_start_stop_hotkey_button;
+    replay_start_stop_hotkey.hotkey_active_label = hotkey_active_label;
 
     replay_save_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
     replay_save_hotkey.keysym = XK_F2;
     replay_save_hotkey.hotkey_entry = replay_save_hotkey_button;
+    replay_save_hotkey.hotkey_active_label = hotkey_active_label;
 
     GtkWidget *save_icon = gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_BUTTON);
 
     GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 2, 5, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, row++, 5, 1);
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
     GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the replays?");
     gtk_grid_attach(file_chooser_grid, file_chooser_label, 0, 0, 1, 1);
@@ -2092,7 +2112,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(replay_file_chooser_button), 1, 0, 1, 1);
 
     GtkGrid *container_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, 3, 5, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, row++, 5, 1);
     gtk_grid_attach(container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
     replay_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     for(auto &supported_container : supported_containers) {
@@ -2103,7 +2123,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_combo_box_set_active(GTK_COMBO_BOX(replay_container), 0);
 
     GtkGrid *replay_time_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, 4, 5, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, row++, 5, 1);
     gtk_grid_attach(replay_time_grid, gtk_label_new("Replay time: "), 0, 0, 1, 1);
     replay_time_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 1200.0, 1.0));
     gtk_spin_button_set_value(replay_time_entry, 30.0);
@@ -2112,7 +2132,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
 
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 5, 5, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 5, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     replay_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(replay_back_button), true);
@@ -2133,6 +2153,8 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
 }
 
 static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
+    int row = 0;
+
     std::string video_filepath = get_home_dir();
     video_filepath += "/Videos";
 
@@ -2144,6 +2166,9 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
+    GtkWidget *hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+    gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
+
     GtkWidget *a = gtk_label_new("Press");
     gtk_widget_set_halign(a, GTK_ALIGN_END);
 
@@ -2153,19 +2178,21 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     record_hotkey_button = gtk_entry_new();
     gtk_entry_set_text(GTK_ENTRY(record_hotkey_button), "Alt + F1");
     g_signal_connect(record_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), record_hotkey_button);
-    gtk_grid_attach(grid, a, 0, 0, 1, 1);
-    gtk_grid_attach(grid, record_hotkey_button, 1, 0, 1, 1);
-    gtk_grid_attach(grid, b, 2, 0, 1, 1);
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 3, 1);
+    gtk_grid_attach(grid, a, 0, row, 1, 1);
+    gtk_grid_attach(grid, record_hotkey_button, 1, row, 1, 1);
+    gtk_grid_attach(grid, b, 2, row, 1, 1);
+    ++row;
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
 
     record_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
     record_hotkey.keysym = XK_F1;
     record_hotkey.hotkey_entry = record_hotkey_button;
+    record_hotkey.hotkey_active_label = hotkey_active_label;
 
     GtkWidget *save_icon = gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_BUTTON);
 
     GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, 2, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, row++, 3, 1);
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
     GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the video?");
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_label), 0, 0, 1, 1);
@@ -2178,7 +2205,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(record_file_chooser_button), 1, 0, 1, 1);
 
     GtkGrid *container_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, 3, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, row++, 3, 1);
     gtk_grid_attach(container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
     record_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     for(auto &supported_container : supported_containers) {
@@ -2189,7 +2216,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_combo_box_set_active(GTK_COMBO_BOX(record_container), 0);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 4, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 3, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     record_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(record_back_button), true);
@@ -2203,6 +2230,8 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
 }
 
 static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
+    int row = 0;
+
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "streaming");
     gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
@@ -2210,6 +2239,9 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_row_spacing(grid, 10);
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
+
+    GtkWidget *hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+    gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
 
     GtkWidget *a = gtk_label_new("Press");
     gtk_widget_set_halign(a, GTK_ALIGN_END);
@@ -2220,17 +2252,19 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     streaming_hotkey_button = gtk_entry_new();
     gtk_entry_set_text(GTK_ENTRY(streaming_hotkey_button), "Alt + F1");
     g_signal_connect(streaming_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), streaming_hotkey_button);
-    gtk_grid_attach(grid, a, 0, 0, 1, 1);
-    gtk_grid_attach(grid, streaming_hotkey_button, 1, 0, 1, 1);
-    gtk_grid_attach(grid, b, 2, 0, 1, 1);
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, 1, 3, 1);
+    gtk_grid_attach(grid, a, 0, row, 1, 1);
+    gtk_grid_attach(grid, streaming_hotkey_button, 1, row, 1, 1);
+    gtk_grid_attach(grid, b, 2, row, 1, 1);
+    ++row;
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
 
     streaming_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
     streaming_hotkey.keysym = XK_F1;
     streaming_hotkey.hotkey_entry = streaming_hotkey_button;
+    streaming_hotkey.hotkey_active_label = hotkey_active_label;
 
     GtkGrid *stream_service_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(stream_service_grid), 0, 2, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(stream_service_grid), 0, row++, 3, 1);
     gtk_grid_attach(stream_service_grid, gtk_label_new("Stream service: "), 0, 0, 1, 1);
     stream_service_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(stream_service_input_menu, "twitch", "Twitch");
@@ -2242,7 +2276,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(stream_service_grid, GTK_WIDGET(stream_service_input_menu), 1, 0, 1, 1);
 
     GtkGrid *stream_id_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(stream_id_grid), 0, 3, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(stream_id_grid), 0, row++, 3, 1);
     stream_key_label = GTK_LABEL(gtk_label_new("Stream key: "));
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_key_label), 0, 0, 1, 1);
     stream_id_entry = GTK_ENTRY(gtk_entry_new());
@@ -2255,7 +2289,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_id_entry), 1, 0, 1, 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, 4, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 3, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     stream_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(stream_back_button), true);
@@ -2432,6 +2466,10 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
+    gtk_widget_set_visible(record_hotkey.hotkey_active_label, false);
+    gtk_widget_set_visible(streaming_hotkey.hotkey_active_label, false);
+    gtk_widget_set_visible(replay_start_stop_hotkey.hotkey_active_label, false);
+    gtk_widget_set_visible(replay_save_hotkey.hotkey_active_label, false);
     enable_stream_record_button_if_info_filled();
 }
 
