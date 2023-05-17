@@ -191,11 +191,7 @@ static void for_each_used_audio_input(GtkListBox *list_box, std::function<void(c
     gtk_container_foreach(GTK_CONTAINER(list_box), used_audio_input_loop_callback, &callback);
 }
 
-static GtkTargetEntry entries[] = {
-    { "GTK_LIST_BOX_ROW", GTK_TARGET_SAME_APP, 0 }
-};
-
-static void drag_begin (GtkWidget *widget, GdkDragContext *context, gpointer data) {
+static void drag_begin (GtkWidget *widget, GdkDragContext *context, gpointer) {
     GtkAllocation alloc;
     int x, y;
     double sx, sy;
@@ -218,9 +214,7 @@ static void drag_begin (GtkWidget *widget, GdkDragContext *context, gpointer dat
     cairo_surface_destroy(surface);
 }
 
-static void drag_data_get(GtkWidget *widget, GdkDragContext *context, GtkSelectionData *selection_data,
-    guint info, guint time, gpointer data)
-{
+static void drag_data_get(GtkWidget *widget, GdkDragContext*, GtkSelectionData *selection_data, guint, guint, gpointer) {
     gtk_selection_data_set(selection_data, gdk_atom_intern_static_string("GTK_LIST_BOX_ROW"),
                           32,
                           (const guchar *)&widget,
@@ -238,10 +232,10 @@ static void update_used_audio_input_track_ids() {
     });
 }
 
-static void drag_data_received (GtkWidget *widget, GdkDragContext *context,
-    gint x, gint y,
+static void drag_data_received (GtkWidget *widget, GdkDragContext*,
+    gint, gint,
     GtkSelectionData *selection_data,
-    guint info, guint32 time, gpointer data)
+    guint, guint32, gpointer)
 {
     GtkWidget *target = widget;
 
@@ -276,6 +270,11 @@ static void enable_stream_record_button_if_info_filled() {
 }
 
 static GtkWidget* create_used_audio_input_row(const char *id, const char *text) {
+    char entry_name[] = "GTK_LIST_BOX_ROW";
+    const GtkTargetEntry entries[] = {
+        { entry_name, GTK_TARGET_SAME_APP, 0 }
+    };
+
     GtkWidget *row = gtk_list_box_row_new();
 
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
@@ -287,7 +286,7 @@ static GtkWidget* create_used_audio_input_row(const char *id, const char *text) 
     gtk_container_add(GTK_CONTAINER(box), handle);
 
     int track_number = 1;
-    for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&track_number](const AudioRow *audio_row) {
+    for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&track_number](const AudioRow*) {
         ++track_number;
     });
 
@@ -319,7 +318,7 @@ static GtkWidget* create_used_audio_input_row(const char *id, const char *text) 
     audio_row->id = id;
     g_object_set_data(G_OBJECT(row), "audio-row", audio_row);
 
-    g_signal_connect(remove_button, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer userdata){
+    g_signal_connect(remove_button, "clicked", G_CALLBACK(+[](GtkButton*, gpointer userdata){
         AudioRow *audio_row = (AudioRow*)userdata;
         gtk_combo_box_text_append(audio_input_menu_todo, audio_row->id.c_str(), gtk_label_get_text(GTK_LABEL(audio_row->label)));
         gtk_container_remove (GTK_CONTAINER(gtk_widget_get_parent(audio_row->row)), audio_row->row);
@@ -535,7 +534,7 @@ static Window window_get_target_window_child(Display *display, Window window) {
 }
 
 /* TODO: Look at xwininfo source to figure out how to make this work for different types of window managers */
-static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpointer userdata) {
+static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent*, gpointer userdata) {
     SelectWindowUserdata *select_window_userdata = (SelectWindowUserdata*)userdata;
     XEvent *ev = (XEvent*)xevent;
     //assert(ev->type == ButtonPress);
@@ -593,8 +592,7 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent *event, gpoin
     return GDK_FILTER_REMOVE;
 }
 
-static gboolean on_select_window_button_click(GtkButton *button, gpointer userdata) {
-    GtkApplication *app = (GtkApplication*)userdata;
+static gboolean on_select_window_button_click(GtkButton *button, gpointer) {
     Display *display = gdk_x11_get_default_xdisplay();
     select_window_userdata.display = display;
     select_window_userdata.select_window_button = button;
@@ -721,12 +719,12 @@ static int key_get_name(KeySym key_sym, char *buffer, int buffer_size) {
     return 0;
 }
 
-static int xerror_dummy(Display *dpy, XErrorEvent *ee) {
+static int xerror_dummy(Display*, XErrorEvent*) {
     return 0;
 }
 
 static bool x_failed = false;
-static int xerror_grab_error(Display *dpy, XErrorEvent *ee) {
+static int xerror_grab_error(Display*, XErrorEvent*) {
     x_failed = true;
     return 0;
 }
@@ -894,7 +892,7 @@ static bool show_pkexec_flatpak_error_if_needed() {
     return false;
 }
 
-static gboolean on_start_replay_click(GtkButton *button, gpointer userdata) {
+static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
 
@@ -914,7 +912,7 @@ static gboolean on_start_replay_click(GtkButton *button, gpointer userdata) {
     return true;
 }
 
-static gboolean on_start_recording_click(GtkButton *button, gpointer userdata) {
+static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
 
@@ -929,14 +927,14 @@ static gboolean on_start_recording_click(GtkButton *button, gpointer userdata) {
     return true;
 }
 
-void on_stream_key_icon_click(GtkWidget *widget, gpointer data) {
+void on_stream_key_icon_click(GtkWidget *widget, gpointer) {
     gboolean visible = gtk_entry_get_visibility(GTK_ENTRY(widget));
 
     gtk_entry_set_visibility(GTK_ENTRY(widget), !visible);
     gtk_entry_set_icon_from_icon_name(GTK_ENTRY(widget), GTK_ENTRY_ICON_SECONDARY, visible ? "view-reveal-symbolic.symbolic" : "view-conceal-symbolic.symbolic");
 }
 
-static gboolean on_start_streaming_click(GtkButton *button, gpointer userdata) {
+static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
 
@@ -964,7 +962,7 @@ static gboolean on_start_streaming_click(GtkButton *button, gpointer userdata) {
     return true;
 }
 
-static gboolean on_streaming_recording_replay_page_back_click(GtkButton *button, gpointer userdata) {
+static gboolean on_streaming_recording_replay_page_back_click(GtkButton*, gpointer userdata) {
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->common_settings_page);
     ungrab_keys(gdk_x11_get_default_xdisplay());
@@ -993,13 +991,13 @@ static gboolean file_choose_button_click_handler(GtkButton *button, const char *
     return true;
 }
 
-static gboolean on_record_file_choose_button_click(GtkButton *button, gpointer userdata) {
+static gboolean on_record_file_choose_button_click(GtkButton *button, gpointer) {
     gboolean res = file_choose_button_click_handler(button, "Where do you want to save the video?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, gtk_combo_box_text_get_active_text(record_container));
     config.record_config.save_directory = gtk_button_get_label(button);
     return res;
 }
 
-static gboolean on_replay_file_chooser_button_click(GtkButton *button, gpointer userdata) {
+static gboolean on_replay_file_chooser_button_click(GtkButton *button, gpointer) {
     gboolean res = file_choose_button_click_handler(button, "Where do you want to save the replays?", GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER, gtk_combo_box_text_get_active_text(replay_container));
     config.replay_config.save_directory = gtk_button_get_label(button);
     return res;
@@ -1142,7 +1140,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     return true;
 }
 
-static gboolean on_replay_save_button_click(GtkButton *button, gpointer userdata) {
+static gboolean on_replay_save_button_click(GtkButton*, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
     kill(gpu_screen_recorder_process, SIGUSR1);
     show_notification(app, "GPU Screen Recorder", "Saved replay", G_NOTIFICATION_PRIORITY_NORMAL);
@@ -1419,7 +1417,7 @@ struct AudioInput {
     std::string description;
 };
 
-static void pa_sourcelist_cb(pa_context *ctx, const pa_source_info *source_info, int eol, void *userdata) {
+static void pa_sourcelist_cb(pa_context*, const pa_source_info *source_info, int eol, void *userdata) {
     if(eol > 0)
         return;
 
@@ -1591,7 +1589,7 @@ static void keypress_toggle_recording(bool recording_state, GtkButton *record_bu
     }
 }
 
-static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent *event, gpointer userdata) {
+static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpointer userdata) {
     if(hotkey_mode == HotkeyMode::NoAction)
         return GDK_FILTER_CONTINUE;
 
@@ -1898,7 +1896,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     add_audio_input_button = gtk_button_new_with_label("Add");
     gtk_widget_set_halign(add_audio_input_button, GTK_ALIGN_END);
     gtk_grid_attach(add_audio_grid, add_audio_input_button, 1, 0, 1, 1);
-    g_signal_connect(add_audio_input_button, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer userdata){
+    g_signal_connect(add_audio_input_button, "clicked", G_CALLBACK(+[](GtkButton*, gpointer){
         const gint selected_audio_input = gtk_combo_box_get_active(GTK_COMBO_BOX(audio_input_menu_todo));
         const char *active_id = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_input_menu_todo));
         const char *active_text = gtk_combo_box_text_get_active_text(audio_input_menu_todo);
@@ -2270,7 +2268,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     return GTK_WIDGET(grid);
 }
 
-static gboolean on_destroy_window(GtkWidget *widget, GdkEvent *event, gpointer data) {
+static gboolean on_destroy_window(GtkWidget*, GdkEvent*, gpointer) {
     if(gpu_screen_recorder_process != -1) {
         kill(gpu_screen_recorder_process, SIGINT);
         int status;
@@ -2504,7 +2502,7 @@ static const char* gpu_vendor_to_name(gpu_vendor vendor) {
     return "";
 }
 
-static void activate(GtkApplication *app, gpointer userdata) {
+static void activate(GtkApplication *app, gpointer) {
     nvfbc_installed = is_nv_fbc_installed();
 
     if(is_wayland() || is_xwayland()) {
@@ -2598,7 +2596,7 @@ static void activate(GtkApplication *app, gpointer userdata) {
 
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
-    GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_FLAGS_NONE);
+    GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
     g_signal_connect(app, "activate", G_CALLBACK(activate), nullptr);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
     g_object_unref(app);

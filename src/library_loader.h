@@ -32,11 +32,4 @@ static bool dlsym_load_list(void *handle, const dlsym_assign *dlsyms) {
     return success;
 }
 
-/* |dlsyms| should be null terminated */
-static void dlsym_load_list_optional(void *handle, const dlsym_assign *dlsyms) {
-    for(int i = 0; dlsyms[i].func; ++i) {
-        *dlsyms[i].func = dlsym_print_fail(handle, dlsyms[i].name, false);
-    }
-}
-
 #endif /* GSR_LIBRARY_LOADER_H */
