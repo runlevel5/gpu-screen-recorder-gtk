@@ -44,6 +44,11 @@
     </screenshots>
 
     <releases>
+        <release version="2.1.6" date="2023-06-10">
+            <description>
+                <p>AMD/Intel: fix multi monitor capture coordinate being incorrect for some GPU driver versions.</p>
+            </description>
+        </release>
         <release version="2.1.5" date="2023-05-22">
             <description>
                 <p>Attempt to fix a recent nvidia (cuda) driver bug on RTX cards that causes a freeze when stopping recording.</p>
