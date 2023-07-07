@@ -44,6 +44,11 @@
     </screenshots>
 
     <releases>
+        <release version="2.1.7" date="2023-07-07">
+            <description>
+                <p>Show proper error when running on wayland. Preparing for wayland support.</p>
+            </description>
+        </release>
         <release version="2.1.6" date="2023-06-10">
             <description>
                 <p>AMD/Intel: fix multi monitor capture coordinate being incorrect for some GPU driver versions.</p>
