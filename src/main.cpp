@@ -125,7 +125,7 @@ struct Container {
 static const Container supported_containers[] = {
     { "mp4", "mp4" },
     { "flv", "flv" },
-    { "matroska", "mkv" },
+    { "matroska", "mkv" }, // TODO: Default to this on amd/intel, add (Recommended on AMD/Intel)
     { "mov", "mov" }
 };
 
@@ -2120,7 +2120,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     }
     gtk_widget_set_hexpand(GTK_WIDGET(replay_container), true);
     gtk_grid_attach(container_grid, GTK_WIDGET(replay_container), 1, 0, 1, 1);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(replay_container), 0);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(replay_container), 0); // TODO:
 
     GtkGrid *replay_time_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, row++, 5, 1);
@@ -2213,7 +2213,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     }
     gtk_widget_set_hexpand(GTK_WIDGET(record_container), true);
     gtk_grid_attach(container_grid, GTK_WIDGET(record_container), 1, 0, 1, 1);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(record_container), 0);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(record_container), 0); // TODO:
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 3, 1);
@@ -2514,17 +2514,13 @@ static bool gl_get_gpu_info(Display *dpy, gpu_info *info) {
     return supported;
 }
 
-static bool is_wayland() {
-    return !gdk_x11_get_default_xdisplay();
-}
-
-static bool is_xwayland() {
+static bool is_xwayland(Display *dpy) {
     int opcode, event, error;
-    if(XQueryExtension(gdk_x11_get_default_xdisplay(), "XWAYLAND", &opcode, &event, &error))
+    if(XQueryExtension(dpy, "XWAYLAND", &opcode, &event, &error))
         return true;
 
     bool xwayland_found = false;
-    for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&xwayland_found](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo*) {
+    for_each_active_monitor_output(dpy, [&xwayland_found](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo*) {
         if(output_info->nameLen >= 8 && strncmp(output_info->name, "XWAYLAND", 8) == 0)
             xwayland_found = true;
     });
@@ -2543,7 +2539,11 @@ static const char* gpu_vendor_to_name(gpu_vendor vendor) {
 static void activate(GtkApplication *app, gpointer) {
     nvfbc_installed = is_nv_fbc_installed();
 
-    if(is_wayland() || is_xwayland()) {
+    Display *dpy = XOpenDisplay(NULL);
+    const bool is_wayland = !dpy;
+
+    if(is_wayland || is_xwayland(dpy)) {
+        XCloseDisplay(dpy);
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "GPU Screen Recorder only works in a pure X11 session. Xwayland is not supported.");
         gtk_dialog_run(GTK_DIALOG(dialog));
@@ -2551,6 +2551,7 @@ static void activate(GtkApplication *app, gpointer) {
         g_application_quit(G_APPLICATION(app));
         return;
     }
+    XCloseDisplay(dpy);
 
     if(!gl_get_gpu_info(gdk_x11_get_default_xdisplay(), &gpu_inf)) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
