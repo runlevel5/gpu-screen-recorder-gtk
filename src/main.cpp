@@ -1089,12 +1089,20 @@ static bool show_pkexec_flatpak_error_if_needed() {
         }
 
         if(is_inside_flatpak() && !flatpak_is_installed_as_system()) {
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel. To install GPU Screen recorder system-wide, you can run this command:\n"
-                "flatpak install flathub --system com.dec05eba.gpu_screen_recorder\n"
-                "Alternatively, record a single window which doesn't have this restriction.");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
+            if(wayland) {
+                GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland. To install GPU Screen recorder system-wide, you can run this command:\n"
+                    "flatpak install flathub --system com.dec05eba.gpu_screen_recorder\n");
+                gtk_dialog_run(GTK_DIALOG(dialog));
+                gtk_widget_destroy(dialog);
+            } else {
+                GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel. To install GPU Screen recorder system-wide, you can run this command:\n"
+                    "flatpak install flathub --system com.dec05eba.gpu_screen_recorder\n"
+                    "Alternatively, record a single window which doesn't have this restriction.");
+                gtk_dialog_run(GTK_DIALOG(dialog));
+                gtk_widget_destroy(dialog);
+            }
             return true;
         }
     }
