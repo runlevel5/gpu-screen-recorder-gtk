@@ -9,7 +9,7 @@ where only the last few seconds are saved.
 More info at [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
 
 ## Note
-This software works only on X11 (Wayland with Xwayland is NOT supported).
+This software works with x11 and wayland, but when using wayland only monitors can be recorded and root access is needed.
 ### TEMPORARY ISSUES
 1) Recording the monitor on steam deck might fail sometimes. This happens even when using ffmpeg directly. This might be a steam deck driver bug. Recording a single window doesn't have this issue.
 2) Videos created on AMD/Intel are in variable framerate format. Use MPV to play such videos, otherwise you might experience stuttering in the video if you are using a buggy video player. Try saving the video into a .mkv file instead when using AMD/Intel, as some software may have better support for .mkv files (such as kdenlive).
@@ -27,7 +27,7 @@ Performance is the same when recording a single window or the monitor, however i
 ## Installation
 This program depends on [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
 Run `sudo ./install.sh` or if you are running Arch Linux, then you can find gpu screen recorder gtk on aur under the name gpu-screen-recorder-gtk-git (`yay -S gpu-screen-recorder-gtk-git`).\
-Dependencies needed when building using `build.sh` or `install.sh`: `gtk3 libx11 libxrandr libpulse`.\
+Dependencies needed when building using `build.sh` or `install.sh`: `gtk3 libx11 libxrandr libpulse libdrm wayland-client wayland-egl`.\
 You can also install gpu screen recorder (the gtk gui version) from [flathub](https://flathub.org/apps/details/com.dec05eba.gpu_screen_recorder). This flatpak includes gpu-screen-recorder so no need to install that first.\
 Note that if you use the flatpak version then you wont be able to use overclocking unless you set "Coolbits" NVIDIA X setting. See https://git.dec05eba.com/gpu-screen-recorder/about/ for more information and how to overcome this.
 

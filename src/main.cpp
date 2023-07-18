@@ -19,6 +19,8 @@
 extern "C" {
 #include "egl.h"
 }
+#include <xf86drmMode.h>
+#include <xf86drm.h>
 
 typedef struct {
     Display *display;
@@ -93,6 +95,9 @@ static Config config;
 static int num_audio_inputs_addable = 0;
 static std::string record_file_current_filename;
 static bool nvfbc_installed = false;
+
+static bool wayland = false;
+char drm_card_path[128];
 
 enum class HotkeyMode {
     NoAction,
@@ -257,12 +262,14 @@ static void drag_data_received (GtkWidget *widget, GdkDragContext*,
 }
 
 static void enable_stream_record_button_if_info_filled() {
-    const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
-    if(strcmp(selected_window_area, "window") == 0 && select_window_userdata.selected_window == None) {
-        gtk_widget_set_sensitive(GTK_WIDGET(replay_button), false);
-        gtk_widget_set_sensitive(GTK_WIDGET(record_button), false);
-        gtk_widget_set_sensitive(GTK_WIDGET(stream_button), false);
-        return;
+    if(!wayland) {
+        const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+        if(strcmp(selected_window_area, "window") == 0 && select_window_userdata.selected_window == None) {
+            gtk_widget_set_sensitive(GTK_WIDGET(replay_button), false);
+            gtk_widget_set_sensitive(GTK_WIDGET(record_button), false);
+            gtk_widget_set_sensitive(GTK_WIDGET(stream_button), false);
+            return;
+        }
     }
     
     gtk_widget_set_sensitive(GTK_WIDGET(replay_button), true);
@@ -403,8 +410,10 @@ static std::string get_date_str() {
 
 static void save_configs() {
     config.main_config.record_area_option = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
-    config.main_config.record_area_width = gtk_spin_button_get_value_as_int(area_width_entry);
-    config.main_config.record_area_height = gtk_spin_button_get_value_as_int(area_height_entry);
+    if(!wayland) {
+        config.main_config.record_area_width = gtk_spin_button_get_value_as_int(area_width_entry);
+        config.main_config.record_area_height = gtk_spin_button_get_value_as_int(area_height_entry);
+    }
     config.main_config.fps = gtk_spin_button_get_value_as_int(fps_entry);
     config.main_config.merge_audio_tracks = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button));
 
@@ -420,46 +429,86 @@ static void save_configs() {
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
-    config.streaming_config.start_recording_hotkey.keysym = streaming_hotkey.keysym;
-    config.streaming_config.start_recording_hotkey.modifiers = streaming_hotkey.modkey_mask;
+    if(!wayland) {
+        config.streaming_config.start_recording_hotkey.keysym = streaming_hotkey.keysym;
+        config.streaming_config.start_recording_hotkey.modifiers = streaming_hotkey.modkey_mask;
+    }
 
     config.record_config.save_directory = gtk_button_get_label(record_file_chooser_button);
     config.record_config.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_container));
-    config.record_config.start_recording_hotkey.keysym = record_hotkey.keysym;
-    config.record_config.start_recording_hotkey.modifiers = record_hotkey.modkey_mask;
+    if(!wayland) {
+        config.record_config.start_recording_hotkey.keysym = record_hotkey.keysym;
+        config.record_config.start_recording_hotkey.modifiers = record_hotkey.modkey_mask;
+    }
 
     config.replay_config.save_directory = gtk_button_get_label(replay_file_chooser_button);
     config.replay_config.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(replay_container));
     config.replay_config.replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
-    config.replay_config.start_recording_hotkey.keysym = replay_start_stop_hotkey.keysym;
-    config.replay_config.start_recording_hotkey.modifiers = replay_start_stop_hotkey.modkey_mask;
-    config.replay_config.save_recording_hotkey.keysym = replay_save_hotkey.keysym;
-    config.replay_config.save_recording_hotkey.modifiers = replay_save_hotkey.modkey_mask;
+    if(!wayland) {
+        config.replay_config.start_recording_hotkey.keysym = replay_start_stop_hotkey.keysym;
+        config.replay_config.start_recording_hotkey.modifiers = replay_start_stop_hotkey.modkey_mask;
+
+        config.replay_config.save_recording_hotkey.keysym = replay_save_hotkey.keysym;
+        config.replay_config.save_recording_hotkey.modifiers = replay_save_hotkey.modkey_mask;
+    }
 
     save_config(config);
 }
+
+typedef struct {
+    int x, y;
+} vec2i;
+
+typedef struct {
+    const char *name;
+    int name_len;
+    vec2i pos;
+    vec2i size;
+    XRRCrtcInfo *crt_info; /* Only on x11 */
+    uint32_t connector_id; /* Only on drm */
+} gsr_monitor;
+
+typedef enum {
+    GSR_CONNECTION_X11,
+    GSR_CONNECTION_WAYLAND,
+    GSR_CONNECTION_DRM
+} gsr_connection_type;
+
+using active_monitor_callback = std::function<void(const gsr_monitor *monitor, void *userdata)>;
 
 static const XRRModeInfo* get_mode_info(const XRRScreenResources *sr, RRMode id) {
     for(int i = 0; i < sr->nmode; ++i) {
         if(sr->modes[i].id == id)
             return &sr->modes[i];
     }    
-    return nullptr;
+    return NULL;
 }
 
-static void for_each_active_monitor_output(Display *display, std::function<void(const XRROutputInfo*, const XRRCrtcInfo*, const XRRModeInfo*)> callback_func) {
+static void for_each_active_monitor_output_x11(Display *display, active_monitor_callback &callback, void *userdata) {
     XRRScreenResources *screen_res = XRRGetScreenResources(display, DefaultRootWindow(display));
     if(!screen_res)
         return;
 
+    char display_name[256];
     for(int i = 0; i < screen_res->noutput; ++i) {
         XRROutputInfo *out_info = XRRGetOutputInfo(display, screen_res, screen_res->outputs[i]);
         if(out_info && out_info->crtc && out_info->connection == RR_Connected) {
             XRRCrtcInfo *crt_info = XRRGetCrtcInfo(display, screen_res, out_info->crtc);
             if(crt_info && crt_info->mode) {
                 const XRRModeInfo *mode_info = get_mode_info(screen_res, crt_info->mode);
-                if(mode_info)
-                    callback_func(out_info, crt_info, mode_info);
+                if(mode_info && out_info->nameLen < (int)sizeof(display_name)) {
+                    memcpy(display_name, out_info->name, out_info->nameLen);
+                    display_name[out_info->nameLen] = '\0';
+
+                    gsr_monitor monitor;
+                    monitor.name = display_name;
+                    monitor.name_len = out_info->nameLen;
+                    monitor.pos = { (int)crt_info->x, (int)crt_info->y };
+                    monitor.size = { (int)crt_info->width, (int)crt_info->height };
+                    monitor.crt_info = crt_info;
+                    monitor.connector_id = 0; // TODO: Get connector id
+                    callback(&monitor, userdata);
+                }
             }
             if(crt_info)
                 XRRFreeCrtcInfo(crt_info);
@@ -469,6 +518,151 @@ static void for_each_active_monitor_output(Display *display, std::function<void(
     }    
 
     XRRFreeScreenResources(screen_res);
+}
+
+typedef struct {
+    int type;
+    int count;
+} drm_connector_type_count;
+
+#define CONNECTOR_TYPE_COUNTS 32
+
+static drm_connector_type_count* drm_connector_types_get_index(drm_connector_type_count *type_counts, int *num_type_counts, int connector_type) {
+    for(int i = 0; i < *num_type_counts; ++i) {
+        if(type_counts[i].type == connector_type)
+            return &type_counts[i];
+    }
+
+    if(*num_type_counts == CONNECTOR_TYPE_COUNTS)
+        return NULL;
+
+    const int index = *num_type_counts;
+    type_counts[index].type = connector_type;
+    type_counts[index].count = 0;
+    ++*num_type_counts;
+    return &type_counts[index];
+}
+
+static bool connector_get_property_by_name(int drmfd, drmModeConnectorPtr props, const char *name, uint64_t *result) {
+    for(int i = 0; i < props->count_props; ++i) {
+        drmModePropertyPtr prop = drmModeGetProperty(drmfd, props->props[i]);
+        if(prop) {
+            if(strcmp(name, prop->name) == 0) {
+                *result = props->prop_values[i];
+                drmModeFreeProperty(prop);
+                return true;
+            }
+            drmModeFreeProperty(prop);
+        }
+    }
+    return false;
+}
+
+static void for_each_active_monitor_output_drm(const char *drm_card_path, active_monitor_callback callback, void *userdata) {
+    int fd = open(drm_card_path, O_RDONLY);
+    if(fd == -1)
+        return;
+
+    drmSetClientCap(fd, DRM_CLIENT_CAP_ATOMIC, 1);
+
+    drm_connector_type_count type_counts[CONNECTOR_TYPE_COUNTS];
+    int num_type_counts = 0;
+
+    char display_name[256];
+    drmModeResPtr resources = drmModeGetResources(fd);
+    if(resources) {
+        for(int i = 0; i < resources->count_connectors; ++i) {
+            drmModeConnectorPtr connector = drmModeGetConnectorCurrent(fd, resources->connectors[i]);
+            if(!connector)
+                continue;
+
+            if(connector->connection != DRM_MODE_CONNECTED) {
+                drmModeFreeConnector(connector);
+                continue;
+            }
+
+            drm_connector_type_count *connector_type = drm_connector_types_get_index(type_counts, &num_type_counts, connector->connector_type);
+            const char *connection_name = drmModeGetConnectorTypeName(connector->connector_type);
+            const int connection_name_len = strlen(connection_name);
+            if(connector_type)
+                ++connector_type->count;
+
+            uint64_t crtc_id = 0;
+            connector_get_property_by_name(fd, connector, "CRTC_ID", &crtc_id);
+
+            drmModeCrtcPtr crtc = drmModeGetCrtc(fd, crtc_id);
+            if(connector_type && crtc_id > 0 && crtc && connection_name_len + 5 < (int)sizeof(display_name)) {
+                const int display_name_len = snprintf(display_name, sizeof(display_name), "%s-%d", connection_name, connector_type->count);
+                gsr_monitor monitor;
+                monitor.name = display_name;
+                monitor.name_len = display_name_len;
+                monitor.pos = { (int)crtc->x, (int)crtc->y };
+                monitor.size = { (int)crtc->width, (int)crtc->height };
+                monitor.crt_info = NULL;
+                monitor.connector_id = connector->connector_id;
+                callback(&monitor, userdata);
+            }
+
+            if(crtc)
+                drmModeFreeCrtc(crtc);
+
+            drmModeFreeConnector(connector);
+        }
+        drmModeFreeResources(resources);
+    }
+
+    close(fd);
+}
+
+static void for_each_active_monitor_output(void *connection, gsr_connection_type connection_type, active_monitor_callback callback, void *userdata) {
+    switch(connection_type) {
+        case GSR_CONNECTION_X11:
+            for_each_active_monitor_output_x11((Display*)connection, callback, userdata);
+            break;
+        case GSR_CONNECTION_WAYLAND:
+            // TODO: use gsr_egl here (connection)
+            break;
+        case GSR_CONNECTION_DRM:
+            for_each_active_monitor_output_drm((const char*)connection, callback, userdata);
+            break;
+    }
+}
+
+/* output should be >= 128 bytes */
+static bool gsr_get_valid_card_path(char *output) {
+    for(int i = 0; i < 10; ++i) {
+        sprintf(output, "/dev/dri/card%d", i);
+        int fd = open(output, O_RDONLY);
+        if(fd == -1)
+            continue;
+
+        drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+
+        drmModePlaneResPtr planes = drmModeGetPlaneResources(fd);
+        if(!planes) {
+            close(fd);
+            continue;
+        }
+
+        bool found_screen_card = false;
+        for(uint32_t i = 0; i < planes->count_planes; ++i) {
+            drmModePlanePtr plane = drmModeGetPlane(fd, planes->planes[i]);
+            if(!plane)
+                continue;
+
+            if(plane->fb_id)
+                found_screen_card = true;
+
+            drmModeFreePlane(plane);
+            if(found_screen_card)
+                break;
+        }
+
+        close(fd);
+        if(found_screen_card)
+            return true;
+    }
+    return false;
 }
 
 static void show_notification(GtkApplication *app, const char *title, const char *body, GNotificationPriority priority) {
@@ -731,6 +925,9 @@ static int xerror_grab_error(Display*, XErrorEvent*) {
 }
 
 static void ungrab_keyboard(Display *display) {
+    if(wayland)
+        return;
+
     if(current_hotkey) {
         gtk_grab_remove(current_hotkey->hotkey_entry);
         gtk_widget_set_visible(current_hotkey->hotkey_active_label, false);
@@ -743,6 +940,9 @@ static void ungrab_keyboard(Display *display) {
 }
 
 static bool grab_ungrab_hotkey_combo(Display *display, Hotkey hotkey, bool grab) {
+    if(wayland)
+        return true;
+
     if(hotkey.keysym == None && hotkey.modkey_mask == 0)
         return true;
 
@@ -798,6 +998,9 @@ static bool grab_ungrab_hotkey_combo(Display *display, Hotkey hotkey, bool grab)
 }
 
 static void ungrab_keys(Display *display) {
+    if(wayland)
+        return;
+
     grab_ungrab_hotkey_combo(display, streaming_hotkey, false);
     grab_ungrab_hotkey_combo(display, record_hotkey, false);
     grab_ungrab_hotkey_combo(display, replay_start_stop_hotkey, false);
@@ -904,16 +1107,18 @@ static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
 
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->replay_page);
-    HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
-    if(!hotkey_result.replay_start_stop_hotkey_success) {
-        gtk_entry_set_text(GTK_ENTRY(replay_start_stop_hotkey.hotkey_entry), "");
-        replay_start_stop_hotkey.keysym = 0;
-        replay_start_stop_hotkey.modkey_mask = 0;
-    }
-    if(!hotkey_result.replay_save_hotkey_success) {
-        gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey.hotkey_entry), "");
-        replay_save_hotkey.keysym = 0;
-        replay_save_hotkey.modkey_mask = 0;
+    if(!wayland) {
+        HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
+        if(!hotkey_result.replay_start_stop_hotkey_success) {
+            gtk_entry_set_text(GTK_ENTRY(replay_start_stop_hotkey.hotkey_entry), "");
+            replay_start_stop_hotkey.keysym = 0;
+            replay_start_stop_hotkey.modkey_mask = 0;
+        }
+        if(!hotkey_result.replay_save_hotkey_success) {
+            gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey.hotkey_entry), "");
+            replay_save_hotkey.keysym = 0;
+            replay_save_hotkey.modkey_mask = 0;
+        }
     }
     return true;
 }
@@ -924,11 +1129,13 @@ static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
 
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
-    HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
-    if(!hotkey_result.record_hotkey_success) {
-        gtk_entry_set_text(GTK_ENTRY(record_hotkey.hotkey_entry), "");
-        record_hotkey.keysym = 0;
-        record_hotkey.modkey_mask = 0;
+    if(!wayland) {
+        HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
+        if(!hotkey_result.record_hotkey_success) {
+            gtk_entry_set_text(GTK_ENTRY(record_hotkey.hotkey_entry), "");
+            record_hotkey.keysym = 0;
+            record_hotkey.modkey_mask = 0;
+        }
     }
     return true;
 }
@@ -959,11 +1166,13 @@ static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
 
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->streaming_page);
-    HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
-    if(!hotkey_result.streaming_hotkey_success) {
-        gtk_entry_set_text(GTK_ENTRY(streaming_hotkey.hotkey_entry), "");
-        streaming_hotkey.keysym = 0;
-        streaming_hotkey.modkey_mask = 0;
+    if(!wayland) {
+        HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
+        if(!hotkey_result.streaming_hotkey_success) {
+            gtk_entry_set_text(GTK_ENTRY(streaming_hotkey.hotkey_entry), "");
+            streaming_hotkey.keysym = 0;
+            streaming_hotkey.modkey_mask = 0;
+        }
     }
     return true;
 }
@@ -1056,8 +1265,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
     int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
-    int record_width = gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = gtk_spin_button_get_value_as_int(area_height_entry);
+    int record_width = wayland ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, dir);
@@ -1177,8 +1386,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     save_configs();
 
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    int record_width = gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = gtk_spin_button_get_value_as_int(area_height_entry);
+    int record_width = wayland ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, dir);
@@ -1292,8 +1501,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
     const char *stream_id_str = gtk_entry_get_text(stream_id_entry);
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    int record_width = gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = gtk_spin_button_get_value_as_int(area_height_entry);
+    int record_width = wayland ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     bool follow_focused = false;
     std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
@@ -1546,7 +1755,7 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     const gchar *selected_view = gtk_combo_box_get_active_id(widget);
     gtk_widget_set_visible(GTK_WIDGET(video_codec_grid), strcmp(selected_view, "advanced") == 0);
     gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), strcmp(selected_view, "advanced") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), strcmp(selected_view, "advanced") == 0 && gpu_inf.vendor == GPU_VENDOR_NVIDIA);
+    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), strcmp(selected_view, "advanced") == 0 && gpu_inf.vendor == GPU_VENDOR_NVIDIA && !wayland);
 }
 
 static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -1596,6 +1805,9 @@ static void keypress_toggle_recording(bool recording_state, GtkButton *record_bu
 }
 
 static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpointer userdata) {
+    if(wayland)
+        return GDK_FILTER_CONTINUE;
+
     if(hotkey_mode == HotkeyMode::NoAction)
         return GDK_FILTER_CONTINUE;
 
@@ -1725,6 +1937,9 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
 }
 
 static gboolean on_hotkey_entry_click(GtkWidget *button, gpointer) {
+    if(wayland)
+        return true;
+
     hotkey_mode = HotkeyMode::NewHotkey;
 
     pressed_hotkey.hotkey_entry = nullptr;
@@ -1802,70 +2017,82 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_container_add(GTK_CONTAINER(record_area_frame), GTK_WIDGET(record_area_grid));
 
     record_area_selection_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
-    gtk_combo_box_text_append(record_area_selection_menu, "focused", "Follow focused window");
-    const bool allow_screen_capture = nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
+    if(!wayland) {
+        gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
+        gtk_combo_box_text_append(record_area_selection_menu, "focused", "Follow focused window");
+    }
+    const bool allow_screen_capture = wayland || nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
     if(allow_screen_capture) {
-        if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
-            gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
-        else
-            gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (requires root access, may perform better)");
+        if(!wayland) {
+            if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
+                gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
+            else
+                gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors (requires root access, may perform better)");
 
-        if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
-            gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
+            if(gpu_inf.vendor == GPU_VENDOR_NVIDIA)
+                gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
+        }
 
-        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&](const XRROutputInfo *output_info, const XRRCrtcInfo *crtc_info, const XRRModeInfo*) {
+        void *connection = wayland ? (void*)drm_card_path : gdk_x11_get_default_xdisplay();
+        const gsr_connection_type connection_type = wayland ? GSR_CONNECTION_DRM : GSR_CONNECTION_X11;
+
+        for_each_active_monitor_output(connection, connection_type, [&](const gsr_monitor *monitor, void*) {
             std::string label = "Monitor ";
-            label.append(output_info->name, output_info->nameLen);
+            label.append(monitor->name, monitor->name_len);
             label += " (";
-            label += std::to_string(crtc_info->width);
+            label += std::to_string(monitor->size.x);
             label += "x";
-            label += std::to_string(crtc_info->height);
+            label += std::to_string(monitor->size.y);
             if(gpu_inf.vendor != GPU_VENDOR_NVIDIA)
                 label += ", requires root access, may perform better";
             label += ")";
 
             // Leak on purpose, what are you gonna do? stab me?
-            char *id = (char*)malloc(output_info->nameLen + 1);
+            char *id = (char*)malloc(monitor->name_len + 1);
             if(!id) {
                 fprintf(stderr, "Failed to allocate memory\n");
                 abort();
             }
-            memcpy(id, output_info->name, output_info->nameLen);
-            id[output_info->nameLen] = '\0';
+            memcpy(id, monitor->name, monitor->name_len);
+            id[monitor->name_len] = '\0';
 
             gtk_combo_box_text_append(record_area_selection_menu, id, label.c_str());
-        });
+        }, NULL);
     }
-    gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), allow_screen_capture ? 2 : 0);
+    if(wayland)
+        gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), 0);
+    else
+        gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), allow_screen_capture ? 2 : 0);
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 3, 1);
 
-    select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
-    gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
-    g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
-    gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 3, 1);
+    if(!wayland) {
+        select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
+        gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
+        g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
+        gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 3, 1);
 
-    g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), select_window_button);
+        g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), select_window_button);
 
-    area_size_label = GTK_LABEL(gtk_label_new("Area size: "));
-    gtk_label_set_xalign(area_size_label, 0.0f);
-    gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_label), 0, record_area_row++, 2, 1);
+        area_size_label = GTK_LABEL(gtk_label_new("Area size: "));
+        gtk_label_set_xalign(area_size_label, 0.0f);
+        gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_label), 0, record_area_row++, 2, 1);
 
-    area_size_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
+        area_size_grid = GTK_GRID(gtk_grid_new());
+        gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
 
-    area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
-    gtk_spin_button_set_value(area_width_entry, 1920.0);
-    gtk_widget_set_hexpand(GTK_WIDGET(area_width_entry), true);
-    gtk_grid_attach(area_size_grid, GTK_WIDGET(area_width_entry), 0, 0, 1, 1);
+        area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        gtk_spin_button_set_value(area_width_entry, 1920.0);
+        gtk_widget_set_hexpand(GTK_WIDGET(area_width_entry), true);
+        gtk_grid_attach(area_size_grid, GTK_WIDGET(area_width_entry), 0, 0, 1, 1);
 
-    gtk_grid_attach(area_size_grid, gtk_label_new("x"), 1, 0, 1, 1);
+        gtk_grid_attach(area_size_grid, gtk_label_new("x"), 1, 0, 1, 1);
 
-    area_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
-    gtk_spin_button_set_value(area_height_entry, 1080.0);
-    gtk_widget_set_hexpand(GTK_WIDGET(area_height_entry), true);
-    gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 0, 1, 1);
+        area_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        gtk_spin_button_set_value(area_height_entry, 1080.0);
+        gtk_widget_set_hexpand(GTK_WIDGET(area_height_entry), true);
+        gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 0, 1, 1);
+    }
 
     GtkFrame *audio_input_frame = GTK_FRAME(gtk_frame_new("Audio input"));
     gtk_grid_attach(grid, GTK_WIDGET(audio_input_frame), 0, grid_row++, 2, 1);
@@ -2057,34 +2284,37 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
-    GtkWidget *hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
-    gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
+    GtkWidget *hotkey_active_label = NULL;
+    if(!wayland) {
+        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+        gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
 
-    GtkWidget *a = gtk_label_new("Press");
-    gtk_widget_set_halign(a, GTK_ALIGN_END);
+        GtkWidget *a = gtk_label_new("Press");
+        gtk_widget_set_halign(a, GTK_ALIGN_END);
 
-    GtkWidget *b = gtk_label_new("to start/stop the replay and ");
-    gtk_widget_set_halign(b, GTK_ALIGN_START);
+        GtkWidget *b = gtk_label_new("to start/stop the replay and ");
+        gtk_widget_set_halign(b, GTK_ALIGN_START);
 
-    GtkWidget *c = gtk_label_new("to save");
-    gtk_widget_set_halign(c, GTK_ALIGN_START);
+        GtkWidget *c = gtk_label_new("to save");
+        gtk_widget_set_halign(c, GTK_ALIGN_START);
 
-    replay_start_stop_hotkey_button = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(replay_start_stop_hotkey_button), "Alt + F1");
-    g_signal_connect(replay_start_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_start_stop_hotkey_button);
+        replay_start_stop_hotkey_button = gtk_entry_new();
+        gtk_entry_set_text(GTK_ENTRY(replay_start_stop_hotkey_button), "Alt + F1");
+        g_signal_connect(replay_start_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_start_stop_hotkey_button);
 
-    replay_save_hotkey_button = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey_button), "Alt + F2");
-    gtk_widget_set_halign(replay_save_hotkey_button, GTK_ALIGN_START);
-    g_signal_connect(replay_save_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_save_hotkey_button);
+        replay_save_hotkey_button = gtk_entry_new();
+        gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey_button), "Alt + F2");
+        gtk_widget_set_halign(replay_save_hotkey_button, GTK_ALIGN_START);
+        g_signal_connect(replay_save_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_save_hotkey_button);
 
-    gtk_grid_attach(grid, a, 0, row, 1, 1);
-    gtk_grid_attach(grid, replay_start_stop_hotkey_button, 1, row, 1, 1);
-    gtk_grid_attach(grid, b, 2, row, 1, 1);
-    gtk_grid_attach(grid, replay_save_hotkey_button, 3, row, 1, 1);
-    gtk_grid_attach(grid, c, 4, row, 1, 1);
-    ++row;
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
+        gtk_grid_attach(grid, a, 0, row, 1, 1);
+        gtk_grid_attach(grid, replay_start_stop_hotkey_button, 1, row, 1, 1);
+        gtk_grid_attach(grid, b, 2, row, 1, 1);
+        gtk_grid_attach(grid, replay_save_hotkey_button, 3, row, 1, 1);
+        gtk_grid_attach(grid, c, 4, row, 1, 1);
+        ++row;
+        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
+    }
 
     replay_start_stop_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
     replay_start_stop_hotkey.keysym = XK_F1;
@@ -2166,23 +2396,26 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
-    GtkWidget *hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
-    gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
+    GtkWidget *hotkey_active_label = NULL;
+    if(!wayland) {
+        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+        gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
 
-    GtkWidget *a = gtk_label_new("Press");
-    gtk_widget_set_halign(a, GTK_ALIGN_END);
+        GtkWidget *a = gtk_label_new("Press");
+        gtk_widget_set_halign(a, GTK_ALIGN_END);
 
-    GtkWidget *b = gtk_label_new("to start/stop recording");
-    gtk_widget_set_halign(b, GTK_ALIGN_START);
+        GtkWidget *b = gtk_label_new("to start/stop recording");
+        gtk_widget_set_halign(b, GTK_ALIGN_START);
 
-    record_hotkey_button = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(record_hotkey_button), "Alt + F1");
-    g_signal_connect(record_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), record_hotkey_button);
-    gtk_grid_attach(grid, a, 0, row, 1, 1);
-    gtk_grid_attach(grid, record_hotkey_button, 1, row, 1, 1);
-    gtk_grid_attach(grid, b, 2, row, 1, 1);
-    ++row;
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+        record_hotkey_button = gtk_entry_new();
+        gtk_entry_set_text(GTK_ENTRY(record_hotkey_button), "Alt + F1");
+        g_signal_connect(record_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), record_hotkey_button);
+        gtk_grid_attach(grid, a, 0, row, 1, 1);
+        gtk_grid_attach(grid, record_hotkey_button, 1, row, 1, 1);
+        gtk_grid_attach(grid, b, 2, row, 1, 1);
+        ++row;
+        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+    }
 
     record_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
     record_hotkey.keysym = XK_F1;
@@ -2240,23 +2473,26 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
-    GtkWidget *hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
-    gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
+    GtkWidget *hotkey_active_label = NULL;
+    if(!wayland) {
+        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+        gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
 
-    GtkWidget *a = gtk_label_new("Press");
-    gtk_widget_set_halign(a, GTK_ALIGN_END);
+        GtkWidget *a = gtk_label_new("Press");
+        gtk_widget_set_halign(a, GTK_ALIGN_END);
 
-    GtkWidget *b = gtk_label_new("to start/stop streaming");
-    gtk_widget_set_halign(b, GTK_ALIGN_START);
+        GtkWidget *b = gtk_label_new("to start/stop streaming");
+        gtk_widget_set_halign(b, GTK_ALIGN_START);
 
-    streaming_hotkey_button = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(streaming_hotkey_button), "Alt + F1");
-    g_signal_connect(streaming_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), streaming_hotkey_button);
-    gtk_grid_attach(grid, a, 0, row, 1, 1);
-    gtk_grid_attach(grid, streaming_hotkey_button, 1, row, 1, 1);
-    gtk_grid_attach(grid, b, 2, row, 1, 1);
-    ++row;
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+        streaming_hotkey_button = gtk_entry_new();
+        gtk_entry_set_text(GTK_ENTRY(streaming_hotkey_button), "Alt + F1");
+        g_signal_connect(streaming_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), streaming_hotkey_button);
+        gtk_grid_attach(grid, a, 0, row, 1, 1);
+        gtk_grid_attach(grid, streaming_hotkey_button, 1, row, 1, 1);
+        gtk_grid_attach(grid, b, 2, row, 1, 1);
+        ++row;
+        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+    }
 
     streaming_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
     streaming_hotkey.keysym = XK_F1;
@@ -2353,36 +2589,41 @@ static void add_audio_input_track(const char *name) {
 static void load_config(const gpu_info &gpu_inf) {
     config = read_config();
 
-    if(strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
+    if(!wayland && strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
         //
-    } else if(strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
+    } else if(!wayland && strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
         //
-    } else if(strcmp(config.main_config.record_area_option.c_str(), "screen") == 0 || strcmp(config.main_config.record_area_option.c_str(), "screen-direct-force") == 0) {
+    } else if(!wayland && (strcmp(config.main_config.record_area_option.c_str(), "screen") == 0 || strcmp(config.main_config.record_area_option.c_str(), "screen-direct-force") == 0)) {
         //
     } else {
+        void *connection = wayland ? (void*)drm_card_path : gdk_x11_get_default_xdisplay();
+        const gsr_connection_type connection_type = wayland ? GSR_CONNECTION_DRM : GSR_CONNECTION_X11;
+
         bool found_monitor = false;
         int monitor_name_size = strlen(config.main_config.record_area_option.c_str());
-        for_each_active_monitor_output(gdk_x11_get_default_xdisplay(), [&](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo*) {
-            if(monitor_name_size == output_info->nameLen && strncmp(config.main_config.record_area_option.c_str(), output_info->name, output_info->nameLen) == 0) {
+        for_each_active_monitor_output(connection, connection_type, [&](const gsr_monitor *monitor, void*) {
+            if(monitor_name_size == monitor->name_len && strncmp(config.main_config.record_area_option.c_str(), monitor->name, monitor->name_len) == 0) {
                 found_monitor = true;
             }
-        });
+        }, NULL);
 
         if(!found_monitor)
             config.main_config.record_area_option.clear();
     }
 
     if(config.main_config.record_area_option.empty()) {
-        const bool allow_screen_capture = nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
+        const bool allow_screen_capture = wayland || nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
         if(allow_screen_capture)
             config.main_config.record_area_option = "screen";
         else
             config.main_config.record_area_option = "window";
     }
 
-    gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
+    if(!wayland) {
+        gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
+        gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
+        gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
+    }
 
     if(config.main_config.record_area_width == 0)
         config.main_config.record_area_width = 1920;
@@ -2422,8 +2663,10 @@ static void load_config(const gpu_info &gpu_inf) {
         config.replay_config.replay_time = 1200;
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(record_area_selection_menu), config.main_config.record_area_option.c_str());
-    gtk_spin_button_set_value(area_width_entry, config.main_config.record_area_width);
-    gtk_spin_button_set_value(area_height_entry, config.main_config.record_area_height);
+    if(!wayland) {
+        gtk_spin_button_set_value(area_width_entry, config.main_config.record_area_width);
+        gtk_spin_button_set_value(area_height_entry, config.main_config.record_area_height);
+    }
     gtk_spin_button_set_value(fps_entry, config.main_config.fps);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button), config.main_config.merge_audio_tracks);
     for(const std::string &audio_input : config.main_config.audio_input) {
@@ -2436,7 +2679,7 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
-    if(config.streaming_config.start_recording_hotkey.keysym) {
+    if(!wayland && config.streaming_config.start_recording_hotkey.keysym) {
         streaming_hotkey.keysym = config.streaming_config.start_recording_hotkey.keysym;
         streaming_hotkey.modkey_mask = config.streaming_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(streaming_hotkey_button), streaming_hotkey);
@@ -2444,7 +2687,7 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_button_set_label(record_file_chooser_button, config.record_config.save_directory.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(record_container), config.record_config.container.c_str());
-    if(config.record_config.start_recording_hotkey.keysym) {
+    if(!wayland && config.record_config.start_recording_hotkey.keysym) {
         record_hotkey.keysym = config.record_config.start_recording_hotkey.keysym;
         record_hotkey.modkey_mask = config.record_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(record_hotkey_button), record_hotkey);
@@ -2453,12 +2696,12 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_button_set_label(replay_file_chooser_button, config.replay_config.save_directory.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(replay_container), config.replay_config.container.c_str());
     gtk_spin_button_set_value(replay_time_entry, config.replay_config.replay_time);
-    if(config.replay_config.start_recording_hotkey.keysym) {
+    if(!wayland && config.replay_config.start_recording_hotkey.keysym) {
         replay_start_stop_hotkey.keysym = config.replay_config.start_recording_hotkey.keysym;
         replay_start_stop_hotkey.modkey_mask = config.replay_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(replay_start_stop_hotkey_button), replay_start_stop_hotkey);
     }
-    if(config.replay_config.save_recording_hotkey.keysym) {
+    if(!wayland && config.replay_config.save_recording_hotkey.keysym) {
         replay_save_hotkey.keysym = config.replay_config.save_recording_hotkey.keysym;
         replay_save_hotkey.modkey_mask = config.replay_config.save_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(replay_save_hotkey_button), replay_save_hotkey);
@@ -2466,16 +2709,18 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
-    gtk_widget_set_visible(record_hotkey.hotkey_active_label, false);
-    gtk_widget_set_visible(streaming_hotkey.hotkey_active_label, false);
-    gtk_widget_set_visible(replay_start_stop_hotkey.hotkey_active_label, false);
-    gtk_widget_set_visible(replay_save_hotkey.hotkey_active_label, false);
+    if(!wayland) {
+        gtk_widget_set_visible(record_hotkey.hotkey_active_label, false);
+        gtk_widget_set_visible(streaming_hotkey.hotkey_active_label, false);
+        gtk_widget_set_visible(replay_start_stop_hotkey.hotkey_active_label, false);
+        gtk_widget_set_visible(replay_save_hotkey.hotkey_active_label, false);
+    }
     enable_stream_record_button_if_info_filled();
 }
 
-static bool gl_get_gpu_info(Display *dpy, gpu_info *info) {
+static bool gl_get_gpu_info(Display *dpy, gpu_info *info, bool wayland) {
     gsr_egl gl;
-    if(!gsr_egl_load(&gl, dpy)) {
+    if(!gsr_egl_load(&gl, dpy, wayland)) {
         fprintf(stderr, "Error: failed to load opengl\n");
         return false;
     }
@@ -2520,10 +2765,12 @@ static bool is_xwayland(Display *dpy) {
         return true;
 
     bool xwayland_found = false;
-    for_each_active_monitor_output(dpy, [&xwayland_found](const XRROutputInfo *output_info, const XRRCrtcInfo*, const XRRModeInfo*) {
-        if(output_info->nameLen >= 8 && strncmp(output_info->name, "XWAYLAND", 8) == 0)
+    for_each_active_monitor_output(dpy, GSR_CONNECTION_X11, [&xwayland_found](const gsr_monitor *monitor, void*) {
+        if(monitor->name_len >= 8 && strncmp(monitor->name, "XWAYLAND", 8) == 0)
             xwayland_found = true;
-    });
+        else if(memmem(monitor->name, monitor->name_len, "X11", 3))
+            xwayland_found = true;
+    }, NULL);
     return xwayland_found;
 }
 
@@ -2537,25 +2784,29 @@ static const char* gpu_vendor_to_name(gpu_vendor vendor) {
 }
 
 static void activate(GtkApplication *app, gpointer) {
-    nvfbc_installed = is_nv_fbc_installed();
-
     Display *dpy = XOpenDisplay(NULL);
-    const bool is_wayland = !dpy;
-
-    if(is_wayland || is_xwayland(dpy)) {
+    wayland = !dpy || is_xwayland(dpy);
+    if(dpy)
         XCloseDisplay(dpy);
-        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "GPU Screen Recorder only works in a pure X11 session. Xwayland is not supported.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
-    }
-    XCloseDisplay(dpy);
 
-    if(!gl_get_gpu_info(gdk_x11_get_default_xdisplay(), &gpu_inf)) {
+    nvfbc_installed = !wayland && is_nv_fbc_installed();
+
+    if(wayland) {
+        if(!gsr_get_valid_card_path(drm_card_path)) {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Failed to find a valid DRM card.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
+    } else {
+        drm_card_path[0] = '\0';
+    }
+
+    if(!gl_get_gpu_info(gdk_x11_get_default_xdisplay(), &gpu_inf, wayland)) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to get OpenGL information. Make sure your are using a NVIDIA GPU and that you have NVIDIA proprietary drivers installed.");
+            "Failed to get OpenGL information. Make sure your GPU drivers are properly installed.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
@@ -2592,7 +2843,8 @@ static void activate(GtkApplication *app, gpointer) {
 
     select_window_userdata.app = app;
 
-    crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);
+    if(!wayland)
+        crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);
 
     GtkStack *stack = GTK_STACK(gtk_stack_new());
     gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(stack));
@@ -2621,11 +2873,13 @@ static void activate(GtkApplication *app, gpointer) {
     g_signal_connect(stream_button, "clicked", G_CALLBACK(on_start_streaming_click), &page_navigation_userdata);
     g_signal_connect(stream_back_button, "clicked", G_CALLBACK(on_streaming_recording_replay_page_back_click), &page_navigation_userdata);
 
-    xim = XOpenIM(gdk_x11_get_default_xdisplay(), NULL, NULL, NULL);
-    xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, NULL);
+    if(!wayland) {
+        xim = XOpenIM(gdk_x11_get_default_xdisplay(), NULL, NULL, NULL);
+        xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, NULL);
 
-    GdkWindow *root_window = gdk_get_default_root_window();
-    gdk_window_add_filter(root_window, hotkey_filter_callback, &page_navigation_userdata);
+        GdkWindow *root_window = gdk_get_default_root_window();
+        gdk_window_add_filter(root_window, hotkey_filter_callback, &page_navigation_userdata);
+    }
 
     g_timeout_add(1000, handle_child_process_death, app);
 

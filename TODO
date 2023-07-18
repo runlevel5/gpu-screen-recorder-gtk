@@ -3,3 +3,5 @@ Make sure the resolution is allowed for streaming.
 Add list of windows to select from. This makes it easier to select another window that is not in the view to be clickable.
 Disable overclocking and show some kind of sign that overclocking is not possible (if coolbits not set).
 Button (in the field) to remove hotkey.
+Implement global hotkeys on wayland.
+If wlroots, use wayland instead of drm.
