@@ -1079,7 +1079,7 @@ static HotkeyResult replace_grabbed_keys_depending_on_active_page() {
 
 static bool show_pkexec_flatpak_error_if_needed() {
     std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
-    if(gpu_inf.vendor != GPU_VENDOR_NVIDIA && window_str != "window" && window_str != "focused") {
+    if((wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA) && window_str != "window" && window_str != "focused") {
         if(!is_pkexec_installed()) {
             GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "pkexec needs to be installed to record a monitor with an AMD/Intel GPU. Please install and run polkit. Alternatively, record a single window which doesn't require root access.");
@@ -2043,7 +2043,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             label += std::to_string(monitor->size.x);
             label += "x";
             label += std::to_string(monitor->size.y);
-            if(gpu_inf.vendor != GPU_VENDOR_NVIDIA)
+            if(wayland)
+                label += ", requires root access";
+            else if(gpu_inf.vendor != GPU_VENDOR_NVIDIA)
                 label += ", requires root access, may perform better";
             label += ")";
 
