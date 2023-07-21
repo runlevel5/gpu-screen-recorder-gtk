@@ -44,6 +44,16 @@
     </screenshots>
 
     <releases>
+        <release version="3.1.0" date="2023-02-21">
+            <description>
+            <ul>
+                <li>Support wlroots capture when possible (no kms root access required)</li>
+                <li>Make window capture a bit more robust</li>
+                <li>Fix possible lag on recording start on AMD/Intel</li>
+                <li>Make capture on AMD/Intel possible without Xwayland</li>
+            </ul>
+            </description>
+        </release>
         <release version="3.0.0" date="2023-07-18">
             <description>
                 <p>Experimental wayland support on AMD/Intel/NVIDIA. Hotkeys not supported.</p>
