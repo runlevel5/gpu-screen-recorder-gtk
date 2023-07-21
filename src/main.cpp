@@ -2840,8 +2840,14 @@ static const char* gpu_vendor_to_name(gpu_vendor vendor) {
 static void activate(GtkApplication *app, gpointer) {
     Display *dpy = XOpenDisplay(NULL);
     wayland = !dpy || is_xwayland(dpy);
-    if(dpy)
-        XCloseDisplay(dpy);
+    if(!wayland && !dpy) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Neither X11 nor Wayland is running.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
 
     nvfbc_installed = !wayland && is_nv_fbc_installed();
 
