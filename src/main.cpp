@@ -647,20 +647,25 @@ static void for_each_active_monitor_output(void *connection, gsr_connection_type
 /* output should be >= 128 bytes */
 static bool gsr_get_valid_card_path(char *output) {
     for(int i = 0; i < 10; ++i) {
-        sprintf(output, "/dev/dri/card%d", i);
+        drmVersion *ver = NULL;
+        drmModePlaneResPtr planes = NULL;
+        bool found_screen_card = false;
+
+        sprintf(output, DRM_DEV_NAME, DRM_DIR_NAME, i);
         int fd = open(output, O_RDONLY);
         if(fd == -1)
             continue;
 
+        ver = drmGetVersion(fd);
+        if(!ver || strstr(ver->name, "nouveau"))
+            goto next;
+
         drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 
-        drmModePlaneResPtr planes = drmModeGetPlaneResources(fd);
-        if(!planes) {
-            close(fd);
-            continue;
-        }
+        planes = drmModeGetPlaneResources(fd);
+        if(!planes)
+            goto next;
 
-        bool found_screen_card = false;
         for(uint32_t i = 0; i < planes->count_planes; ++i) {
             drmModePlanePtr plane = drmModeGetPlane(fd, planes->planes[i]);
             if(!plane)
@@ -674,6 +679,11 @@ static bool gsr_get_valid_card_path(char *output) {
                 break;
         }
 
+        next:
+        if(planes)
+            drmModeFreePlaneResources(planes);
+        if(ver)
+            drmFreeVersion(ver);
         close(fd);
         if(found_screen_card)
             return true;
