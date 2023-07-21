@@ -4,4 +4,5 @@ Add list of windows to select from. This makes it easier to select another windo
 Disable overclocking and show some kind of sign that overclocking is not possible (if coolbits not set).
 Button (in the field) to remove hotkey.
 Implement global hotkeys on wayland.
-If wlroots, use wayland instead of drm.
+Add pipewire capture option.
+Error if polkit agent is not running (pkexec --help may work but the agent might not be running anyways).

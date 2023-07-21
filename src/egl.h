@@ -8,6 +8,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef struct {
+    int x, y;
+} vec2i;
+
 #ifdef _WIN64
 typedef signed   long long int khronos_intptr_t;
 typedef unsigned long long int khronos_uintptr_t;
@@ -33,7 +37,6 @@ typedef void* EGLImageKHR;
 typedef void *GLeglImageOES;
 typedef void (*__eglMustCastToProperFunctionPointerType)(void);
 
-#define EGL_OPENGL_ES_API                       0x30A0
 #define EGL_BUFFER_SIZE                         0x3020
 #define EGL_RENDERABLE_TYPE                     0x3040
 #define EGL_OPENGL_ES2_BIT                      0x0004
@@ -43,6 +46,33 @@ typedef void (*__eglMustCastToProperFunctionPointerType)(void);
 #define GL_VENDOR                               0x1F00
 #define GL_RENDERER                             0x1F01
 
+#define GSR_MAX_OUTPUTS 32
+
+typedef struct {
+    Display *dpy;
+    Window window;
+} gsr_x11;
+
+typedef struct {
+    uint32_t wl_name;
+    void *output;
+    vec2i pos;
+    vec2i size;
+    char *name;
+} gsr_wayland_output;
+
+typedef struct {
+    void *dpy;
+    void *window;
+    void *registry;
+    void *surface;
+    void *compositor;
+    void *export_manager;
+    gsr_wayland_output outputs[GSR_MAX_OUTPUTS];
+    int num_outputs;
+    gsr_wayland_output *output_to_capture;
+} gsr_wayland;
+
 typedef struct {
     void *egl_library;
     void *gl_library;
@@ -51,22 +81,8 @@ typedef struct {
     EGLSurface egl_surface;
     EGLContext egl_context;
 
-    Display *x11_dpy;
-    Window x11_window;
-
-    void *wayland_dpy;
-    void *wayland_window;
-    void *wayland_registry;
-    void *wayland_surface;
-    void *wayland_compositor;
-
-    int fd;
-    uint32_t width;
-    uint32_t height;
-    uint32_t pitch;
-    uint32_t offset;
-    uint32_t pixel_format;
-    uint64_t modifier;
+    gsr_x11 x11;
+    gsr_wayland wayland;
 
     EGLDisplay (*eglGetDisplay)(EGLNativeDisplayType display_id);
     unsigned int (*eglInitialize)(EGLDisplay dpy, int32_t *major, int32_t *minor);
@@ -85,7 +101,7 @@ typedef struct {
 bool gsr_egl_load(gsr_egl *self, Display *dpy, bool wayland);
 void gsr_egl_unload(gsr_egl *self);
 
-void gsr_egl_update(gsr_egl *self);
-void gsr_egl_cleanup_frame(gsr_egl *self);
+/* wayland protocol capture, does not include kms capture */
+bool gsr_egl_supports_wayland_capture(gsr_egl *self);
 
 #endif /* GSR_EGL_H */
