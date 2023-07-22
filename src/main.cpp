@@ -2016,7 +2016,7 @@ static bool audio_inputs_contains(const std::vector<AudioInput> &audio_inputs, c
 }
 
 static void get_connection_by_active_type(void **connection, gsr_connection_type *connection_type) {
-    if(wayland) {
+    if(wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
         if(gsr_egl_supports_wayland_capture(&egl)) {
             *connection = &egl;
             *connection_type = GSR_CONNECTION_WAYLAND;
@@ -2860,7 +2860,16 @@ static void activate(GtkApplication *app, gpointer) {
         return;
     }
 
-    if(wayland && !gsr_egl_supports_wayland_capture(&egl)) {
+    if(!gl_get_gpu_info(&egl, &gpu_inf)) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Failed to get OpenGL information. Make sure your GPU drivers are properly installed.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
+
+    if((gpu_inf.vendor != GPU_VENDOR_NVIDIA) || (wayland && !gsr_egl_supports_wayland_capture(&egl))) {
         if(!gsr_get_valid_card_path(drm_card_path)) {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "Failed to find a valid DRM card.");
@@ -2871,15 +2880,6 @@ static void activate(GtkApplication *app, gpointer) {
         }
     } else {
         drm_card_path[0] = '\0';
-    }
-
-    if(!gl_get_gpu_info(&egl, &gpu_inf)) {
-        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to get OpenGL information. Make sure your GPU drivers are properly installed.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
     }
 
     if(gpu_inf.vendor == GPU_VENDOR_NVIDIA) {
