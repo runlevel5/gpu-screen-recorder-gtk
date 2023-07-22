@@ -7,3 +7,4 @@ Implement global hotkeys on wayland.
 Add pipewire capture option.
 Error if polkit agent is not running (pkexec --help may work but the agent might not be running anyways).
 Fix gui crash on stop recording on sway.
+Re-enable wlroots based capture when it's fixed.

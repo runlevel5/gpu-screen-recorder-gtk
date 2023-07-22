@@ -375,5 +375,7 @@ void gsr_egl_unload(gsr_egl *self) {
 }
 
 bool gsr_egl_supports_wayland_capture(gsr_egl *self) {
-    return !!self->wayland.export_manager && self->wayland.num_outputs > 0;
+    (void)self;
+    return false;
+    //return !!self->wayland.export_manager && self->wayland.num_outputs > 0;
 }

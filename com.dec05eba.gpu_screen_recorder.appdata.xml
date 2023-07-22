@@ -44,6 +44,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.1.3" date="2023-02-22">
+            <description>
+                <p>Fix capture on wlroots based wayland compositors. Fix cursor offset in amd/intel capture.</p>
+            </description>
+        </release>
         <release version="3.1.2" date="2023-02-22">
             <description>
                 <p>Support cursor capture on AMD/Intel on Wayland. Attempt to fix multi monitor offset capture in some cases.</p>

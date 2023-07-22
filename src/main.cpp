@@ -97,7 +97,7 @@ static std::string record_file_current_filename;
 static bool nvfbc_installed = false;
 
 static bool wayland = false;
-char drm_card_path[128];
+static char drm_card_path[128];
 static gsr_egl egl;
 
 enum class HotkeyMode {
