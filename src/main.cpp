@@ -91,6 +91,7 @@ static bool replaying = false;
 static bool recording = false;
 static bool streaming = false;
 static pid_t gpu_screen_recorder_process = -1;
+static int prev_exit_status = -1;
 static Config config;
 static int num_audio_inputs_addable = 0;
 static std::string record_file_current_filename;
@@ -1280,6 +1281,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     GtkApplication *app = (GtkApplication*)userdata;
     const gchar *dir = gtk_button_get_label(replay_file_chooser_button);
 
+    int exit_status = prev_exit_status;
+    prev_exit_status = -1;
     if(replaying) {
         bool exit_success = kill_gpu_screen_recorder_get_result();
 
@@ -1289,8 +1292,13 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), true);
         gtk_widget_set_sensitive(GTK_WIDGET(replay_save_button), false);
 
-        if(!exit_success)
-            show_notification(app, "GPU Screen Recorder", "Failed to start replay. Either your graphics card doesn't support GPU Screen Recorder or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
+        if(exit_status == 10) {
+            show_notification(app, "GPU Screen Recorder",
+                "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(!exit_success) {
+            show_notification(app, "GPU Screen Recorder",
+                "Failed to start replay. Either your graphics card doesn't support GPU Screen Recorder or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
+        }
 
         return true;
     }
@@ -1400,6 +1408,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     GtkApplication *app = (GtkApplication*)userdata;
     const gchar *dir = gtk_button_get_label(record_file_chooser_button);
 
+    int exit_status = prev_exit_status;
+    prev_exit_status = -1;
     if(recording) {
         bool exit_success = kill_gpu_screen_recorder_get_result();
 
@@ -1408,7 +1418,10 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), true);
 
-        if(exit_success) {
+        if(exit_status == 10) {
+            show_notification(app, "GPU Screen Recorder",
+                "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(exit_success) {
             std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
         } else {
@@ -1514,6 +1527,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 static gboolean on_start_streaming_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
 
+    int exit_status = prev_exit_status;
+    prev_exit_status = -1;
     if(streaming) {
         bool exit_success = kill_gpu_screen_recorder_get_result();
 
@@ -1522,7 +1537,10 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(stream_back_button), true);
 
-        if(exit_success) {
+        if(exit_status == 10) {
+            show_notification(app, "GPU Screen Recorder",
+                "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(exit_success) {
             show_notification(app, "GPU Screen Recorder", "Stopped streaming", G_NOTIFICATION_PRIORITY_NORMAL);
         } else {
             show_notification(app, "GPU Screen Recorder", "Failed to stream video. There is either an error in your streaming config or your graphics card doesn't support GPU Screen Recorder", G_NOTIFICATION_PRIORITY_URGENT);
@@ -2602,8 +2620,12 @@ static gboolean on_destroy_window(GtkWidget*, GdkEvent*, gpointer) {
 
 static gboolean handle_child_process_death(gpointer userdata) {
     if(gpu_screen_recorder_process != -1) {
-        int status;
+        int status = 0;
         if(waitpid(gpu_screen_recorder_process, &status, WNOHANG) != 0) {
+            prev_exit_status = -1;
+            if(WIFEXITED(status))
+                prev_exit_status = WEXITSTATUS(status);
+
             if(replaying) {
                 on_start_replay_button_click(start_replay_button, userdata);
             } else if(recording) {
