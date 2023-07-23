@@ -44,6 +44,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.1.4" date="2023-02-23">
+            <description>
+                <p>AMD/Intel: Better color accuracy.</p>
+            </description>
+        </release>
         <release version="3.1.3" date="2023-02-22">
             <description>
                 <p>Fix capture on wlroots based wayland compositors. Fix cursor offset in amd/intel capture.</p>
