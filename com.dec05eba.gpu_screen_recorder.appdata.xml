@@ -18,7 +18,7 @@
 
     <description>
         <p>
-            This is a screen recorder that has minimal impact on system performance by recording a window using the GPU only, similar to shadowplay on windows. This is the fastest screen recording tool for Linux. This screen recorder works with both X11 and Wayland.
+            This is a screen recorder that has minimal impact on system performance by recording a monitor using the GPU only, similar to shadowplay on windows. This is the fastest screen recording tool for Linux. This screen recorder works with both X11 and Wayland.
         </p>
         <p>
             This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few seconds are saved.
@@ -44,6 +44,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.1.5" date="2023-07-25">
+            <description>
+                <p>AMD/Intel: Fix too dark video in the flatpak version.</p>
+            </description>
+        </release>
         <release version="3.1.4" date="2023-07-23">
             <description>
                 <p>AMD/Intel: Better color accuracy.</p>
