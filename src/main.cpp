@@ -2302,7 +2302,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "NVIDIA driver has a \"feature\" (read: bug) where it will downclock memory transfer rate when a program uses CUDA, such as GPU Screen Recorder.\n"
             "To work around this bug, GPU Screen Recorder can overclock your GPU memory transfer rate to it's normal optimal level. To enable overclocking for optimal performance enable the \"Overclock memory transfer rate to workaround NVIDIA driver performance bug\" option.\n"
-            "You also need to have \"Coolbits\" NVIDIA X setting set to \"12\" to enable overclocking. This setting is automatically installed if you installed GPU Screen Recorder from AUR or from source, but not if you installed GPU Screen Recorder flatpak.\n"
+            "You also need to have \"Coolbits\" NVIDIA X setting set to \"12\" to enable overclocking.\n"
             "Click <a href=\"https://wiki.archlinux.org/title/NVIDIA/Tips_and_tricks#Enabling_overclocking\">here</a> to see how to set this up manually or if you are using flatpak.\n"
             "\n"
             "Note that this only works when Xorg server is running as root, and using this option will only give you a performance boost if the game you are recording is bottlenecked by your GPU.\n"
@@ -2791,6 +2791,7 @@ static void load_config(const gpu_info &gpu_inf) {
 }
 
 static bool gl_get_gpu_info(gsr_egl *egl, gpu_info *info) {
+    const char *software_renderers[] = { "llvmpipe", "SWR", "softpipe", NULL };
     bool supported = true;
     const unsigned char *gl_vendor = egl->glGetString(GL_VENDOR);
     const unsigned char *gl_renderer = egl->glGetString(GL_RENDERER);
@@ -2803,10 +2804,14 @@ static bool gl_get_gpu_info(gsr_egl *egl, gpu_info *info) {
         goto end;
     }
 
-    if(gl_renderer && strstr((const char*)gl_renderer, "llvmpipe")) {
-        fprintf(stderr, "Error: your opengl environment is not properly setup. It's using llvmpipe (cpu fallback) for opengl instead of your graphics card\n");
-        supported = false;
-        goto end;
+    if(gl_renderer) {
+        for(int i = 0; software_renderers[i]; ++i) {
+            if(strstr((const char*)gl_renderer, software_renderers[i])) {
+                fprintf(stderr, "gsr error: your opengl environment is not properly setup. It's using %s (software rendering) for opengl instead of your graphics card. Please make sure your graphics driver is properly installed\n", software_renderers[i]);
+                supported = false;
+                goto end;
+            }
+        }
     }
 
     if(strstr((const char*)gl_vendor, "AMD"))
