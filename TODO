@@ -8,3 +8,7 @@ Add pipewire capture option.
 Error if polkit agent is not running (pkexec --help may work but the agent might not be running anyways).
 Fix gui crash on stop recording on sway.
 Re-enable wlroots based capture when it's fixed.
+Add translation support (using gettext, which uses .mo files and _ macro). It should be easy for non-devs to contribute.
+    But how? maybe have a page that links to the english translation files (or translation directory) in git and give instructions,
+    telling them to copy the file content and then send me the file by email with the language name (then I can add it to the correct)
+    file with correct locale. Or if they know how to use git they can use that directly.

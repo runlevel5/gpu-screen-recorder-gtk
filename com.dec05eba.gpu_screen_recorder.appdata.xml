@@ -28,6 +28,7 @@
             Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: flatpak install flathub --system com.dec05eba.gpu_screen_recorder
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
             Some distros such as manjaro disable hardware accelerated H264/HEVC which means GPU Screen Recorder wont work on AMD/Intel and you have to either switch to another distro or install mesa from source (or install mesa-git for example).
+            Recording a single window is also only possible on X11.
         </p>
     </description>
 
@@ -44,6 +45,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.1.7" date="2023-08-15">
+            <description>
+                <p>NVIDIA: Workaround new nvidia driver bug that causes recording of a small window to freeze recording.</p>
+            </description>
+        </release>
         <release version="3.1.6" date="2023-08-13">
             <description>
                 <p>AMD/Intel: fix capture issue on some systems</p>
