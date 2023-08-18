@@ -9,7 +9,7 @@ where only the last few seconds are saved.
 More info at [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
 
 ## Note
-This software works with x11 and wayland, but when using wayland only monitors can be recorded and root access is needed.
+This software works with x11 and wayland, but when using wayland only monitors can be recorded.
 ### TEMPORARY ISSUES
 1) Recording the monitor on steam deck might fail sometimes. This happens even when using ffmpeg directly. This might be a steam deck driver bug. Recording a single window doesn't have this issue.
 2) Videos created on AMD/Intel are in variable framerate format. Use MPV to play such videos, otherwise you might experience stuttering in the video if you are using a buggy video player. Try saving the video into a .mkv file instead when using AMD/Intel, as some software may have better support for .mkv files (such as kdenlive).
