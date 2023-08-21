@@ -25,10 +25,17 @@
         </p>
         <p>
             There are some restrictions when recording on AMD/Intel or Wayland. Videos created on AMD/Intel/Wayland are in variable framerate format. Very out of date video players might have an issue playing such videos. I recommend using MPV or a browser to play such videos, otherwise you might experience stuttering in the video.
+        </p>
+        <p>
             Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: flatpak install flathub --system com.dec05eba.gpu_screen_recorder
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
-            Some distros such as manjaro disable hardware accelerated H264/HEVC which means GPU Screen Recorder wont work on AMD/Intel and you have to either switch to another distro or install mesa from source (or install mesa-git for example).
-            Recording a single window is also only possible on X11.
+        </p>
+        <p>
+            Some distros such as manjaro disable hardware accelerated H264/HEVC which means GPU Screen Recorder wont work on AMD/Intel and you have to either switch to another distro or install mesa
+            from source (or install mesa-git for example).
+        </p>
+        <p>
+            Recording a single window is also only possible on X11. Hotkeys are not supported on wayland either (wayland doesn't really support this). Use X11 if you want a proper desktop experience in general.
         </p>
     </description>
 
