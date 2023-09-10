@@ -13,6 +13,10 @@ This software works with x11 and wayland, but when using wayland only monitors c
 ### TEMPORARY ISSUES
 1) Recording the monitor on steam deck might fail sometimes. This happens even when using ffmpeg directly. This might be a steam deck driver bug. Recording a single window doesn't have this issue.
 2) Videos created on AMD/Intel are in variable framerate format. Use MPV to play such videos, otherwise you might experience stuttering in the video if you are using a buggy video player. Try saving the video into a .mkv file instead when using AMD/Intel, as some software may have better support for .mkv files (such as kdenlive).
+### AMD/Intel/Wayland root permission
+When recording a window under AMD/Intel no special user permission is required, however when recording a monitor (or when using wayland) the program needs root permission (to access KMS).\
+To make this safer, the part that needs root access has been moved to its own executable (to make it as small as possible).\
+For you as a user this only means that if you installed GPU Screen Recorder as a flatpak then a prompt asking for root password will show up when you start recording.
 # Performance
 On a system with a i5 4690k CPU and a GTX 1080 GPU:\
 When recording Legend of Zelda Breath of the Wild at 4k, fps drops from 30 to 7 when using OBS Studio + nvenc, however when using this screen recorder the fps remains at 30.\
@@ -35,6 +39,6 @@ Note that if you use the flatpak version then you wont be able to use overclocki
 ![](https://www.dec05eba.com/images/gpu-screen-recorder.png)
 
 # Donations
-If you really want to donate, you can donate via bitcoin or monero.
+If you want to donate you can donate via bitcoin or monero.
 * Bitcoin: bc1qqvuqnwrdyppf707ge27fqz2n9y9gu7lf5ypyuf
 * Monero: 4An9kp2qW1C9Gah7ewv4JzcNFQ5TAX7ineGCqXWK6vQnhsGGcRpNgcn8r9EC3tMcgY7vqCKs3nSRXhejMHBaGvFdN2egYet
