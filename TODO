@@ -12,3 +12,7 @@ Add translation support (using gettext, which uses .mo files and _ macro). It sh
     But how? maybe have a page that links to the english translation files (or translation directory) in git and give instructions,
     telling them to copy the file content and then send me the file by email with the language name (then I can add it to the correct)
     file with correct locale. Or if they know how to use git they can use that directly.
+Add option to start replay on system startup (use the gpu screen recorder systemd file?) and use the settings from the replay page. This is not possible unless gsr-kms-server has cap (on amd/intel and nvidia wayland), so no flatpak.
+The program should minimize to taskbar on minimize.
+Add default audio output by default if no config file exists. Or redesign audio where there is only a button at first, no list. The button should say: add audio,
+    and then each audio item has a dropdown list where you can select which audio device to use.
