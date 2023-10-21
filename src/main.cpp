@@ -2221,7 +2221,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 
     framerate_mode_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(framerate_mode_grid), 0, grid_row++, 2, 1);
-    gtk_grid_attach(framerate_mode_grid, gtk_label_new("Framerate mode: "), 0, 0, 1, 1);
+    gtk_grid_attach(framerate_mode_grid, gtk_label_new("Frame rate mode: "), 0, 0, 1, 1);
     framerate_mode_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(framerate_mode_input_menu, "auto", "Auto (Recommended)");
     gtk_combo_box_text_append(framerate_mode_input_menu, "cfr", "Constant");
