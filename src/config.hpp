@@ -27,6 +27,7 @@ struct MainConfig {
     std::string quality;
     std::string codec; // Video codec
     std::string audio_codec;
+    std::string framerate_mode;
     bool advanced_view = false;
     bool overclock = false;
 };
@@ -201,13 +202,14 @@ static bool string_to_int(std::string str, int &value) {
     return true;
 }
 
-static Config read_config() {
+static Config read_config(bool &config_empty) {
     Config config;
 
     const std::string config_path = get_config_dir() + "/config";
     std::string file_content;
     if(!file_get_content(config_path.c_str(), file_content)) {
         fprintf(stderr, "Warning: Failed to read config file: %s\n", config_path.c_str());
+        config_empty = true;
         return config;
     }
 
@@ -248,6 +250,8 @@ static Config read_config() {
             config.main_config.codec.assign(value.str, value.size);
         } else if(key == "main.audio_codec") {
             config.main_config.audio_codec.assign(value.str, value.size);
+        } else if(key == "main.framerate_mode") {
+            config.main_config.framerate_mode.assign(value.str, value.size);
         } else if(key == "main.advanced_view") {
             if(value == "true")
                 config.main_config.advanced_view = true;
@@ -342,6 +346,7 @@ static void save_config(const Config &config) {
     fprintf(file, "main.quality %s\n", config.main_config.quality.c_str());
     fprintf(file, "main.codec %s\n", config.main_config.codec.c_str());
     fprintf(file, "main.audio_codec %s\n", config.main_config.audio_codec.c_str());
+    fprintf(file, "main.framerate_mode %s\n", config.main_config.framerate_mode.c_str());
     fprintf(file, "main.advanced_view %s\n", config.main_config.advanced_view ? "true" : "false");
     fprintf(file, "main.overclock %s\n", config.main_config.overclock ? "true" : "false");
 

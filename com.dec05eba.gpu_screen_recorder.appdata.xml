@@ -52,6 +52,15 @@
     </screenshots>
 
     <releases>
+        <release version="3.2.0" date="2023-10-21">
+            <description>
+                <ul>
+                    <p>AMD/Intel: workaround driver bug that causes vram leak</p>
+                    <li>Add framerate mode option in advanced menu</li>
+                    <li>Redesign audio input to make it clear that you have to add audio to use it</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.1.7" date="2023-08-15">
             <description>
                 <p>NVIDIA: Workaround new nvidia driver bug that causes recording of a small window to freeze recording.</p>

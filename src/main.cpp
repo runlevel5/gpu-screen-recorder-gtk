@@ -48,10 +48,10 @@ static GtkGrid *area_size_grid;
 static GtkSpinButton *area_width_entry;
 static GtkSpinButton *area_height_entry;
 static GtkComboBoxText *record_area_selection_menu;
-static GtkComboBoxText *audio_input_menu_todo;
 static GtkComboBoxText *quality_input_menu;
 static GtkComboBoxText *video_codec_input_menu;
 static GtkComboBoxText *audio_codec_input_menu;
+static GtkComboBoxText *framerate_mode_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
 static GtkComboBoxText *record_container;
 static GtkComboBoxText *replay_container;
@@ -80,6 +80,7 @@ static GtkWidget *streaming_hotkey_button;
 static GtkWidget *merge_audio_tracks_button;
 static GtkGrid *video_codec_grid;
 static GtkGrid *audio_codec_grid;
+static GtkGrid *framerate_mode_grid;
 static GtkComboBoxText *view_combo_box;
 static GtkGrid *overclock_grid;
 static GtkWidget *overclock_button;
@@ -93,13 +94,25 @@ static bool streaming = false;
 static pid_t gpu_screen_recorder_process = -1;
 static int prev_exit_status = -1;
 static Config config;
-static int num_audio_inputs_addable = 0;
 static std::string record_file_current_filename;
 static bool nvfbc_installed = false;
 
 static bool wayland = false;
 static char drm_card_path[128];
 static gsr_egl egl;
+
+struct AudioInput {
+    std::string name;
+    std::string description;
+};
+
+struct PulseAudioServerInfo {
+    std::string default_sink_name;
+    std::string default_source_name;
+};
+
+static std::vector<AudioInput> audio_inputs;
+static PulseAudioServerInfo pa_default_sources;
 
 enum class HotkeyMode {
     NoAction,
@@ -138,9 +151,7 @@ static const Container supported_containers[] = {
 
 struct AudioRow {
     GtkWidget *row;
-    GtkWidget *track_number_label;
-    GtkWidget *label;
-    std::string id;
+    GtkComboBoxText *input_list;
 };
 
 typedef enum {
@@ -229,18 +240,7 @@ static void drag_data_get(GtkWidget *widget, GdkDragContext*, GtkSelectionData *
                           sizeof(gpointer));
 }
 
-static void update_used_audio_input_track_ids() {
-    int track_number = 1;
-    for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&](const AudioRow *audio_row) {
-        char track_number_str[32];
-        snprintf(track_number_str, sizeof(track_number_str), "%d:", track_number);
-        GtkWidget *track_number_label = ((AudioRow*)g_object_get_data(G_OBJECT(audio_row->row), "audio-row"))->track_number_label;
-        gtk_label_set_text(GTK_LABEL(track_number_label), track_number_str);
-        ++track_number;
-    });
-}
-
-static void drag_data_received (GtkWidget *widget, GdkDragContext*,
+static void drag_data_received(GtkWidget *widget, GdkDragContext*,
     gint, gint,
     GtkSelectionData *selection_data,
     guint, guint32, gpointer)
@@ -259,8 +259,6 @@ static void drag_data_received (GtkWidget *widget, GdkDragContext*,
     gtk_container_remove(GTK_CONTAINER(list_box), source);
     gtk_list_box_insert(GTK_LIST_BOX(list_box), source, pos);
     g_object_unref(source);
-
-    update_used_audio_input_track_ids();
 }
 
 static void enable_stream_record_button_if_info_filled() {
@@ -273,13 +271,13 @@ static void enable_stream_record_button_if_info_filled() {
             return;
         }
     }
-    
+
     gtk_widget_set_sensitive(GTK_WIDGET(replay_button), true);
     gtk_widget_set_sensitive(GTK_WIDGET(record_button), true);
     gtk_widget_set_sensitive(GTK_WIDGET(stream_button), true);
 }
 
-static GtkWidget* create_used_audio_input_row(const char *id, const char *text) {
+static GtkWidget* create_used_audio_input_row(void) {
     char entry_name[] = "GTK_LIST_BOX_ROW";
     const GtkTargetEntry entries[] = {
         { entry_name, GTK_TARGET_SAME_APP, 0 }
@@ -295,20 +293,14 @@ static GtkWidget* create_used_audio_input_row(const char *id, const char *text) 
     gtk_container_add(GTK_CONTAINER(handle), image);
     gtk_container_add(GTK_CONTAINER(box), handle);
 
-    int track_number = 1;
-    for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&track_number](const AudioRow*) {
-        ++track_number;
-    });
-
-    char track_number_str[32];
-    snprintf(track_number_str, sizeof(track_number_str), "%d:", track_number);
-    GtkWidget *track_number_label = gtk_label_new(track_number_str);
-    gtk_label_set_xalign(GTK_LABEL(track_number_label), 0.0f);
-    gtk_container_add(GTK_CONTAINER(box), track_number_label);
-
-    GtkWidget *label = gtk_label_new(text);
-    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
-    gtk_container_add_with_properties(GTK_CONTAINER(box), label, "expand", TRUE, NULL);
+    GtkComboBoxText *input_list = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    for(const auto &audio_input : audio_inputs) {
+        gtk_combo_box_text_append(input_list, audio_input.name.c_str(), audio_input.description.c_str());
+    }
+    gtk_widget_set_hexpand(GTK_WIDGET(input_list), true);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(input_list), 0);
+    //gtk_combo_box_set_active_id(GTK_COMBO_BOX(combo), id);
+    gtk_container_add(GTK_CONTAINER(box), GTK_WIDGET(input_list));
 
     GtkWidget *remove_button = gtk_button_new_with_label("Remove");
     gtk_widget_set_halign(remove_button, GTK_ALIGN_END);
@@ -323,24 +315,12 @@ static GtkWidget* create_used_audio_input_row(const char *id, const char *text) 
 
     AudioRow *audio_row = new AudioRow();
     audio_row->row = row;
-    audio_row->track_number_label = track_number_label;
-    audio_row->label = label;
-    audio_row->id = id;
+    audio_row->input_list = input_list;
     g_object_set_data(G_OBJECT(row), "audio-row", audio_row);
 
     g_signal_connect(remove_button, "clicked", G_CALLBACK(+[](GtkButton*, gpointer userdata){
         AudioRow *audio_row = (AudioRow*)userdata;
-        gtk_combo_box_text_append(audio_input_menu_todo, audio_row->id.c_str(), gtk_label_get_text(GTK_LABEL(audio_row->label)));
-        gtk_container_remove (GTK_CONTAINER(gtk_widget_get_parent(audio_row->row)), audio_row->row);
-
-        ++num_audio_inputs_addable;
-        if(num_audio_inputs_addable == 1) {
-            gtk_combo_box_set_active(GTK_COMBO_BOX(audio_input_menu_todo), 0);
-            gtk_widget_set_sensitive(add_audio_input_button, true);
-        }
-
-        update_used_audio_input_track_ids();
-        enable_stream_record_button_if_info_filled();
+        gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(audio_row->row)), audio_row->row);
         delete audio_row;
         return true;
     }), audio_row);
@@ -421,11 +401,12 @@ static void save_configs() {
 
     config.main_config.audio_input.clear();
     for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [](const AudioRow *audio_row) {
-        config.main_config.audio_input.push_back(gtk_label_get_text(GTK_LABEL(audio_row->label)));
+        config.main_config.audio_input.push_back(gtk_combo_box_text_get_active_text(audio_row->input_list));
     });
     config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     config.main_config.codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     config.main_config.audio_codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
+    config.main_config.framerate_mode = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
     config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
 
@@ -1277,6 +1258,23 @@ static bool kill_gpu_screen_recorder_get_result() {
     return exit_success;
 }
 
+static void add_audio_command_line_args(std::vector<const char*> &args, std::string &merge_audio_tracks_arg_value) {
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
+        for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&merge_audio_tracks_arg_value](const AudioRow *audio_row) {
+            if(!merge_audio_tracks_arg_value.empty())
+                merge_audio_tracks_arg_value += '|';
+            merge_audio_tracks_arg_value += gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_row->input_list));
+        });
+
+        if(!merge_audio_tracks_arg_value.empty())
+            args.insert(args.end(), { "-a", merge_audio_tracks_arg_value.c_str() });
+    } else {
+        for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&args](const AudioRow *audio_row) {
+            args.insert(args.end(), { "-a", gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_row->input_list)) });
+        });
+    }
+}
+
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
     const gchar *dir = gtk_button_get_label(replay_file_chooser_button);
@@ -1336,6 +1334,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
+    const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
@@ -1347,21 +1346,11 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
         args.insert(args.end(), { "-oc", "yes" });
 
-    std::string merge_audio_tracks_arg_value;
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
-        for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&merge_audio_tracks_arg_value](const AudioRow *audio_row) {
-            if(!merge_audio_tracks_arg_value.empty())
-                merge_audio_tracks_arg_value += '|';
-            merge_audio_tracks_arg_value += audio_row->id;
-        });
+    if(strcmp(framerate_mode_input_str, "auto") != 0)
+        args.insert(args.end(), { "-fm", framerate_mode_input_str });
 
-        if(!merge_audio_tracks_arg_value.empty())
-            args.insert(args.end(), { "-a", merge_audio_tracks_arg_value.c_str() });
-    } else {
-        for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&args](const AudioRow *audio_row) {
-            args.insert(args.end(), { "-a", audio_row->id.c_str() });
-        });
-    }
+    std::string merge_audio_tracks_arg_value;
+    add_audio_command_line_args(args, merge_audio_tracks_arg_value);
 
     if(follow_focused)
         args.insert(args.end(), { "-s", area });
@@ -1464,6 +1453,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
+    const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
@@ -1475,21 +1465,11 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
         args.insert(args.end(), { "-oc", "yes" });
 
-    std::string merge_audio_tracks_arg_value;
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
-        for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&merge_audio_tracks_arg_value](const AudioRow *audio_row) {
-            if(!merge_audio_tracks_arg_value.empty())
-                merge_audio_tracks_arg_value += '|';
-            merge_audio_tracks_arg_value += audio_row->id;
-        });
+    if(strcmp(framerate_mode_input_str, "auto") != 0)
+        args.insert(args.end(), { "-fm", framerate_mode_input_str });
 
-        if(!merge_audio_tracks_arg_value.empty())
-            args.insert(args.end(), { "-a", merge_audio_tracks_arg_value.c_str() });
-    } else {
-        for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&args](const AudioRow *audio_row) {
-            args.insert(args.end(), { "-a", audio_row->id.c_str() });
-        });
-    }
+    std::string merge_audio_tracks_arg_value;
+    add_audio_command_line_args(args, merge_audio_tracks_arg_value);
 
     if(follow_focused)
         args.insert(args.end(), { "-s", area });
@@ -1592,6 +1572,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
+    const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
@@ -1603,21 +1584,11 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
         args.insert(args.end(), { "-oc", "yes" });
 
-    std::string merge_audio_tracks_arg_value;
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
-        for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&merge_audio_tracks_arg_value](const AudioRow *audio_row) {
-            if(!merge_audio_tracks_arg_value.empty())
-                merge_audio_tracks_arg_value += '|';
-            merge_audio_tracks_arg_value += audio_row->id;
-        });
+    if(strcmp(framerate_mode_input_str, "auto") != 0)
+        args.insert(args.end(), { "-fm", framerate_mode_input_str });
 
-        if(!merge_audio_tracks_arg_value.empty())
-            args.insert(args.end(), { "-a", merge_audio_tracks_arg_value.c_str() });
-    } else {
-        for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&args](const AudioRow *audio_row) {
-            args.insert(args.end(), { "-a", audio_row->id.c_str() });
-        });
-    }
+    std::string merge_audio_tracks_arg_value;
+    add_audio_command_line_args(args, merge_audio_tracks_arg_value);
 
     if(follow_focused)
         args.insert(args.end(), { "-s", area });
@@ -1679,11 +1650,6 @@ static void pa_state_cb(pa_context *c, void *userdata) {
     }
 }
 
-struct AudioInput {
-    std::string name;
-    std::string description;
-};
-
 static void pa_sourcelist_cb(pa_context*, const pa_source_info *source_info, int eol, void *userdata) {
     if(eol > 0)
         return;
@@ -1735,11 +1701,6 @@ static std::vector<AudioInput> get_pulseaudio_inputs() {
     pa_mainloop_free(main_loop);
     return {};
 }
-
-struct PulseAudioServerInfo {
-    std::string default_sink_name;
-    std::string default_source_name;
-};
 
 static void server_info_callback(pa_context*, const pa_server_info *server_info, void *userdata) {
     PulseAudioServerInfo *u = (PulseAudioServerInfo*)userdata;
@@ -1807,6 +1768,7 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     const gchar *selected_view = gtk_combo_box_get_active_id(widget);
     gtk_widget_set_visible(GTK_WIDGET(video_codec_grid), strcmp(selected_view, "advanced") == 0);
     gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), strcmp(selected_view, "advanced") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(framerate_mode_grid), strcmp(selected_view, "advanced") == 0);
     gtk_widget_set_visible(GTK_WIDGET(overclock_grid), strcmp(selected_view, "advanced") == 0 && gpu_inf.vendor == GPU_VENDOR_NVIDIA && !wayland);
 }
 
@@ -2110,7 +2072,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
                 if(!gsr_egl_supports_wayland_capture(&egl))
                     label += ", requires root access";
             } else if(gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
-                label += ", requires root access, may perform better";
+                label += ", requires root access";
             }
             label += ")";
 
@@ -2161,7 +2123,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 0, 1, 1);
     }
 
-    GtkFrame *audio_input_frame = GTK_FRAME(gtk_frame_new("Audio input"));
+    GtkFrame *audio_input_frame = GTK_FRAME(gtk_frame_new("Audio"));
     gtk_grid_attach(grid, GTK_WIDGET(audio_input_frame), 0, grid_row++, 2, 1);
 
     GtkGrid *audio_grid = GTK_GRID(gtk_grid_new());
@@ -2177,68 +2139,38 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_set_column_spacing(add_audio_grid, 10);
     gtk_grid_attach(audio_grid, GTK_WIDGET(add_audio_grid), 0, audio_input_area_row++, 1, 1);
 
-    audio_input_menu_todo = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    // TODO:
     const PulseAudioServerInfo pa_server_info = get_pulseaudio_default_inputs();
-    const auto audio_inputs = get_pulseaudio_inputs();
 
-    if(!pa_server_info.default_sink_name.empty() && audio_inputs_contains(audio_inputs, pa_server_info.default_sink_name)) {
-        gtk_combo_box_text_append(audio_input_menu_todo, pa_server_info.default_sink_name.c_str(), "Default output");
-        ++num_audio_inputs_addable;
-    }
+    // if(!pa_server_info.default_sink_name.empty() && audio_inputs_contains(audio_inputs, pa_server_info.default_sink_name)) {
+    //     gtk_combo_box_text_append(audio_input_menu_todo, pa_server_info.default_sink_name.c_str(), "Default output");
+    //     ++num_audio_inputs_addable;
+    // }
 
-    if(!pa_server_info.default_source_name.empty() && audio_inputs_contains(audio_inputs, pa_server_info.default_source_name)) {
-        gtk_combo_box_text_append(audio_input_menu_todo, pa_server_info.default_source_name.c_str(), "Default input");
-        ++num_audio_inputs_addable;
-    }
+    // if(!pa_server_info.default_source_name.empty() && audio_inputs_contains(audio_inputs, pa_server_info.default_source_name)) {
+    //     gtk_combo_box_text_append(audio_input_menu_todo, pa_server_info.default_source_name.c_str(), "Default input");
+    //     ++num_audio_inputs_addable;
+    // }
 
-    for(const AudioInput &audio_input : audio_inputs) {
-        std::string text = audio_input.description;
-        gtk_combo_box_text_append(audio_input_menu_todo, audio_input.name.c_str(), audio_input.description.c_str());
-        ++num_audio_inputs_addable;
-    }
-    gtk_widget_set_hexpand(GTK_WIDGET(audio_input_menu_todo), true);
-    gtk_grid_attach(add_audio_grid, GTK_WIDGET(audio_input_menu_todo), 0, 0, 1, 1);
+    // for(const AudioInput &audio_input : audio_inputs) {
+    //     std::string text = audio_input.description;
+    //     gtk_combo_box_text_append(audio_input_menu_todo, audio_input.name.c_str(), audio_input.description.c_str());
+    //     ++num_audio_inputs_addable;
+    // }
 
-    add_audio_input_button = gtk_button_new_with_label("Add");
-    gtk_widget_set_halign(add_audio_input_button, GTK_ALIGN_END);
-    gtk_grid_attach(add_audio_grid, add_audio_input_button, 1, 0, 1, 1);
+    add_audio_input_button = gtk_button_new_with_label("Add audio track");
+    gtk_grid_attach(add_audio_grid, add_audio_input_button, 0, 0, 1, 1);
     g_signal_connect(add_audio_input_button, "clicked", G_CALLBACK(+[](GtkButton*, gpointer){
-        const gint selected_audio_input = gtk_combo_box_get_active(GTK_COMBO_BOX(audio_input_menu_todo));
-        const char *active_id = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_input_menu_todo));
-        const char *active_text = gtk_combo_box_text_get_active_text(audio_input_menu_todo);
-        if(selected_audio_input == -1 || !active_id || !active_text)
-            return true;
-
-        GtkWidget *row = create_used_audio_input_row(active_id, active_text);
+        GtkWidget *row = create_used_audio_input_row();
         gtk_widget_show_all(row);
-        gtk_list_box_insert (GTK_LIST_BOX(audio_input_used_list), row, -1);
-        gtk_combo_box_text_remove(audio_input_menu_todo, selected_audio_input);
-
-        --num_audio_inputs_addable;
-        if(num_audio_inputs_addable > 0)
-            gtk_combo_box_set_active(GTK_COMBO_BOX(audio_input_menu_todo), num_audio_inputs_addable - 1);
-        else
-            gtk_widget_set_sensitive(add_audio_input_button, false);
-
-        enable_stream_record_button_if_info_filled();
+        gtk_list_box_insert(GTK_LIST_BOX(audio_input_used_list), row, -1);
         return true;
     }), nullptr);
-
-    if(num_audio_inputs_addable > 0) {
-        gtk_combo_box_set_active(GTK_COMBO_BOX(audio_input_menu_todo), 0);
-        gtk_widget_set_sensitive(add_audio_input_button, true);
-    } else {
-        gtk_widget_set_sensitive(add_audio_input_button, false);
-    }
 
     audio_input_used_list = gtk_list_box_new();
     gtk_widget_set_hexpand (audio_input_used_list, TRUE);
     gtk_list_box_set_selection_mode (GTK_LIST_BOX (audio_input_used_list), GTK_SELECTION_NONE);
     gtk_grid_attach(audio_grid, audio_input_used_list, 0, audio_input_area_row++, 2, 1);
-
-    GtkWidget *selected_audio_inputs_label = gtk_label_new("Selected audio inputs:");
-    gtk_widget_set_halign(selected_audio_inputs_label, GTK_ALIGN_START);
-    gtk_grid_attach(add_audio_grid, selected_audio_inputs_label, 0, ++audio_input_area_row, 2, 1);
 
     merge_audio_tracks_button = gtk_check_button_new_with_label("Merge audio tracks");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button), true);
@@ -2286,6 +2218,17 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_hexpand(GTK_WIDGET(audio_codec_input_menu), true);
     gtk_grid_attach(audio_codec_grid, GTK_WIDGET(audio_codec_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(audio_codec_input_menu), 0);
+
+    framerate_mode_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(framerate_mode_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(framerate_mode_grid, gtk_label_new("Framerate mode: "), 0, 0, 1, 1);
+    framerate_mode_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(framerate_mode_input_menu, "auto", "Auto (Recommended)");
+    gtk_combo_box_text_append(framerate_mode_input_menu, "cfr", "Constant");
+    gtk_combo_box_text_append(framerate_mode_input_menu, "vfr", "Variable");
+    gtk_widget_set_hexpand(GTK_WIDGET(framerate_mode_input_menu), true);
+    gtk_grid_attach(framerate_mode_grid, GTK_WIDGET(framerate_mode_input_menu), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(framerate_mode_input_menu), 0);
 
     overclock_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(overclock_grid), 0, grid_row++, 2, 1);
@@ -2638,27 +2581,22 @@ static gboolean handle_child_process_death(gpointer userdata) {
     return G_SOURCE_CONTINUE;
 }
 
-// Only adds the item if |name| matches an item in the audio input menu
 static void add_audio_input_track(const char *name) {
-    std::string audio_input_id;
-    const gint audio_input_row = combo_box_text_get_row_by_label(GTK_COMBO_BOX(audio_input_menu_todo), name, audio_input_id);
-    if(audio_input_row == -1)
-        return;
+    GtkWidget *row = create_used_audio_input_row();
 
-    GtkWidget *row = create_used_audio_input_row(audio_input_id.c_str(), name);
+    const AudioRow *audio_row = (AudioRow*)g_object_get_data(G_OBJECT(row), "audio-row");
+    std::string audio_id;
+    gint target_combo_box_index = combo_box_text_get_row_by_label(GTK_COMBO_BOX(audio_row->input_list), name, audio_id);
+    if(target_combo_box_index != -1)
+        gtk_combo_box_set_active(GTK_COMBO_BOX(audio_row->input_list), target_combo_box_index);
+
     gtk_widget_show_all(row);
     gtk_list_box_insert (GTK_LIST_BOX(audio_input_used_list), row, -1);
-    gtk_combo_box_text_remove(audio_input_menu_todo, audio_input_row);
-
-    --num_audio_inputs_addable;
-    if(num_audio_inputs_addable > 0)
-        gtk_combo_box_set_active(GTK_COMBO_BOX(audio_input_menu_todo), num_audio_inputs_addable - 1);
-    else
-        gtk_widget_set_sensitive(add_audio_input_button, false);
 }
 
 static void load_config(const gpu_info &gpu_inf) {
-    config = read_config();
+    bool config_empty = false;
+    config = read_config(config_empty);
 
     if(!wayland && strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
         //
@@ -2717,6 +2655,9 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac" && config.main_config.audio_codec != "flac")
         config.main_config.audio_codec = "opus";
 
+    if(config.main_config.framerate_mode != "auto" && config.main_config.framerate_mode != "cfr" && config.main_config.framerate_mode != "vfr")
+        config.main_config.framerate_mode = "auto";
+
     if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube" && config.streaming_config.streaming_service != "custom")
         config.streaming_config.streaming_service = "twitch";
 
@@ -2741,12 +2682,18 @@ static void load_config(const gpu_info &gpu_inf) {
     }
     gtk_spin_button_set_value(fps_entry, config.main_config.fps);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button), config.main_config.merge_audio_tracks);
+
     for(const std::string &audio_input : config.main_config.audio_input) {
         add_audio_input_track(audio_input.c_str());
     }
+
+    if(config_empty && config.main_config.audio_input.empty())
+        add_audio_input_track("Default output");
+
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(quality_input_menu), config.main_config.quality.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_codec_input_menu), config.main_config.audio_codec.c_str());
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(framerate_mode_input_menu), config.main_config.framerate_mode.c_str());
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), config.main_config.overclock);
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
@@ -2933,6 +2880,14 @@ static void activate(GtkApplication *app, gpointer) {
     gtk_window_set_resizable(GTK_WINDOW(window), false);
 
     select_window_userdata.app = app;
+    audio_inputs = get_pulseaudio_inputs();
+    pa_default_sources = get_pulseaudio_default_inputs();
+
+    if(!pa_default_sources.default_source_name.empty() && audio_inputs_contains(audio_inputs, pa_default_sources.default_source_name))
+        audio_inputs.insert(audio_inputs.begin(), { pa_default_sources.default_source_name.c_str(), "Default input" });
+
+    if(!pa_default_sources.default_sink_name.empty() && audio_inputs_contains(audio_inputs, pa_default_sources.default_sink_name))
+        audio_inputs.insert(audio_inputs.begin(), { pa_default_sources.default_sink_name.c_str(), "Default output" });
 
     if(!wayland)
         crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);

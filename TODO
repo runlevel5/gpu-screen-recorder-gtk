@@ -13,6 +13,9 @@ Add translation support (using gettext, which uses .mo files and _ macro). It sh
     telling them to copy the file content and then send me the file by email with the language name (then I can add it to the correct)
     file with correct locale. Or if they know how to use git they can use that directly.
 Add option to start replay on system startup (use the gpu screen recorder systemd file?) and use the settings from the replay page. This is not possible unless gsr-kms-server has cap (on amd/intel and nvidia wayland), so no flatpak.
+    Dont add this option if not running systemd, or disable the button then.
 The program should minimize to taskbar on minimize.
-Add default audio output by default if no config file exists. Or redesign audio where there is only a button at first, no list. The button should say: add audio,
-    and then each audio item has a dropdown list where you can select which audio device to use.
+Bypass password prompt in flatpak with polkit policy: https://gitlab.com/corectrl/corectrl/-/wikis/Setup#dont-ask-for-user-password
+    autostart can also be done by adding the application to ~/.config/autostart/com.dec05eba.gpu_screen_recorder, but that may not work on minimal window manager setups. So maybe use systemd instead.
+    The frontpage should have a toggle button saying "dont ask for password when recording", which should add those polkit changes to the system (requires root). Shouldn't this be done by the polkitd user?
+    Check if this is possible (if /etc/polkit-1/localauthority or /etc/polkit-1/rules.d exists).
