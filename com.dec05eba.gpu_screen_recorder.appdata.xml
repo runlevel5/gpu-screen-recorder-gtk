@@ -55,7 +55,7 @@
         <release version="3.2.0" date="2023-10-21">
             <description>
                 <ul>
-                    <p>AMD/Intel: workaround driver bug that causes vram leak</p>
+                    <li>AMD/Intel: workaround driver bug that causes vram leak</li>
                     <li>Add framerate mode option in advanced menu</li>
                     <li>Redesign audio input to make it clear that you have to add audio to use it</li>
                 </ul>
