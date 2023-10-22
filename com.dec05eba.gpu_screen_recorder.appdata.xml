@@ -52,6 +52,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.2.1" date="2023-10-22">
+            <description>
+                <p>AMD/Intel wayland: fix broken colors when system uses 10-bit</p>
+            </description>
+        </release>
         <release version="3.2.0" date="2023-10-21">
             <description>
                 <ul>
