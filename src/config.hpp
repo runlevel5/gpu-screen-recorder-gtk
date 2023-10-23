@@ -86,6 +86,17 @@ static std::string get_config_dir() {
     return config_dir;
 }
 
+static std::string get_videos_dir() {
+    std::string videos_dir;
+    const char *xdg_videos_dir = getenv("XDG_VIDEOS_DIR");
+    if(xdg_videos_dir) {
+        videos_dir = xdg_videos_dir;
+    } else {
+        videos_dir = get_home_dir() + "/Videos";
+    }
+    return videos_dir;
+}
+
 static int create_directory_recursive(char *path) {
     int path_len = strlen(path);
     char *p = path;

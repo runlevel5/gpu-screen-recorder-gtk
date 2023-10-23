@@ -2283,8 +2283,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     int row = 0;
 
-    std::string video_filepath = get_home_dir();
-    video_filepath += "/Videos";
+    std::string video_filepath = get_videos_dir();
 
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "replay");
@@ -2395,8 +2394,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
 static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     int row = 0;
 
-    std::string video_filepath = get_home_dir();
-    video_filepath += "/Videos";
+    std::string video_filepath = get_videos_dir();
 
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "recording");
@@ -2665,10 +2663,10 @@ static void load_config(const gpu_info &gpu_inf) {
         gtk_label_set_text(stream_key_label, "Url: ");
 
     if(config.record_config.save_directory.empty() || !is_directory(config.record_config.save_directory.c_str()))
-        config.record_config.save_directory = get_home_dir() + "/Videos";
+        config.record_config.save_directory = get_videos_dir();
 
     if(config.replay_config.save_directory.empty() || !is_directory(config.replay_config.save_directory.c_str()))
-        config.replay_config.save_directory = get_home_dir() + "/Videos";
+        config.replay_config.save_directory = get_videos_dir();
 
     if(config.replay_config.replay_time < 5)
         config.replay_config.replay_time = 5;
