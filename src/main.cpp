@@ -2294,7 +2294,10 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
     GtkWidget *hotkey_active_label = NULL;
-    if(!wayland) {
+    if(wayland) {
+        gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 5, 1);
+        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
+    } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
 
@@ -2405,7 +2408,10 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
     GtkWidget *hotkey_active_label = NULL;
-    if(!wayland) {
+    if(wayland) {
+        gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 3, 1);
+        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+    } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
 
@@ -2482,7 +2488,10 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
     GtkWidget *hotkey_active_label = NULL;
-    if(!wayland) {
+    if(wayland) {
+        gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 3, 1);
+        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+    } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
 

@@ -52,6 +52,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.2.2" date="2023-10-31">
+            <description>
+                <p>Intel: attempt to fix glitched graphics on some intel gpus. I dont know, ask intel why they are weird</p>
+            </description>
+        </release>
         <release version="3.2.1" date="2023-10-22">
             <description>
                 <p>AMD/Intel wayland: fix broken colors when system uses 10-bit</p>
