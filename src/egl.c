@@ -129,7 +129,7 @@ static bool gsr_egl_create_window(gsr_egl *self, bool wayland) {
 
     const int32_t attr[] = {
         EGL_BUFFER_SIZE, 24,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
         EGL_NONE
     };
 
@@ -167,7 +167,7 @@ static bool gsr_egl_create_window(gsr_egl *self, bool wayland) {
         }
     }
 
-    self->eglBindAPI(EGL_OPENGL_ES2_BIT);
+    self->eglBindAPI(EGL_OPENGL_API);
 
     self->egl_display = self->eglGetDisplay(self->wayland.dpy ? (EGLNativeDisplayType)self->wayland.dpy : (EGLNativeDisplayType)self->x11.dpy);
     if(!self->egl_display) {
