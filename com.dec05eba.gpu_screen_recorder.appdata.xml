@@ -52,6 +52,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.2.4" date="2023-11-05">
+            <description>
+                <p>Nvidia x11: disable screen direct record option, as there is an nvidia driver bug that causes some games to freeze/crash with this option</p>
+            </description>
+        </release>
         <release version="3.2.3" date="2023-11-01">
             <description>
                 <p>Use opengl context instead of egl2, might fix program startup not working for some users</p>

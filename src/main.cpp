@@ -2052,10 +2052,8 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     }
     const bool allow_screen_capture = wayland || nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
     if(allow_screen_capture) {
-        if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA) {
+        if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA)
             gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
-            gtk_combo_box_text_append(record_area_selection_menu, "screen-direct-force", "All monitors (for VRR. No cursor, may have driver issues. Only use with VRR monitors!)");
-        }
 
         void *connection = NULL;
         gsr_connection_type connection_type = GSR_CONNECTION_DRM;
@@ -2609,7 +2607,7 @@ static void load_config(const gpu_info &gpu_inf) {
         //
     } else if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
         //
-    } else if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA && (strcmp(config.main_config.record_area_option.c_str(), "screen") == 0 || strcmp(config.main_config.record_area_option.c_str(), "screen-direct-force") == 0)) {
+    } else if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "screen") == 0) {
         //
     } else {
         void *connection = NULL;
