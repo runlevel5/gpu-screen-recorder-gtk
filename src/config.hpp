@@ -6,6 +6,7 @@
 #include <functional>
 #include <unistd.h>
 #include <limits.h>
+#include <inttypes.h>
 #include <libgen.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -213,6 +214,9 @@ static bool string_to_int(std::string str, int &value) {
     return true;
 }
 
+#define FORMAT_I64 "%" PRIi64
+#define FORMAT_U32 "%" PRIu32
+
 static Config read_config(bool &config_empty) {
     Config config;
 
@@ -279,7 +283,7 @@ static Config read_config(bool &config_empty) {
             config.streaming_config.stream_key.assign(value.str, value.size);
         } else if(key == "streaming.start_recording_hotkey") {
             std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), "%ld %u", &config.streaming_config.start_recording_hotkey.keysym, &config.streaming_config.start_recording_hotkey.modifiers) != 2) {
+            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.streaming_config.start_recording_hotkey.keysym, &config.streaming_config.start_recording_hotkey.modifiers) != 2) {
                 fprintf(stderr, "Warning: Invalid config option value for streaming.start_recording_hotkey\n");
                 config.streaming_config.start_recording_hotkey.keysym = 0;
                 config.streaming_config.start_recording_hotkey.modifiers = 0;
@@ -290,7 +294,7 @@ static Config read_config(bool &config_empty) {
             config.record_config.container.assign(value.str, value.size);
         } else if(key == "record.start_recording_hotkey") {
             std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), "%ld %u", &config.record_config.start_recording_hotkey.keysym, &config.record_config.start_recording_hotkey.modifiers) != 2) {
+            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.record_config.start_recording_hotkey.keysym, &config.record_config.start_recording_hotkey.modifiers) != 2) {
                 fprintf(stderr, "Warning: Invalid config option value for record.start_recording_hotkey\n");
                 config.record_config.start_recording_hotkey.keysym = 0;
                 config.record_config.start_recording_hotkey.modifiers = 0;
@@ -306,14 +310,14 @@ static Config read_config(bool &config_empty) {
             }
         } else if(key == "replay.start_recording_hotkey") {
             std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), "%ld %u", &config.replay_config.start_recording_hotkey.keysym, &config.replay_config.start_recording_hotkey.modifiers) != 2) {
+            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.replay_config.start_recording_hotkey.keysym, &config.replay_config.start_recording_hotkey.modifiers) != 2) {
                 fprintf(stderr, "Warning: Invalid config option value for replay.start_recording_hotkey\n");
                 config.replay_config.start_recording_hotkey.keysym = 0;
                 config.replay_config.start_recording_hotkey.modifiers = 0;
             }
         } else if(key == "replay.save_recording_hotkey") {
             std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), "%ld %u", &config.replay_config.save_recording_hotkey.keysym, &config.replay_config.save_recording_hotkey.modifiers) != 2) {
+            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.replay_config.save_recording_hotkey.keysym, &config.replay_config.save_recording_hotkey.modifiers) != 2) {
                 fprintf(stderr, "Warning: Invalid config option value for replay.save_recording_hotkey\n");
                 config.replay_config.save_recording_hotkey.keysym = 0;
                 config.replay_config.save_recording_hotkey.modifiers = 0;
@@ -363,17 +367,17 @@ static void save_config(const Config &config) {
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());
-    fprintf(file, "streaming.start_recording_hotkey %ld %u\n", config.streaming_config.start_recording_hotkey.keysym, config.streaming_config.start_recording_hotkey.modifiers);
+    fprintf(file, "streaming.start_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.streaming_config.start_recording_hotkey.keysym, config.streaming_config.start_recording_hotkey.modifiers);
 
     fprintf(file, "record.save_directory %s\n", config.record_config.save_directory.c_str());
     fprintf(file, "record.container %s\n", config.record_config.container.c_str());
-    fprintf(file, "record.start_recording_hotkey %ld %u\n", config.record_config.start_recording_hotkey.keysym, config.record_config.start_recording_hotkey.modifiers);
+    fprintf(file, "record.start_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.record_config.start_recording_hotkey.keysym, config.record_config.start_recording_hotkey.modifiers);
 
     fprintf(file, "replay.save_directory %s\n", config.replay_config.save_directory.c_str());
     fprintf(file, "replay.container %s\n", config.replay_config.container.c_str());
     fprintf(file, "replay.time %d\n", config.replay_config.replay_time);
-    fprintf(file, "replay.start_recording_hotkey %ld %u\n", config.replay_config.start_recording_hotkey.keysym, config.replay_config.start_recording_hotkey.modifiers);
-    fprintf(file, "replay.save_recording_hotkey %ld %u\n", config.replay_config.save_recording_hotkey.keysym, config.replay_config.save_recording_hotkey.modifiers);
+    fprintf(file, "replay.start_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.replay_config.start_recording_hotkey.keysym, config.replay_config.start_recording_hotkey.modifiers);
+    fprintf(file, "replay.save_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.replay_config.save_recording_hotkey.keysym, config.replay_config.save_recording_hotkey.modifiers);
 
     fclose(file);
 }

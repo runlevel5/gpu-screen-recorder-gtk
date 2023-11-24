@@ -18,10 +18,10 @@ build_gsr_gtk() {
     dependencies="gtk+-3.0 x11 xrandr libpulse libdrm wayland-egl wayland-client"
     includes="$(pkg-config --cflags $dependencies)"
     libs="$(pkg-config --libs $dependencies) -ldl"
-    gcc -c src/egl.c $opts $includes
+    $CC -c src/egl.c $opts $includes
     $CC -c external/wlr-export-dmabuf-unstable-v1-protocol.c $opts $includes
-    g++ -c src/main.cpp $opts $includes
-    g++ -o gpu-screen-recorder-gtk egl.o wlr-export-dmabuf-unstable-v1-protocol.o main.o $libs $opts
+    $CXX -c src/main.cpp $opts $includes
+    $CXX -o gpu-screen-recorder-gtk egl.o wlr-export-dmabuf-unstable-v1-protocol.o main.o $libs $opts
 }
 
 build_wayland_protocol
