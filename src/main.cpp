@@ -199,7 +199,13 @@ static bool is_pkexec_installed() {
 }
 
 static bool flatpak_is_installed_as_system(void) {
-    return system("flatpak-spawn --host flatpak run --system --command=pwd com.dec05eba.gpu_screen_recorder") == 0;
+    static bool installed_as_system = false;
+    static bool checked = false;
+    if(!checked) {
+        checked = true;
+        installed_as_system = system("flatpak-spawn --host flatpak run --system --command=pwd com.dec05eba.gpu_screen_recorder") == 0;
+    }
+    return installed_as_system;
 }
 
 static void used_audio_input_loop_callback(GtkWidget *row, gpointer userdata) {
@@ -2082,7 +2088,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
 
-    if(is_inside_flatpak() && drm_card_path[0] != '\0') {
+    if(is_inside_flatpak() && flatpak_is_installed_as_system() && drm_card_path[0] != '\0') {
         GtkGrid *password_prompt_grid = GTK_GRID(gtk_grid_new());
         gtk_grid_attach(grid, GTK_WIDGET(password_prompt_grid), 0, grid_row++, 2, 1);
         gtk_grid_set_column_spacing(password_prompt_grid, 10);
