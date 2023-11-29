@@ -2053,7 +2053,7 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
     pclose(f);
     return true;
 }
-
+#if 0
 static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
     int result = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --install-polkit-rule");
     switch(result) {
@@ -2095,7 +2095,7 @@ static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
     }
     return true;
 }
-
+#endif
 static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app, const gpu_info &gpu_inf) {
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "common-settings");
