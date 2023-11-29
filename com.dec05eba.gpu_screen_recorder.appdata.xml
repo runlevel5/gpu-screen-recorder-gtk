@@ -52,6 +52,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.2.7" date="2023-11-29">
+            <description>
+                <p>Add option to remove password prompts (when possible)</p>
+            </description>
+        </release>
         <release version="3.2.6" date="2023-11-27">
             <description>
                 <p>Fix possible crash when recording multiple audio sources (merged)</p>
