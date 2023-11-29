@@ -19,9 +19,10 @@ build_gsr_gtk() {
     includes="$(pkg-config --cflags $dependencies)"
     libs="$(pkg-config --libs $dependencies) -ldl"
     $CC -c src/egl.c $opts $includes
+    $CC -c src/library_loader.c $opts $includes
     $CC -c external/wlr-export-dmabuf-unstable-v1-protocol.c $opts $includes
     $CXX -c src/main.cpp $opts $includes
-    $CXX -o gpu-screen-recorder-gtk egl.o wlr-export-dmabuf-unstable-v1-protocol.o main.o $libs $opts
+    $CXX -o gpu-screen-recorder-gtk egl.o library_loader.o wlr-export-dmabuf-unstable-v1-protocol.o main.o $libs $opts
 }
 
 build_wayland_protocol

@@ -84,6 +84,8 @@ static GtkGrid *framerate_mode_grid;
 static GtkComboBoxText *view_combo_box;
 static GtkGrid *overclock_grid;
 static GtkWidget *overclock_button;
+static GtkButton *remove_password_prompts_button = NULL;
+static GtkButton *restore_password_prompts_button = NULL;
 
 static XIM xim;
 static XIC xic;
@@ -409,6 +411,8 @@ static void save_configs() {
     config.main_config.framerate_mode = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
     config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
+    if(restore_password_prompts_button)
+        config.main_config.polkit_rule_installed = gtk_widget_is_sensitive(GTK_WIDGET(restore_password_prompts_button));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
@@ -1794,12 +1798,9 @@ static bool is_nvenc_installed() {
 
 static bool is_cuda_installed() {
     void *lib = dlopen("libcuda.so.1", RTLD_LAZY);
-    if(lib) {
-        dlclose(lib);
-        return true;
-    }
+    if(!lib)
+        lib = dlopen("libcuda.so", RTLD_LAZY);
 
-    lib = dlopen("libcuda.so", RTLD_LAZY);
     if(lib)
         dlclose(lib);
 
@@ -2010,6 +2011,53 @@ static void get_connection_by_active_type(void **connection, gsr_connection_type
     }
 }
 
+struct SupportedVideoCodecs {
+    bool h264;
+    bool hevc;
+    bool av1;
+};
+
+static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_codecs) {
+    supported_video_codecs->h264 = false;
+    supported_video_codecs->hevc = false;
+    supported_video_codecs->av1 = false;
+
+    FILE *f = popen("gpu-screen-recorder --list-supported-video-codecs", "r");
+    if(!f) {
+        fprintf(stderr, "error: 'gpu-screen-recorder --list-supported-video-codecs' failed\n");
+        return false;
+    }
+
+    char output[1024];
+    ssize_t bytes_read = fread(output, 1, sizeof(output) - 1, f);
+    if(bytes_read < 0 || ferror(f)) {
+        fprintf(stderr, "error: failed to read 'gpu-screen-recorder --list-supported-video-codecs' output\n");
+        pclose(f);
+        return false;
+    }
+    output[bytes_read] = '\0';
+
+    if(strstr(output, "h264"))
+        supported_video_codecs->h264 = true;
+    if(strstr(output, "hevc"))
+        supported_video_codecs->hevc = true;
+    if(strstr(output, "av1"))
+        supported_video_codecs->av1 = true;
+
+    pclose(f);
+    return true;
+}
+
+static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
+    system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --install-polkit-rule");
+    return true;
+}
+
+static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
+    system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --uninstall-polkit-rule");
+    return true;
+}
+
 static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app, const gpu_info &gpu_inf) {
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "common-settings");
@@ -2033,6 +2081,30 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(simple_advanced_grid, GTK_WIDGET(view_combo_box), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
+
+    if(is_inside_flatpak() && drm_card_path[0] != '\0') {
+        GtkGrid *password_prompt_grid = GTK_GRID(gtk_grid_new());
+        gtk_grid_attach(grid, GTK_WIDGET(password_prompt_grid), 0, grid_row++, 2, 1);
+        gtk_grid_set_column_spacing(password_prompt_grid, 10);
+
+        remove_password_prompts_button = GTK_BUTTON(gtk_button_new_with_label("Remove password prompts"));
+        gtk_widget_set_hexpand(GTK_WIDGET(remove_password_prompts_button), true);
+        gtk_grid_attach(password_prompt_grid, GTK_WIDGET(remove_password_prompts_button), 0, 0, 1, 1);
+        g_signal_connect(remove_password_prompts_button, "clicked", G_CALLBACK(on_remove_password_prompts_button_click), NULL);
+
+        restore_password_prompts_button = GTK_BUTTON(gtk_button_new_with_label("Restore password prompts"));
+        gtk_widget_set_hexpand(GTK_WIDGET(restore_password_prompts_button), true);
+        gtk_grid_attach(password_prompt_grid, GTK_WIDGET(restore_password_prompts_button), 1, 0, 1, 1);
+        g_signal_connect(restore_password_prompts_button, "clicked", G_CALLBACK(on_restore_password_prompts_button_click), NULL);
+
+        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
+        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
+
+        if(config.main_config.polkit_rule_installed)
+            gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
+        else
+            gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
+    }
 
     GtkFrame *record_area_frame = GTK_FRAME(gtk_frame_new("Record area"));
     gtk_grid_attach(grid, GTK_WIDGET(record_area_frame), 0, grid_row++, 2, 1);
@@ -2200,8 +2272,18 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
     video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
-    gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
-    gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
+    SupportedVideoCodecs supported_video_codecs;
+    if(get_supported_video_codecs(&supported_video_codecs)) {
+        if(supported_video_codecs.h264)
+            gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
+        if(supported_video_codecs.hevc)
+            gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
+        if(supported_video_codecs.av1)
+            gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
+    } else {
+        gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
+        gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
+    }
     gtk_widget_set_hexpand(GTK_WIDGET(video_codec_input_menu), true);
     gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(video_codec_input_menu), 0);
@@ -2654,7 +2736,7 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
         config.main_config.quality = "very_high";
 
-    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265")
+    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265" && config.main_config.codec != "av1")
         config.main_config.codec = "auto";
 
     if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac" && config.main_config.audio_codec != "flac")
@@ -2732,6 +2814,11 @@ static void load_config(const gpu_info &gpu_inf) {
     }
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
+    if(remove_password_prompts_button) {
+        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), !config.main_config.polkit_rule_installed);
+        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), config.main_config.polkit_rule_installed);
+    }
+
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
     if(!wayland) {
         gtk_widget_set_visible(record_hotkey.hotkey_active_label, false);
@@ -2811,7 +2898,118 @@ static const char* gpu_vendor_to_name(gpu_vendor vendor) {
     return "";
 }
 
-static void activate(GtkApplication *app, gpointer) {
+static bool write_to_file_create_recursive(const char *filepath, const char *file_content) {
+    char dir_buf[PATH_MAX];
+    strcpy(dir_buf, filepath);
+    char *dir = dirname(dir_buf);
+
+    if(create_directory_recursive(dir) != 0) {
+        fprintf(stderr, "error: failed to create %s\n", dir);
+        return false;
+    }
+
+    FILE *f = fopen(filepath, "wb");
+    if(!f) {
+        fprintf(stderr, "error: failed to create %s\n", filepath);
+        return false;
+    }
+
+    int file_content_len = strlen(file_content);
+    if((int)fwrite(file_content, 1, file_content_len, f) != file_content_len) {
+        fprintf(stderr, "error: failed to write all data to %s\n", filepath);
+        fclose(f);
+        return false;
+    }
+
+    fclose(f);
+    return true;
+}
+
+struct ProgramArgs {
+    gboolean kms_server;
+    gchar *kms_socket_path;
+    gchar *dri_card_path;
+
+    gboolean install_polkit_rule;
+    gboolean uninstall_polkit_rule;
+
+    gboolean add_replay_system_startup;
+    gboolean remove_replay_system_startup;
+};
+
+static void handle_program_args(GtkApplication *app, const ProgramArgs *program_args) {
+    if(program_args->install_polkit_rule) {
+        if(access("/etc/polkit-1", F_OK) != 0) {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Unable to remove password prompts as it appears you don't have polkit installed (/etc/polkit-1 doesn't exist)");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
+
+        bool la_created = write_to_file_create_recursive("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla",
+            "[User permissions]\n"
+            "Identity=unix-user:*\n"
+            "Action=com.dec05eba.gpu_screen_recorder\n"
+            "ResultActive=yes");
+
+        bool rule_created = write_to_file_create_recursive("/etc/polkit-1/rules.d/44-gsr.rules",
+            "polkit.addRule(function(action, subject) {\n"
+            "    if(action.id == \"com.dec05eba.gpu_screen_recorder\" && subject.local == true && subject.active == true) {\n"
+            "        return polkit.Result.YES;\n"
+            "    }\n"
+            "});");
+
+        if(!la_created && !rule_created) {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Unable to remove password prompts (failed to create polkit /etc/polkit-1/localauthority/50-local.d/44-gsr.pkla and /etc/polkit-1/rules.d/44-gsr.rules)");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
+
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
+
+    if(program_args->uninstall_polkit_rule) {
+        remove("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla");
+        remove("/etc/polkit-1/rules.d/44-gsr.rules");
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
+
+    if(program_args->kms_server) {
+        if(!program_args->kms_socket_path || !program_args->dri_card_path) {
+            fprintf(stderr, "error: missing kms socket path or dri card path\n");
+            g_application_quit(G_APPLICATION(app));
+            return;
+        }
+
+        const char *args[] = { "gsr-kms-server", program_args->kms_socket_path, program_args->dri_card_path, NULL };
+        execvp(args[0], (char *const*)args);
+        perror(args[0]);
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
+
+    GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+        "GPU Screen Recorder shouldn't be run as the root user");
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+    g_application_quit(G_APPLICATION(app));
+}
+
+static void activate(GtkApplication *app, gpointer userdata) {
+    const ProgramArgs *program_args = (ProgramArgs*)userdata;
+    // Is user root?
+    if(getuid() == 0) {
+        handle_program_args(app, program_args);
+        return;
+    }
+
     Display *dpy = XOpenDisplay(NULL);
     wayland = !dpy || is_xwayland(dpy);
     if(!wayland && !dpy) {
@@ -2938,10 +3136,81 @@ static void activate(GtkApplication *app, gpointer) {
     load_config(gpu_inf);
 }
 
+// All of these arguments require the program to be run as root
+static void init_program_args(GtkApplication *app, ProgramArgs *program_args) {
+    GOptionEntry cmd_params[8];
+    cmd_params[0].long_name = "kms-server";
+    cmd_params[0].short_name = '\0';
+    cmd_params[0].flags = G_OPTION_FLAG_NONE;
+    cmd_params[0].arg = G_OPTION_ARG_NONE;
+    cmd_params[0].arg_data = &program_args->kms_server;
+    cmd_params[0].description = "Start kms server";
+    cmd_params[0].arg_description = NULL;
+
+    cmd_params[1].long_name = "kms-socket-path";
+    cmd_params[1].short_name = '\0';
+    cmd_params[1].flags = G_OPTION_FLAG_NONE;
+    cmd_params[1].arg = G_OPTION_ARG_STRING;
+    cmd_params[1].arg_data = &program_args->kms_socket_path;
+    cmd_params[1].description = "Path to kms unix socket";
+    cmd_params[1].arg_description = "PATH";
+
+    cmd_params[2].long_name = "dri-card-path";
+    cmd_params[2].short_name = '\0';
+    cmd_params[2].flags = G_OPTION_FLAG_NONE;
+    cmd_params[2].arg = G_OPTION_ARG_STRING;
+    cmd_params[2].arg_data = &program_args->dri_card_path;
+    cmd_params[2].description = "Path to dri card";
+    cmd_params[2].arg_description = "PATH";
+
+    cmd_params[3].long_name = "install-polkit-rule";
+    cmd_params[3].short_name = '\0';
+    cmd_params[3].flags = G_OPTION_FLAG_NONE;
+    cmd_params[3].arg = G_OPTION_ARG_NONE;
+    cmd_params[3].arg_data = &program_args->install_polkit_rule;
+    cmd_params[3].description = "Install polkit rule (to remove the password prompt on record start on AMD/Intel and Nvidia Wayland)";
+    cmd_params[3].arg_description = NULL;
+
+    cmd_params[4].long_name = "uninstall-polkit-rule";
+    cmd_params[4].short_name = '\0';
+    cmd_params[4].flags = G_OPTION_FLAG_NONE;
+    cmd_params[4].arg = G_OPTION_ARG_NONE;
+    cmd_params[4].arg_data = &program_args->uninstall_polkit_rule;
+    cmd_params[4].description = "Uninstall polkit rule (re-adds the password prompt on record start on AMD/Intel and Nvidia Wayland)";
+    cmd_params[4].arg_description = NULL;
+
+// TODO:
+#if 0
+    cmd_params[5].long_name = "add-replay-system-startup";
+    cmd_params[5].short_name = '\0';
+    cmd_params[5].flags = G_OPTION_FLAG_NONE;
+    cmd_params[5].arg = G_OPTION_ARG_NONE;
+    cmd_params[5].arg_data = &program_args->add_replay_system_startup;
+    cmd_params[5].description = "Adds GPU Screen Recorder with replay started to system startup (systemd)";
+    cmd_params[5].arg_description = NULL;
+
+    cmd_params[6].long_name = "remove-replay-system-startup";
+    cmd_params[6].short_name = '\0';
+    cmd_params[6].flags = G_OPTION_FLAG_NONE;
+    cmd_params[6].arg = G_OPTION_ARG_NONE;
+    cmd_params[6].arg_data = &program_args->remove_replay_system_startup;
+    cmd_params[6].description = "Remove GPU Screen Recorder with replay started from system startup (systemd)";
+    cmd_params[6].arg_description = NULL;
+#endif
+
+    cmd_params[5].long_name = NULL;
+    g_application_add_main_option_entries(G_APPLICATION(app), cmd_params);
+}
+
 int main(int argc, char **argv) {
+    ProgramArgs program_args;
+    memset(&program_args, 0, sizeof(program_args));
+
     setlocale(LC_ALL, "C");
+
     GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
-    g_signal_connect(app, "activate", G_CALLBACK(activate), nullptr);
+    init_program_args(app, &program_args);
+    g_signal_connect(app, "activate", G_CALLBACK(activate), &program_args);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
     g_object_unref(app);
     return status;

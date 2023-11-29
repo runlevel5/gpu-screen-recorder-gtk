@@ -6,6 +6,7 @@ cd "$script_dir"
 [ $(id -u) -ne 0 ] && echo "You need root privileges to run the install script" && exit 1
 
 ./build.sh
+strip gpu-screen-recorder-gtk
 
 install -Dm755 "gpu-screen-recorder-gtk" "/usr/bin/gpu-screen-recorder-gtk"
 install -Dm644 "gpu-screen-recorder-gtk.desktop" "/usr/share/applications/com.dec05eba.gpu_screen_recorder.desktop"
