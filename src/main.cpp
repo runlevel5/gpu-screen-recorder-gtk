@@ -2055,12 +2055,24 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
 }
 
 static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
-    system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --install-polkit-rule");
+    bool success = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --install-polkit-rule") == 0;
+    if(success) {
+        config.main_config.polkit_rule_installed = true;
+        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
+        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
+        save_configs();
+    }
     return true;
 }
 
 static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
-    system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --uninstall-polkit-rule");
+    bool success = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --uninstall-polkit-rule") == 0;
+    if(success) {
+        config.main_config.polkit_rule_installed = false;
+        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
+        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
+        save_configs();
+    }
     return true;
 }
 
@@ -2950,8 +2962,7 @@ static void handle_program_args(GtkApplication *app, const ProgramArgs *program_
                 "Unable to remove password prompts as it appears you don't have polkit installed (/etc/polkit-1 doesn't exist)");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(app));
-            return;
+            exit(2);
         }
 
         bool la_created = write_to_file_create_recursive("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla",
@@ -2972,8 +2983,7 @@ static void handle_program_args(GtkApplication *app, const ProgramArgs *program_
                 "Unable to remove password prompts (failed to create polkit /etc/polkit-1/localauthority/50-local.d/44-gsr.pkla and /etc/polkit-1/rules.d/44-gsr.rules)");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(app));
-            return;
+            exit(2);
         }
 
         g_application_quit(G_APPLICATION(app));
@@ -3005,7 +3015,7 @@ static void handle_program_args(GtkApplication *app, const ProgramArgs *program_
         "GPU Screen Recorder shouldn't be run as the root user");
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
-    g_application_quit(G_APPLICATION(app));
+    exit(2);
 }
 
 static void activate(GtkApplication *app, gpointer userdata) {
