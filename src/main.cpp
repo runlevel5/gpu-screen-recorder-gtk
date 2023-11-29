@@ -2065,14 +2065,14 @@ static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
             break;
         }
         case 20: {
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "Unable to remove password prompts as it appears you don't have polkit installed (/etc/polkit-1 doesn't exist)");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             break;
         }
         case 21: {
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "Unable to remove password prompts (failed to create polkit /etc/polkit-1/localauthority/50-local.d/44-gsr.pkla and /etc/polkit-1/rules.d/44-gsr.rules");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
@@ -2120,6 +2120,8 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
 
+    // TODO:
+    #if 0
     if(is_inside_flatpak() && flatpak_is_installed_as_system() && drm_card_path[0] != '\0') {
         GtkGrid *password_prompt_grid = GTK_GRID(gtk_grid_new());
         gtk_grid_attach(grid, GTK_WIDGET(password_prompt_grid), 0, grid_row++, 2, 1);
@@ -2143,6 +2145,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         else
             gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
     }
+    #endif
 
     GtkFrame *record_area_frame = GTK_FRAME(gtk_frame_new("Record area"));
     gtk_grid_attach(grid, GTK_WIDGET(record_area_frame), 0, grid_row++, 2, 1);
