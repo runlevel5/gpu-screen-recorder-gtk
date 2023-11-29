@@ -54,7 +54,10 @@
     <releases>
         <release version="3.2.7" date="2023-11-29">
             <description>
-                <p>Configure quality settings to reduce file size on amd/intel</p>
+                <ul>
+                    <li>Add option to remove password prompts (if possible on the system)</li>
+                    <li>Configure quality settings to reduce file size on amd/intel</li>
+                </ul>
             </description>
         </release>
         <release version="3.2.6" date="2023-11-27">

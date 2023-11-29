@@ -418,7 +418,7 @@ static void save_configs() {
     config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
     config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
     if(restore_password_prompts_button)
-        config.main_config.polkit_rule_installed = gtk_widget_is_sensitive(GTK_WIDGET(restore_password_prompts_button));
+        config.main_config.password_prompt_removed = gtk_widget_is_sensitive(GTK_WIDGET(restore_password_prompts_button));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
@@ -2053,27 +2053,27 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
     pclose(f);
     return true;
 }
-#if 0
+
 static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
-    int result = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --install-polkit-rule");
+    int result = system("flatpak-spawn --host pkexec setcap cap_sys_admin+ep /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
     switch(result) {
         case 0: {
-            config.main_config.polkit_rule_installed = true;
+            config.main_config.password_prompt_removed = true;
             gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
             gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
             save_configs();
             break;
         }
-        case 20: {
+        case 127: {
             GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Unable to remove password prompts as it appears you don't have polkit installed (/etc/polkit-1 doesn't exist)");
+                "Unable to remove password prompts as it appears you don't have setcap installed on your system");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             break;
         }
-        case 21: {
+        default: {
             GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Unable to remove password prompts (failed to create polkit /etc/polkit-1/localauthority/50-local.d/44-gsr.pkla and /etc/polkit-1/rules.d/44-gsr.rules");
+                "Unable to remove password prompts (/var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server may not exist or it may be read-only)");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             break;
@@ -2083,10 +2083,10 @@ static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
 }
 
 static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
-    int result = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --uninstall-polkit-rule");
+    int result = system("flatpak-spawn --host pkexec setcap -r /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
     switch(result) {
         case 0: {
-            config.main_config.polkit_rule_installed = false;
+            config.main_config.password_prompt_removed = false;
             gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
             gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
             save_configs();
@@ -2095,7 +2095,7 @@ static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
     }
     return true;
 }
-#endif
+
 static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app, const gpu_info &gpu_inf) {
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "common-settings");
@@ -2120,8 +2120,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
 
-    // TODO:
-    #if 0
     if(is_inside_flatpak() && flatpak_is_installed_as_system() && drm_card_path[0] != '\0') {
         GtkGrid *password_prompt_grid = GTK_GRID(gtk_grid_new());
         gtk_grid_attach(grid, GTK_WIDGET(password_prompt_grid), 0, grid_row++, 2, 1);
@@ -2140,12 +2138,11 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
         gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
 
-        if(config.main_config.polkit_rule_installed)
+        if(config.main_config.password_prompt_removed)
             gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
         else
             gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
     }
-    #endif
 
     GtkFrame *record_area_frame = GTK_FRAME(gtk_frame_new("Record area"));
     gtk_grid_attach(grid, GTK_WIDGET(record_area_frame), 0, grid_row++, 2, 1);
@@ -2856,8 +2853,8 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
     if(remove_password_prompts_button) {
-        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), !config.main_config.polkit_rule_installed);
-        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), config.main_config.polkit_rule_installed);
+        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), !config.main_config.password_prompt_removed);
+        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), config.main_config.password_prompt_removed);
     }
 
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
@@ -2937,33 +2934,6 @@ static const char* gpu_vendor_to_name(gpu_vendor vendor) {
         case GPU_VENDOR_NVIDIA:     return "NVIDIA";
     }
     return "";
-}
-
-static bool write_to_file_create_recursive(const char *filepath, const char *file_content) {
-    char dir_buf[PATH_MAX];
-    strcpy(dir_buf, filepath);
-    char *dir = dirname(dir_buf);
-
-    if(create_directory_recursive(dir) != 0) {
-        fprintf(stderr, "error: failed to create %s\n", dir);
-        return false;
-    }
-
-    FILE *f = fopen(filepath, "wb");
-    if(!f) {
-        fprintf(stderr, "error: failed to create %s\n", filepath);
-        return false;
-    }
-
-    int file_content_len = strlen(file_content);
-    if((int)fwrite(file_content, 1, file_content_len, f) != file_content_len) {
-        fprintf(stderr, "error: failed to write all data to %s\n", filepath);
-        fclose(f);
-        return false;
-    }
-
-    fclose(f);
-    return true;
 }
 
 static void activate(GtkApplication *app, gpointer) {
@@ -3093,115 +3063,11 @@ static void activate(GtkApplication *app, gpointer) {
     load_config(gpu_inf);
 }
 
-struct ProgramArgs {
-    gboolean kms_server;
-    gchar *kms_socket_path;
-    gchar *dri_card_path;
-
-    gboolean install_polkit_rule;
-    gboolean uninstall_polkit_rule;
-
-    gboolean add_replay_system_startup;
-    gboolean remove_replay_system_startup;
-};
-
-static void handle_program_args(const ProgramArgs *program_args) {
-    if(program_args->install_polkit_rule) {
-        if(access("/etc/polkit-1", F_OK) != 0) {
-            fprintf(stderr, "error: Unable to remove password prompts as it appears you don't have polkit installed (/etc/polkit-1 doesn't exist)\n");
-            exit(20);
-        }
-
-        bool la_created = write_to_file_create_recursive("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla",
-            "[User permissions]\n"
-            "Identity=unix-user:*\n"
-            "Action=com.dec05eba.gpu_screen_recorder\n"
-            "ResultActive=yes");
-
-        bool rule_created = write_to_file_create_recursive("/etc/polkit-1/rules.d/44-gsr.rules",
-            "polkit.addRule(function(action, subject) {\n"
-            "    if(action.id == \"com.dec05eba.gpu_screen_recorder\" && subject.local == true && subject.active == true) {\n"
-            "        return polkit.Result.YES;\n"
-            "    }\n"
-            "});");
-
-        if(!la_created && !rule_created) {
-            fprintf(stderr, "error: Unable to remove password prompts (failed to create polkit /etc/polkit-1/localauthority/50-local.d/44-gsr.pkla and /etc/polkit-1/rules.d/44-gsr.rules)\n");
-            exit(21);
-        }
-
-        exit(0);
-    }
-
-    if(program_args->uninstall_polkit_rule) {
-        remove("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla");
-        remove("/etc/polkit-1/rules.d/44-gsr.rules");
-        exit(0);
-    }
-
-    if(program_args->kms_server) {
-        if(!program_args->kms_socket_path || !program_args->dri_card_path) {
-            fprintf(stderr, "error: missing kms socket path or dri card path\n");
-            exit(1);
-        }
-
-        const char *args[] = { "gsr-kms-server", program_args->kms_socket_path, program_args->dri_card_path, NULL };
-        execvp(args[0], (char *const*)args);
-        perror(args[0]);
-        exit(127);
-    }
-
-    fprintf(stderr, "error: GPU Screen Recorder shouldn't be run as the root user\n");
-    exit(23);
-}
-
-static void usage() {
-    fprintf(stderr, "usage: gpu-screen-recorder-gtk [--kms-server] [--kms-socket-path <socket_path>] [--dri-card-path <path>]\n");
-    exit(1);
-}
-
-static void parse_program_args(int argc, char **argv, ProgramArgs *program_args) {
-    memset(program_args, 0, sizeof(*program_args));
-
-    for(int i = 1; i < argc; ++i) {
-        const char *arg = argv[i];
-        if(strcmp(arg, "--kms-server") == 0) {
-            program_args->kms_server = true;
-        } else if(strcmp(arg, "--kms-socket-path") == 0 && i + 1 < argc) {
-            program_args->kms_socket_path = argv[i + 1];
-            ++i;
-        } else if(strcmp(arg, "--dri-card-path") == 0 && i + 1 < argc) {
-            program_args->dri_card_path = argv[i + 1];
-            ++i;
-        } else if(strcmp(arg, "--install-polkit-rule") == 0) {
-            program_args->install_polkit_rule = true;
-        } else if(strcmp(arg, "--uninstall-polkit-rule") == 0) {
-            program_args->uninstall_polkit_rule = true;
-        } else {
-            fprintf(stderr, "error: invalid program argument \"%s\"\n", arg);
-            usage();
-        }
-    }
-}
-
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
-
-    // Is user root?
-    if(getuid() == 0) {
-        ProgramArgs program_args;
-        parse_program_args(argc, argv, &program_args);
-        handle_program_args(&program_args);
-        return 0;
-    } else {
-        if(argc != 1) {
-            fprintf(stderr, "Warning: ignoring program arguments as the program is not running as root\n");
-        }
-    }
-
     GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
     g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
-    int status = g_application_run(G_APPLICATION(app), 1, argv);
+    int status = g_application_run(G_APPLICATION(app), argc, argv);
     g_object_unref(app);
     return status;
 }
