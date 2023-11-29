@@ -2055,23 +2055,43 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
 }
 
 static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
-    bool success = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --install-polkit-rule") == 0;
-    if(success) {
-        config.main_config.polkit_rule_installed = true;
-        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
-        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
-        save_configs();
+    int result = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --install-polkit-rule");
+    switch(result) {
+        case 0: {
+            config.main_config.polkit_rule_installed = true;
+            gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
+            gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
+            save_configs();
+            break;
+        }
+        case 20: {
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Unable to remove password prompts as it appears you don't have polkit installed (/etc/polkit-1 doesn't exist)");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            break;
+        }
+        case 21: {
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Unable to remove password prompts (failed to create polkit /etc/polkit-1/localauthority/50-local.d/44-gsr.pkla and /etc/polkit-1/rules.d/44-gsr.rules");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            break;
+        }
     }
     return true;
 }
 
 static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
-    bool success = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --uninstall-polkit-rule") == 0;
-    if(success) {
-        config.main_config.polkit_rule_installed = false;
-        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
-        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
-        save_configs();
+    int result = system("flatpak-spawn --host pkexec flatpak run --command=gpu-screen-recorder-gtk com.dec05eba.gpu_screen_recorder --uninstall-polkit-rule");
+    switch(result) {
+        case 0: {
+            config.main_config.polkit_rule_installed = false;
+            gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
+            gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
+            save_configs();
+            break;
+        }
     }
     return true;
 }
@@ -2943,89 +2963,7 @@ static bool write_to_file_create_recursive(const char *filepath, const char *fil
     return true;
 }
 
-struct ProgramArgs {
-    gboolean kms_server;
-    gchar *kms_socket_path;
-    gchar *dri_card_path;
-
-    gboolean install_polkit_rule;
-    gboolean uninstall_polkit_rule;
-
-    gboolean add_replay_system_startup;
-    gboolean remove_replay_system_startup;
-};
-
-static void handle_program_args(GtkApplication *app, const ProgramArgs *program_args) {
-    if(program_args->install_polkit_rule) {
-        if(access("/etc/polkit-1", F_OK) != 0) {
-            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Unable to remove password prompts as it appears you don't have polkit installed (/etc/polkit-1 doesn't exist)");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            exit(2);
-        }
-
-        bool la_created = write_to_file_create_recursive("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla",
-            "[User permissions]\n"
-            "Identity=unix-user:*\n"
-            "Action=com.dec05eba.gpu_screen_recorder\n"
-            "ResultActive=yes");
-
-        bool rule_created = write_to_file_create_recursive("/etc/polkit-1/rules.d/44-gsr.rules",
-            "polkit.addRule(function(action, subject) {\n"
-            "    if(action.id == \"com.dec05eba.gpu_screen_recorder\" && subject.local == true && subject.active == true) {\n"
-            "        return polkit.Result.YES;\n"
-            "    }\n"
-            "});");
-
-        if(!la_created && !rule_created) {
-            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Unable to remove password prompts (failed to create polkit /etc/polkit-1/localauthority/50-local.d/44-gsr.pkla and /etc/polkit-1/rules.d/44-gsr.rules)");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            exit(2);
-        }
-
-        g_application_quit(G_APPLICATION(app));
-        return;
-    }
-
-    if(program_args->uninstall_polkit_rule) {
-        remove("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla");
-        remove("/etc/polkit-1/rules.d/44-gsr.rules");
-        g_application_quit(G_APPLICATION(app));
-        return;
-    }
-
-    if(program_args->kms_server) {
-        if(!program_args->kms_socket_path || !program_args->dri_card_path) {
-            fprintf(stderr, "error: missing kms socket path or dri card path\n");
-            g_application_quit(G_APPLICATION(app));
-            return;
-        }
-
-        const char *args[] = { "gsr-kms-server", program_args->kms_socket_path, program_args->dri_card_path, NULL };
-        execvp(args[0], (char *const*)args);
-        perror(args[0]);
-        g_application_quit(G_APPLICATION(app));
-        return;
-    }
-
-    GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-        "GPU Screen Recorder shouldn't be run as the root user");
-    gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-    exit(2);
-}
-
-static void activate(GtkApplication *app, gpointer userdata) {
-    const ProgramArgs *program_args = (ProgramArgs*)userdata;
-    // Is user root?
-    if(getuid() == 0) {
-        handle_program_args(app, program_args);
-        return;
-    }
-
+static void activate(GtkApplication *app, gpointer) {
     Display *dpy = XOpenDisplay(NULL);
     wayland = !dpy || is_xwayland(dpy);
     if(!wayland && !dpy) {
@@ -3152,82 +3090,115 @@ static void activate(GtkApplication *app, gpointer userdata) {
     load_config(gpu_inf);
 }
 
-// All of these arguments require the program to be run as root
-static void init_program_args(GtkApplication *app, ProgramArgs *program_args) {
-    GOptionEntry cmd_params[8];
-    cmd_params[0].long_name = "kms-server";
-    cmd_params[0].short_name = '\0';
-    cmd_params[0].flags = G_OPTION_FLAG_NONE;
-    cmd_params[0].arg = G_OPTION_ARG_NONE;
-    cmd_params[0].arg_data = &program_args->kms_server;
-    cmd_params[0].description = "Start kms server";
-    cmd_params[0].arg_description = NULL;
+struct ProgramArgs {
+    gboolean kms_server;
+    gchar *kms_socket_path;
+    gchar *dri_card_path;
 
-    cmd_params[1].long_name = "kms-socket-path";
-    cmd_params[1].short_name = '\0';
-    cmd_params[1].flags = G_OPTION_FLAG_NONE;
-    cmd_params[1].arg = G_OPTION_ARG_STRING;
-    cmd_params[1].arg_data = &program_args->kms_socket_path;
-    cmd_params[1].description = "Path to kms unix socket";
-    cmd_params[1].arg_description = "PATH";
+    gboolean install_polkit_rule;
+    gboolean uninstall_polkit_rule;
 
-    cmd_params[2].long_name = "dri-card-path";
-    cmd_params[2].short_name = '\0';
-    cmd_params[2].flags = G_OPTION_FLAG_NONE;
-    cmd_params[2].arg = G_OPTION_ARG_STRING;
-    cmd_params[2].arg_data = &program_args->dri_card_path;
-    cmd_params[2].description = "Path to dri card";
-    cmd_params[2].arg_description = "PATH";
+    gboolean add_replay_system_startup;
+    gboolean remove_replay_system_startup;
+};
 
-    cmd_params[3].long_name = "install-polkit-rule";
-    cmd_params[3].short_name = '\0';
-    cmd_params[3].flags = G_OPTION_FLAG_NONE;
-    cmd_params[3].arg = G_OPTION_ARG_NONE;
-    cmd_params[3].arg_data = &program_args->install_polkit_rule;
-    cmd_params[3].description = "Install polkit rule (to remove the password prompt on record start on AMD/Intel and Nvidia Wayland)";
-    cmd_params[3].arg_description = NULL;
+static void handle_program_args(const ProgramArgs *program_args) {
+    if(program_args->install_polkit_rule) {
+        if(access("/etc/polkit-1", F_OK) != 0) {
+            fprintf(stderr, "error: Unable to remove password prompts as it appears you don't have polkit installed (/etc/polkit-1 doesn't exist)\n");
+            exit(20);
+        }
 
-    cmd_params[4].long_name = "uninstall-polkit-rule";
-    cmd_params[4].short_name = '\0';
-    cmd_params[4].flags = G_OPTION_FLAG_NONE;
-    cmd_params[4].arg = G_OPTION_ARG_NONE;
-    cmd_params[4].arg_data = &program_args->uninstall_polkit_rule;
-    cmd_params[4].description = "Uninstall polkit rule (re-adds the password prompt on record start on AMD/Intel and Nvidia Wayland)";
-    cmd_params[4].arg_description = NULL;
+        bool la_created = write_to_file_create_recursive("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla",
+            "[User permissions]\n"
+            "Identity=unix-user:*\n"
+            "Action=com.dec05eba.gpu_screen_recorder\n"
+            "ResultActive=yes");
 
-// TODO:
-#if 0
-    cmd_params[5].long_name = "add-replay-system-startup";
-    cmd_params[5].short_name = '\0';
-    cmd_params[5].flags = G_OPTION_FLAG_NONE;
-    cmd_params[5].arg = G_OPTION_ARG_NONE;
-    cmd_params[5].arg_data = &program_args->add_replay_system_startup;
-    cmd_params[5].description = "Adds GPU Screen Recorder with replay started to system startup (systemd)";
-    cmd_params[5].arg_description = NULL;
+        bool rule_created = write_to_file_create_recursive("/etc/polkit-1/rules.d/44-gsr.rules",
+            "polkit.addRule(function(action, subject) {\n"
+            "    if(action.id == \"com.dec05eba.gpu_screen_recorder\" && subject.local == true && subject.active == true) {\n"
+            "        return polkit.Result.YES;\n"
+            "    }\n"
+            "});");
 
-    cmd_params[6].long_name = "remove-replay-system-startup";
-    cmd_params[6].short_name = '\0';
-    cmd_params[6].flags = G_OPTION_FLAG_NONE;
-    cmd_params[6].arg = G_OPTION_ARG_NONE;
-    cmd_params[6].arg_data = &program_args->remove_replay_system_startup;
-    cmd_params[6].description = "Remove GPU Screen Recorder with replay started from system startup (systemd)";
-    cmd_params[6].arg_description = NULL;
-#endif
+        if(!la_created && !rule_created) {
+            fprintf(stderr, "error: Unable to remove password prompts (failed to create polkit /etc/polkit-1/localauthority/50-local.d/44-gsr.pkla and /etc/polkit-1/rules.d/44-gsr.rules)\n");
+            exit(21);
+        }
 
-    cmd_params[5].long_name = NULL;
-    g_application_add_main_option_entries(G_APPLICATION(app), cmd_params);
+        exit(0);
+    }
+
+    if(program_args->uninstall_polkit_rule) {
+        remove("/etc/polkit-1/localauthority/50-local.d/44-gsr.pkla");
+        remove("/etc/polkit-1/rules.d/44-gsr.rules");
+        exit(0);
+    }
+
+    if(program_args->kms_server) {
+        if(!program_args->kms_socket_path || !program_args->dri_card_path) {
+            fprintf(stderr, "error: missing kms socket path or dri card path\n");
+            exit(1);
+        }
+
+        const char *args[] = { "gsr-kms-server", program_args->kms_socket_path, program_args->dri_card_path, NULL };
+        execvp(args[0], (char *const*)args);
+        perror(args[0]);
+        exit(127);
+    }
+
+    fprintf(stderr, "error: GPU Screen Recorder shouldn't be run as the root user\n");
+    exit(23);
+}
+
+static void usage() {
+    fprintf(stderr, "usage: gpu-screen-recorder-gtk [--kms-server] [--kms-socket-path <socket_path>] [--dri-card-path <path>]\n");
+    exit(1);
+}
+
+static void parse_program_args(int argc, char **argv, ProgramArgs *program_args) {
+    memset(program_args, 0, sizeof(*program_args));
+
+    for(int i = 0; i < argc; ++i) {
+        const char *arg = argv[i];
+        if(strcmp(arg, "--kms-server") == 0) {
+            program_args->kms_server = true;
+        } else if(strcmp(arg, "--kms-socket-path") == 0 && i + 1 < argc) {
+            program_args->kms_socket_path = argv[i + 1];
+            ++i;
+        } else if(strcmp(arg, "--dri-card-path") == 0 && i + 1 < argc) {
+            program_args->dri_card_path = argv[i + 1];
+            ++i;
+        } else if(strcmp(arg, "--install-polkit-rule") == 0) {
+            program_args->install_polkit_rule = true;
+        } else if(strcmp(arg, "--uninstall-polkit-rule") == 0) {
+            program_args->uninstall_polkit_rule = true;
+        } else {
+            fprintf(stderr, "error: invalid program argument \"%s\"\n", arg);
+            usage();
+        }
+    }
 }
 
 int main(int argc, char **argv) {
-    ProgramArgs program_args;
-    memset(&program_args, 0, sizeof(program_args));
-
     setlocale(LC_ALL, "C");
 
+    // Is user root?
+    if(getuid() == 0) {
+        ProgramArgs program_args;
+        parse_program_args(argc, argv, &program_args);
+        handle_program_args(&program_args);
+        return 0;
+    } else {
+        if(argc != 1) {
+            fprintf(stderr, "Warning: ignoring program arguments as the program is not running as root\n");
+        }
+    }
+
     GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
-    init_program_args(app, &program_args);
-    g_signal_connect(app, "activate", G_CALLBACK(activate), &program_args);
-    int status = g_application_run(G_APPLICATION(app), argc, argv);
+    g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+    int status = g_application_run(G_APPLICATION(app), 1, argv);
     g_object_unref(app);
     return status;
 }
