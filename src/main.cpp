@@ -3160,7 +3160,7 @@ static void usage() {
 static void parse_program_args(int argc, char **argv, ProgramArgs *program_args) {
     memset(program_args, 0, sizeof(*program_args));
 
-    for(int i = 0; i < argc; ++i) {
+    for(int i = 1; i < argc; ++i) {
         const char *arg = argv[i];
         if(strcmp(arg, "--kms-server") == 0) {
             program_args->kms_server = true;
