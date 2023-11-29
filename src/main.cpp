@@ -21,6 +21,7 @@ extern "C" {
 }
 #include <xf86drmMode.h>
 #include <xf86drm.h>
+#include <sys/capability.h>
 
 typedef struct {
     Display *display;
@@ -417,8 +418,6 @@ static void save_configs() {
     config.main_config.framerate_mode = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
     config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
-    if(restore_password_prompts_button)
-        config.main_config.password_prompt_removed = gtk_widget_is_sensitive(GTK_WIDGET(restore_password_prompts_button));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
@@ -2058,7 +2057,6 @@ static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
     int result = system("flatpak-spawn --host pkexec setcap cap_sys_admin+ep /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
     switch(result) {
         case 0: {
-            config.main_config.password_prompt_removed = true;
             gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
             gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
             save_configs();
@@ -2086,7 +2084,6 @@ static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
     int result = system("flatpak-spawn --host pkexec setcap -r /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
     switch(result) {
         case 0: {
-            config.main_config.password_prompt_removed = false;
             gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
             gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
             save_configs();
@@ -2137,11 +2134,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 
         gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
         gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
-
-        if(config.main_config.password_prompt_removed)
-            gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
-        else
-            gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
     }
 
     GtkFrame *record_area_frame = GTK_FRAME(gtk_frame_new("Record area"));
@@ -2719,6 +2711,18 @@ static void add_audio_input_track(const char *name) {
     gtk_list_box_insert (GTK_LIST_BOX(audio_input_used_list), row, -1);
 }
 
+// Checks for flatpak gsr kms server specifically
+static bool kms_server_has_admin_privileges(void) {
+    cap_t kms_server_cap = cap_get_file("/app/bin/gsr-kms-server");
+    if(kms_server_cap) {
+        cap_flag_value_t res = CAP_CLEAR;
+        cap_get_flag(kms_server_cap, CAP_SYS_ADMIN, CAP_PERMITTED, &res);
+        cap_free(kms_server_cap);
+        return res == CAP_SET;
+    }
+    return false;
+}
+
 static void load_config(const gpu_info &gpu_inf) {
     bool config_empty = false;
     config = read_config(config_empty);
@@ -2853,8 +2857,9 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
     if(remove_password_prompts_button) {
-        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), !config.main_config.password_prompt_removed);
-        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), config.main_config.password_prompt_removed);
+        bool password_prompts_removed = kms_server_has_admin_privileges();
+        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), !password_prompts_removed);
+        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), password_prompts_removed);
     }
 
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);

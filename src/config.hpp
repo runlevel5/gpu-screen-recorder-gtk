@@ -31,7 +31,6 @@ struct MainConfig {
     std::string framerate_mode;
     bool advanced_view = false;
     bool overclock = false;
-    bool password_prompt_removed = false;
 };
 
 struct StreamingConfig {
@@ -278,11 +277,6 @@ static Config read_config(bool &config_empty) {
                 config.main_config.overclock = true;
             else if(value == "false")
                 config.main_config.overclock = false;
-        } else if(key == "main.password_prompt_removed") {
-            if(value == "true")
-                config.main_config.password_prompt_removed = true;
-            else if(value == "false")
-                config.main_config.password_prompt_removed = false;
         } else if(key == "streaming.service") {
             config.streaming_config.streaming_service.assign(value.str, value.size);
         } else if(key == "streaming.key") {
@@ -370,7 +364,6 @@ static void save_config(const Config &config) {
     fprintf(file, "main.framerate_mode %s\n", config.main_config.framerate_mode.c_str());
     fprintf(file, "main.advanced_view %s\n", config.main_config.advanced_view ? "true" : "false");
     fprintf(file, "main.overclock %s\n", config.main_config.overclock ? "true" : "false");
-    fprintf(file, "main.password_prompt_removed %s\n", config.main_config.password_prompt_removed ? "true" : "false");
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());

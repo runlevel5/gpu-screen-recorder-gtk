@@ -15,7 +15,7 @@ build_wayland_protocol() {
 }
 
 build_gsr_gtk() {
-    dependencies="gtk+-3.0 x11 xrandr libpulse libdrm wayland-egl wayland-client"
+    dependencies="gtk+-3.0 x11 xrandr libpulse libcap libdrm wayland-egl wayland-client"
     includes="$(pkg-config --cflags $dependencies)"
     libs="$(pkg-config --libs $dependencies) -ldl"
     $CC -c src/egl.c $opts $includes
