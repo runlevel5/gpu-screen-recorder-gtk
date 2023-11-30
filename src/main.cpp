@@ -2307,7 +2307,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         if(supported_video_codecs.h264)
             gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
         if(supported_video_codecs.hevc)
-            gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
+            gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
         if(supported_video_codecs.av1)
             gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
     } else {
