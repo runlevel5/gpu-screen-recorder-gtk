@@ -52,10 +52,11 @@
     </screenshots>
 
     <releases>
-        <release version="3.2.7" date="2023-11-30">
+        <release version="3.3.0" date="2023-12-01">
             <description>
                 <ul>
                     <li>Add option to remove password prompts (if possible on the system)</li>
+                    <li>Add experimental av1 support (if supported by the hardware)</li>
                     <li>Configure quality settings to reduce file size on amd/intel</li>
                     <li>Workaround amd/intel driver issue when using h264 (or fps > 60) and mkv (forcefully set video codec to hevc)</li>
                 </ul>

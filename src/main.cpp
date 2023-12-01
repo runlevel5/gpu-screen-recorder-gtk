@@ -1304,7 +1304,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(!exit_success) {
             show_notification(app, "GPU Screen Recorder",
-                "Failed to start replay. Either your graphics card doesn't support GPU Screen Recorder or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
+                "Failed to start replay. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
         }
 
         return true;
@@ -1423,7 +1423,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
             std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
             show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
         } else {
-            show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
         }
         return true;
     }
@@ -1532,7 +1532,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         } else if(exit_success) {
             show_notification(app, "GPU Screen Recorder", "Stopped streaming", G_NOTIFICATION_PRIORITY_NORMAL);
         } else {
-            show_notification(app, "GPU Screen Recorder", "Failed to stream video. There is either an error in your streaming config or your graphics card doesn't support GPU Screen Recorder", G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "Failed to stream video. There is either an error in your streaming config or your graphics card doesn't support GPU Screen Recorder with the settings you used", G_NOTIFICATION_PRIORITY_URGENT);
         }
 
         return true;
