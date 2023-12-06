@@ -1,10 +1,12 @@
+![](https://dec05eba.com/images/gpu_screen_recorder_logo_small.png)
+
 gtk frontend for [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
 
 This is a screen recorder that has minimal impact on system performance by recording a window using the GPU only,
 similar to shadowplay on windows. This is the fastest screen recording tool for Linux.
 
 This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia shadowplay-like instant replay,
-where only the last few seconds are saved.
+where only the last moments are saved.
 
 More info at [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
 
