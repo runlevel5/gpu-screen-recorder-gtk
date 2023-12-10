@@ -140,6 +140,14 @@ static Hotkey record_hotkey;
 static Hotkey replay_start_stop_hotkey;
 static Hotkey replay_save_hotkey;
 
+struct SupportedVideoCodecs {
+    bool h264;
+    bool hevc;
+    bool av1;
+};
+
+static SupportedVideoCodecs supported_video_codecs;
+
 struct Container {
     const char *container_name;
     const char *file_extension;
@@ -2016,12 +2024,6 @@ static void get_connection_by_active_type(void **connection, gsr_connection_type
     }
 }
 
-struct SupportedVideoCodecs {
-    bool h264;
-    bool hevc;
-    bool av1;
-};
-
 static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_codecs) {
     supported_video_codecs->h264 = false;
     supported_video_codecs->hevc = false;
@@ -2302,7 +2304,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
     video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
-    SupportedVideoCodecs supported_video_codecs;
     if(get_supported_video_codecs(&supported_video_codecs)) {
         if(supported_video_codecs.h264)
             gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
@@ -2476,7 +2477,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
 
     GtkGrid *replay_time_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, row++, 5, 1);
-    gtk_grid_attach(replay_time_grid, gtk_label_new("Replay time: "), 0, 0, 1, 1);
+    gtk_grid_attach(replay_time_grid, gtk_label_new("Replay time in seconds: "), 0, 0, 1, 1);
     replay_time_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 1200.0, 1.0));
     gtk_spin_button_set_value(replay_time_entry, 30.0);
     gtk_widget_set_hexpand(GTK_WIDGET(replay_time_entry), true);
@@ -2870,6 +2871,24 @@ static void load_config(const gpu_info &gpu_inf) {
         gtk_widget_set_visible(replay_save_hotkey.hotkey_active_label, false);
     }
     enable_stream_record_button_if_info_filled();
+
+    if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor != GPU_VENDOR_NVIDIA && config.main_config.codec != "av1") {
+        if(supported_video_codecs.av1) {
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Your distro has disabled support for H264 and HEVC video codecs in video encoding. Switched video codec to AV1. If you wish to use H264/HEVC video codecs then switch to a less user hostile distro.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            config.main_config.codec = "av1";
+            gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
+        } else {
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Either your GPU doesn't support H264/HEVC video codecs in video encoding or your distro has disabled support for those video codecs. Switch to a less user hostile distro.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(select_window_userdata.app));
+            return;
+        }
+    }
 }
 
 static bool gl_get_gpu_info(gsr_egl *egl, gpu_info *info) {
@@ -3005,6 +3024,8 @@ static void activate(GtkApplication *app, gpointer) {
             return;
         }
     }
+
+    get_supported_video_codecs(&supported_video_codecs);
 
     std::string window_title = "GPU Screen Recorder | Running on ";
     window_title += gpu_vendor_to_name(gpu_inf.vendor);
