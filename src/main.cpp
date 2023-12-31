@@ -2057,6 +2057,13 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
 
 static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
     int result = system("flatpak-spawn --host pkexec setcap cap_sys_admin+ep /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
+    if(result != 0) {
+        // This can happen on some distros such as OpenSUSE because setcap is not found by which by the user
+        // and neither pkexec, and only by the root user directly. In such cases we guess the path to setcap.
+        int result2 = system("flatpak-spawn --host pkexec /usr/sbin/setcap cap_sys_admin+ep /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
+        if(result2 == 0)
+            result = 0;
+    }
     switch(result) {
         case 0: {
             gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
@@ -2073,7 +2080,7 @@ static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
         }
         default: {
             GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Unable to remove password prompts (/var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server may not exist or it may be read-only)");
+                "Unable to remove password prompts (/var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server may not exist or it may be read-only or setcap is not installed on your system)");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             break;
@@ -2874,15 +2881,15 @@ static void load_config(const gpu_info &gpu_inf) {
 
     if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor != GPU_VENDOR_NVIDIA && config.main_config.codec != "av1") {
         if(supported_video_codecs.av1) {
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Your distro has disabled support for H264 and HEVC video codecs in video encoding. Switched video codec to AV1. If you wish to use H264/HEVC video codecs then switch to a less user hostile distro.");
+            GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Your distro has disabled support for H264 and HEVC video codecs. Switched video codec to AV1. If you wish to use H264/HEVC video codecs then follow your distros guide to install a non-crippled mesa (with H264 and HEVC support) or switch to a less user hostile distro or recompile mesa from source. For example on fedora you may need to follow this: <a href=\"https://rpmfusion.org/Howto/Multimedia\">Hardware Accelerated Codec</a>.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             config.main_config.codec = "av1";
             gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
         } else {
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Either your GPU doesn't support H264/HEVC video codecs in video encoding or your distro has disabled support for those video codecs. Switch to a less user hostile distro.");
+            GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Either your GPU doesn't support H264/HEVC video codecs or your distro has disabled support for those video codecs. If you wish to use H264/HEVC video codecs then follow your distros guide to install a non-crippled mesa (with H264 and HEVC support) or switch to a less user hostile distro or recompile mesa from source, if you know that your GPU supports H264/HEVC. For example on fedora you may need to follow this: <a href=\"https://rpmfusion.org/Howto/Multimedia\">Hardware Accelerated Codec</a>.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(select_window_userdata.app));
