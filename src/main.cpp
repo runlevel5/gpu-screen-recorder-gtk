@@ -2903,7 +2903,6 @@ static void load_config(const gpu_info &gpu_inf) {
 
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Use of GPU Screen Recorder on Wayland is not recommended since Wayland compositors are missing features that GPU Screen Recorder relies on, such as window capture, global hotkeys, and other future functionality.\n"
-            "Software around Wayland (desktop portal and pipewire) are also brittle and buggy. Wayland is also badly designed and will never support all of the features needed for a proper desktop experience.\n"
             "Use X11 if you want to have access to all of the features provided by GPU Screen Recorder.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
