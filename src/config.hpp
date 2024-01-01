@@ -31,6 +31,7 @@ struct MainConfig {
     std::string framerate_mode;
     bool advanced_view = false;
     bool overclock = false;
+    bool wayland_warning_shown = false;
 };
 
 struct StreamingConfig {
@@ -277,6 +278,11 @@ static Config read_config(bool &config_empty) {
                 config.main_config.overclock = true;
             else if(value == "false")
                 config.main_config.overclock = false;
+        } else if(key == "main.wayland_warning_shown") {
+            if(value == "true")
+                config.main_config.wayland_warning_shown = true;
+            else if(value == "false")
+                config.main_config.wayland_warning_shown = false;
         } else if(key == "streaming.service") {
             config.streaming_config.streaming_service.assign(value.str, value.size);
         } else if(key == "streaming.key") {
@@ -364,6 +370,7 @@ static void save_config(const Config &config) {
     fprintf(file, "main.framerate_mode %s\n", config.main_config.framerate_mode.c_str());
     fprintf(file, "main.advanced_view %s\n", config.main_config.advanced_view ? "true" : "false");
     fprintf(file, "main.overclock %s\n", config.main_config.overclock ? "true" : "false");
+    fprintf(file, "main.wayland_warning_shown %s\n", config.main_config.wayland_warning_shown ? "true" : "false");
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());

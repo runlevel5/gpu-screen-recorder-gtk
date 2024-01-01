@@ -2881,7 +2881,7 @@ static void load_config(const gpu_info &gpu_inf) {
 
     if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor != GPU_VENDOR_NVIDIA && config.main_config.codec != "av1") {
         if(supported_video_codecs.av1) {
-            GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
                 "Your distro has disabled support for H264 and HEVC video codecs. Switched video codec to AV1. If you wish to use H264/HEVC video codecs then follow your distros guide to install a non-crippled mesa (with H264 and HEVC support) or switch to a less user hostile distro or recompile mesa from source. For example on fedora you may need to follow this: <a href=\"https://rpmfusion.org/Howto/Multimedia\">Hardware Accelerated Codec</a>.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
@@ -2895,6 +2895,18 @@ static void load_config(const gpu_info &gpu_inf) {
             g_application_quit(G_APPLICATION(select_window_userdata.app));
             return;
         }
+    }
+
+    if(wayland && !config.main_config.wayland_warning_shown) {
+        config.main_config.wayland_warning_shown = true;
+        save_configs();
+
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
+            "Use of GPU Screen Recorder on Wayland is not recommended since Wayland compositors are missing features that GPU Screen Recorder relies on, such as window capture, global hotkeys, and other future functionality.\n"
+            "Software around Wayland (desktop portal and pipewire) are also brittle and buggy. Wayland is also badly designed and will never support all of the features needed for a proper desktop experience.\n"
+            "Use X11 if you want to have access to all of the features provided by GPU Screen Recorder.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
     }
 }
 
