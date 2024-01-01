@@ -2896,17 +2896,6 @@ static void load_config(const gpu_info &gpu_inf) {
             return;
         }
     }
-
-    if(wayland && !config.main_config.wayland_warning_shown) {
-        config.main_config.wayland_warning_shown = true;
-        save_configs();
-
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
-            "Use of GPU Screen Recorder on Wayland is not recommended since Wayland compositors are missing features that GPU Screen Recorder relies on, such as window capture, global hotkeys, and other future functionality.\n"
-            "Use X11 if you want to have access to all of the features provided by GPU Screen Recorder.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-    }
 }
 
 static bool gl_get_gpu_info(gsr_egl *egl, gpu_info *info) {
