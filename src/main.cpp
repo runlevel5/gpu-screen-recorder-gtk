@@ -48,7 +48,8 @@ static GtkLabel *area_size_label;
 static GtkGrid *area_size_grid;
 static GtkSpinButton *area_width_entry;
 static GtkSpinButton *area_height_entry;
-static GtkComboBoxText *record_area_selection_menu;
+static GtkComboBox *record_area_selection_menu;
+static GtkTreeModel *record_area_selection_model;
 static GtkComboBoxText *quality_input_menu;
 static GtkComboBoxText *video_codec_input_menu;
 static GtkComboBoxText *audio_codec_input_menu;
@@ -278,10 +279,41 @@ static void drag_data_received(GtkWidget *widget, GdkDragContext*,
     g_object_unref(source);
 }
 
+static std::string record_area_selection_menu_get_active_id() {
+    std::string id_str;
+    GtkTreeIter iter;
+    if(!gtk_combo_box_get_active_iter(record_area_selection_menu, &iter))
+        return id_str;
+
+    gchar *id;
+    gtk_tree_model_get(record_area_selection_model, &iter, 1, &id, -1);
+    id_str = id;
+    g_free(id);
+    return id_str;
+}
+
+static void record_area_selection_menu_set_active_id(const gchar *id) {
+    GtkTreeIter iter;
+    if(!gtk_tree_model_get_iter_first(record_area_selection_model, &iter))
+        return;
+
+    do {
+        gchar *row_id = nullptr;
+        gtk_tree_model_get(record_area_selection_model, &iter, 1, &row_id, -1);
+
+        const bool found_row = strcmp(row_id, id) == 0;
+        g_free(row_id);
+        if(found_row) {
+            gtk_combo_box_set_active_iter(record_area_selection_menu, &iter);
+            break;
+        }
+    } while(gtk_tree_model_iter_next(record_area_selection_model, &iter));
+}
+
 static void enable_stream_record_button_if_info_filled() {
     if(!wayland) {
-        const gchar *selected_window_area = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
-        if(strcmp(selected_window_area, "window") == 0 && select_window_userdata.selected_window == None) {
+        const std::string selected_window_area = record_area_selection_menu_get_active_id();
+        if(strcmp(selected_window_area.c_str(), "window") == 0 && select_window_userdata.selected_window == None) {
             gtk_widget_set_sensitive(GTK_WIDGET(replay_button), false);
             gtk_widget_set_sensitive(GTK_WIDGET(record_button), false);
             gtk_widget_set_sensitive(GTK_WIDGET(stream_button), false);
@@ -408,7 +440,7 @@ static std::string get_date_str() {
 }
 
 static void save_configs() {
-    config.main_config.record_area_option = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    config.main_config.record_area_option = record_area_selection_menu_get_active_id();
     if(!wayland) {
         config.main_config.record_area_width = gtk_spin_button_get_value_as_int(area_width_entry);
         config.main_config.record_area_height = gtk_spin_button_get_value_as_int(area_height_entry);
@@ -1103,7 +1135,7 @@ static HotkeyResult replace_grabbed_keys_depending_on_active_page() {
 }
 
 static bool show_pkexec_flatpak_error_if_needed() {
-    std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    const std::string window_str = record_area_selection_menu_get_active_id();
     if(!gsr_egl_supports_wayland_capture(&egl) && (wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA) && window_str != "window" && window_str != "focused") {
         if(!is_pkexec_installed()) {
             GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
@@ -1334,7 +1366,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     }
 
     bool follow_focused = false;
-    std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    std::string window_str = record_area_selection_menu_get_active_id();
     if(window_str == "window") {
         if(select_window_userdata.selected_window == None) {
             fprintf(stderr, "No window selected!\n");
@@ -1453,7 +1485,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     record_file_current_filename = std::string(dir_tmp) + "/Video_" + get_date_str() + "." + gtk_combo_box_text_get_active_text(record_container);
 
     bool follow_focused = false;
-    std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    std::string window_str = record_area_selection_menu_get_active_id();
     if(window_str == "window") {
         if(select_window_userdata.selected_window == None) {
             fprintf(stderr, "No window selected!\n");
@@ -1554,7 +1586,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     bool follow_focused = false;
-    std::string window_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_area_selection_menu));
+    std::string window_str = record_area_selection_menu_get_active_id();
     if(window_str == "window") {
         if(select_window_userdata.selected_window == None) {
             fprintf(stderr, "No window selected!\n");
@@ -1772,11 +1804,12 @@ static PulseAudioServerInfo get_pulseaudio_default_inputs() {
 }
 
 static void record_area_item_change_callback(GtkComboBox *widget, gpointer userdata) {
+    (void)widget;
     GtkWidget *select_window_button = (GtkWidget*)userdata;
-    const gchar *selected_window_area = gtk_combo_box_get_active_id(widget);
-    gtk_widget_set_visible(select_window_button, strcmp(selected_window_area, "window") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(selected_window_area, "focused") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(selected_window_area, "focused") == 0);
+    const std::string selected_window_area = record_area_selection_menu_get_active_id();
+    gtk_widget_set_visible(select_window_button, strcmp(selected_window_area.c_str(), "window") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(selected_window_area.c_str(), "focused") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(selected_window_area.c_str(), "focused") == 0);
     enable_stream_record_button_if_info_filled();
 }
 
@@ -2102,6 +2135,20 @@ static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
     return true;
 }
 
+static void record_area_set_sensitive(GtkCellLayout *cell_layout, GtkCellRenderer *cell, GtkTreeModel *tree_model, GtkTreeIter *iter, gpointer data) {
+    (void)cell_layout;
+    (void)data;
+    if(wayland) {
+        gchar *id;
+        gtk_tree_model_get(tree_model, iter, 1, &id, -1);
+        gboolean sensitive = g_strcmp0("window", id) != 0 && g_strcmp0("focused", id) != 0;
+        g_free(id);
+        g_object_set(cell, "sensitive", sensitive, NULL);
+    } else {
+        g_object_set(cell, "sensitive", true, NULL);
+    }
+}
+
 static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app, const gpu_info &gpu_inf) {
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "common-settings");
@@ -2156,15 +2203,35 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_margin(GTK_WIDGET(record_area_grid), 10, 10, 10, 10);
     gtk_container_add(GTK_CONTAINER(record_area_frame), GTK_WIDGET(record_area_grid));
 
-    record_area_selection_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    if(!wayland) {
-        gtk_combo_box_text_append(record_area_selection_menu, "window", "Window");
-        gtk_combo_box_text_append(record_area_selection_menu, "focused", "Follow focused window");
+    GtkListStore *store = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
+    GtkTreeIter iter;
+    record_area_selection_model = GTK_TREE_MODEL(store);
+
+    if(wayland) {
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, "Window (Unavailable on Wayland)", -1);
+        gtk_list_store_set(store, &iter, 1, "window", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, "Follow focused window (Unavailable on Wayland)", -1);
+        gtk_list_store_set(store, &iter, 1, "focused", -1);
+    } else {
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, "Window", -1, "window", -1);
+        gtk_list_store_set(store, &iter, 1, "window", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, "Follow focused window", -1, "focused", -1);
+        gtk_list_store_set(store, &iter, 1, "focused", -1);
     }
+
     const bool allow_screen_capture = wayland || nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
     if(allow_screen_capture) {
-        if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA)
-            gtk_combo_box_text_append(record_area_selection_menu, "screen", "All monitors");
+        if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA) {
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, "All monitors", -1);
+            gtk_list_store_set(store, &iter, 1, "screen", -1);
+        }
 
         void *connection = NULL;
         gsr_connection_type connection_type = GSR_CONNECTION_DRM;
@@ -2194,13 +2261,21 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             memcpy(id, monitor->name, monitor->name_len);
             id[monitor->name_len] = '\0';
 
-            gtk_combo_box_text_append(record_area_selection_menu, id, label.c_str());
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, label.c_str(), -1);
+            gtk_list_store_set(store, &iter, 1, id, -1);
         }, NULL);
     }
-    if(wayland)
-        gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), 0);
-    else
-        gtk_combo_box_set_active(GTK_COMBO_BOX(record_area_selection_menu), allow_screen_capture ? 2 : 0);
+
+    record_area_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(record_area_selection_model));
+
+    GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
+    gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, TRUE);
+    gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, "text", 0, NULL);
+    gtk_cell_layout_set_cell_data_func(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, record_area_set_sensitive, NULL, NULL);
+
+    gtk_combo_box_set_active(record_area_selection_menu, allow_screen_capture ? 2 : 0);
+
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 3, 1);
 
@@ -2735,9 +2810,10 @@ static void load_config(const gpu_info &gpu_inf) {
     bool config_empty = false;
     config = read_config(config_empty);
 
+    std::string first_monitor;
     if(!wayland && strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
         //
-    } else if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
+    } else if(!wayland && strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
         //
     } else if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "screen") == 0) {
         //
@@ -2749,6 +2825,10 @@ static void load_config(const gpu_info &gpu_inf) {
         bool found_monitor = false;
         int monitor_name_size = strlen(config.main_config.record_area_option.c_str());
         for_each_active_monitor_output(connection, connection_type, [&](const gsr_monitor *monitor, void*) {
+            if(first_monitor.empty()) {
+                first_monitor.assign(monitor->name, monitor->name_len);
+            }
+
             if(monitor_name_size == monitor->name_len && strncmp(config.main_config.record_area_option.c_str(), monitor->name, monitor->name_len) == 0) {
                 found_monitor = true;
             }
@@ -2760,10 +2840,11 @@ static void load_config(const gpu_info &gpu_inf) {
 
     if(config.main_config.record_area_option.empty()) {
         const bool allow_screen_capture = wayland || nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
-        if(allow_screen_capture)
-            config.main_config.record_area_option = "screen";
-        else
+        if(allow_screen_capture) {
+            config.main_config.record_area_option = first_monitor;
+        } else {
             config.main_config.record_area_option = "window";
+        }
     }
 
     if(!wayland) {
@@ -2809,10 +2890,10 @@ static void load_config(const gpu_info &gpu_inf) {
 
     if(config.replay_config.replay_time < 5)
         config.replay_config.replay_time = 5;
-    else if(config.replay_config.replay_time> 1200)
+    else if(config.replay_config.replay_time > 1200)
         config.replay_config.replay_time = 1200;
 
-    gtk_combo_box_set_active_id(GTK_COMBO_BOX(record_area_selection_menu), config.main_config.record_area_option.c_str());
+    record_area_selection_menu_set_active_id(config.main_config.record_area_option.c_str());
     if(!wayland) {
         gtk_spin_button_set_value(area_width_entry, config.main_config.record_area_width);
         gtk_spin_button_set_value(area_height_entry, config.main_config.record_area_height);
