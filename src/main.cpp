@@ -68,6 +68,7 @@ static GtkButton *record_back_button;
 static GtkButton *stream_back_button;
 static GtkButton *replay_save_button;
 static GtkButton *start_recording_button;
+static GtkButton *pause_recording_button;
 static GtkButton *start_replay_button;
 static GtkButton *start_streaming_button;
 static GtkEntry *stream_id_entry;
@@ -76,10 +77,12 @@ static GtkButton *select_window_button;
 static GtkWidget *audio_input_used_list;
 static GtkWidget *add_audio_input_button;
 static GtkWidget *record_hotkey_button;
+static GtkWidget *pause_unpause_hotkey_button;
 static GtkWidget *replay_start_stop_hotkey_button;
 static GtkWidget *replay_save_hotkey_button;
 static GtkWidget *streaming_hotkey_button;
 static GtkWidget *merge_audio_tracks_button;
+static GtkWidget *show_notification_button;
 static GtkGrid *video_codec_grid;
 static GtkGrid *audio_codec_grid;
 static GtkGrid *framerate_mode_grid;
@@ -94,6 +97,7 @@ static XIC xic;
 
 static bool replaying = false;
 static bool recording = false;
+static bool paused = false;
 static bool streaming = false;
 static pid_t gpu_screen_recorder_process = -1;
 static int prev_exit_status = -1;
@@ -138,6 +142,7 @@ static Hotkey pressed_hotkey;
 static Hotkey latest_hotkey;
 static Hotkey streaming_hotkey;
 static Hotkey record_hotkey;
+static Hotkey pause_unpause_hotkey;
 static Hotkey replay_start_stop_hotkey;
 static Hotkey replay_save_hotkey;
 
@@ -458,6 +463,7 @@ static void save_configs() {
     config.main_config.framerate_mode = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
     config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
+    config.main_config.show_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
@@ -471,6 +477,9 @@ static void save_configs() {
     if(!wayland) {
         config.record_config.start_recording_hotkey.keysym = record_hotkey.keysym;
         config.record_config.start_recording_hotkey.modifiers = record_hotkey.modkey_mask;
+
+        config.record_config.pause_recording_hotkey.keysym = pause_unpause_hotkey.keysym;
+        config.record_config.pause_recording_hotkey.modifiers = pause_unpause_hotkey.modkey_mask;
     }
 
     config.replay_config.save_directory = gtk_button_get_label(replay_file_chooser_button);
@@ -1060,6 +1069,7 @@ static void ungrab_keys(Display *display) {
 
     grab_ungrab_hotkey_combo(display, streaming_hotkey, false);
     grab_ungrab_hotkey_combo(display, record_hotkey, false);
+    grab_ungrab_hotkey_combo(display, pause_unpause_hotkey, false);
     grab_ungrab_hotkey_combo(display, replay_start_stop_hotkey, false);
     grab_ungrab_hotkey_combo(display, replay_save_hotkey, false);
 }
@@ -1106,6 +1116,7 @@ static void set_hotkey_text_from_hotkey_data(GtkEntry *entry, Hotkey hotkey) {
 
 struct HotkeyResult {
     bool record_hotkey_success = false;
+    bool pause_unpause_hotkey_success = false;
     bool streaming_hotkey_success = false;
     bool replay_start_stop_hotkey_success = false;
     bool replay_save_hotkey_success = false;
@@ -1117,8 +1128,11 @@ static HotkeyResult replace_grabbed_keys_depending_on_active_page() {
     const GtkWidget *visible_page = gtk_stack_get_visible_child(page_navigation_userdata.stack);
     if(visible_page == page_navigation_userdata.recording_page) {
         bool grab_record_success = grab_ungrab_hotkey_combo(gdk_x11_get_default_xdisplay(), record_hotkey, true);
+        bool grab_pause_success = grab_ungrab_hotkey_combo(gdk_x11_get_default_xdisplay(), pause_unpause_hotkey, true);
         hotkey_mode = HotkeyMode::Record;
+
         hotkey_result.record_hotkey_success = grab_record_success;
+        hotkey_result.pause_unpause_hotkey_success = grab_pause_success;
     } else if(visible_page == page_navigation_userdata.streaming_page) {
         bool grab_record_success = grab_ungrab_hotkey_combo(gdk_x11_get_default_xdisplay(), streaming_hotkey, true);
         hotkey_mode = HotkeyMode::Record;
@@ -1200,6 +1214,11 @@ static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
             gtk_entry_set_text(GTK_ENTRY(record_hotkey.hotkey_entry), "");
             record_hotkey.keysym = 0;
             record_hotkey.modkey_mask = 0;
+        }
+        if(!hotkey_result.pause_unpause_hotkey_success) {
+            gtk_entry_set_text(GTK_ENTRY(pause_unpause_hotkey.hotkey_entry), "");
+            pause_unpause_hotkey.keysym = 0;
+            pause_unpause_hotkey.modkey_mask = 0;
         }
     }
     return true;
@@ -1438,7 +1457,18 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 static gboolean on_replay_save_button_click(GtkButton*, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
     kill(gpu_screen_recorder_process, SIGUSR1);
-    show_notification(app, "GPU Screen Recorder", "Saved replay", G_NOTIFICATION_PRIORITY_NORMAL);
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button)))
+        show_notification(app, "GPU Screen Recorder", "Saved replay", G_NOTIFICATION_PRIORITY_NORMAL);
+    return true;
+}
+
+static gboolean on_pause_unpause_button_click(GtkButton*, gpointer) {
+    kill(gpu_screen_recorder_process, SIGUSR2);
+    paused = !paused;
+    if(paused)
+        gtk_button_set_label(pause_recording_button, "Unpause recording");
+    else
+        gtk_button_set_label(pause_recording_button, "Pause recording");
     return true;
 }
 
@@ -1456,12 +1486,18 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), true);
 
+        paused = false;
+        gtk_widget_set_sensitive(GTK_WIDGET(pause_recording_button), false);
+        gtk_button_set_label(pause_recording_button, "Pause recording");
+
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_success) {
-            std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
-            show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
+            if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button))) {
+                const std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
+                show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
+            }
         } else {
             show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
         }
@@ -1550,6 +1586,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
     recording = true;
     gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), false);
+    gtk_widget_set_sensitive(GTK_WIDGET(pause_recording_button), true);
     return true;
 }
 
@@ -1816,10 +1853,12 @@ static void record_area_item_change_callback(GtkComboBox *widget, gpointer userd
 static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdata) {
     (void)userdata;
     const gchar *selected_view = gtk_combo_box_get_active_id(widget);
-    gtk_widget_set_visible(GTK_WIDGET(video_codec_grid), strcmp(selected_view, "advanced") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), strcmp(selected_view, "advanced") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(framerate_mode_grid), strcmp(selected_view, "advanced") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), strcmp(selected_view, "advanced") == 0 && gpu_inf.vendor == GPU_VENDOR_NVIDIA && !wayland);
+    const bool advanced_view = strcmp(selected_view, "advanced") == 0;
+    gtk_widget_set_visible(GTK_WIDGET(video_codec_grid), advanced_view);
+    gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), advanced_view);
+    gtk_widget_set_visible(GTK_WIDGET(framerate_mode_grid), advanced_view);
+    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), advanced_view && gpu_inf.vendor == GPU_VENDOR_NVIDIA && !wayland);
+    gtk_widget_set_visible(GTK_WIDGET(show_notification_button), advanced_view);
 }
 
 static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -1885,6 +1924,8 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
         if(visible_page == page_navigation_userdata->recording_page) {
             if(key_sym == record_hotkey.keysym && key_state_without_locks(ev->xkey.state) == key_mod_mask_to_x11_mask(record_hotkey.modkey_mask)) {
                 keypress_toggle_recording(recording, start_recording_button, on_start_recording_button_click, page_navigation_userdata->app);
+            } else if(key_sym == pause_unpause_hotkey.keysym && key_state_without_locks(ev->xkey.state) == key_mod_mask_to_x11_mask(pause_unpause_hotkey.modkey_mask) && recording) {
+                on_pause_unpause_button_click(nullptr, page_navigation_userdata->app);
             }
         } else if(visible_page == page_navigation_userdata->streaming_page) {
             if(key_sym == streaming_hotkey.keysym && key_state_without_locks(ev->xkey.state) == key_mod_mask_to_x11_mask(streaming_hotkey.modkey_mask)) {
@@ -1970,6 +2011,8 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
             bool hotkey_success = false;
             if(current_hotkey == &record_hotkey)
                 hotkey_success = hotkey_result.record_hotkey_success;
+            else if(current_hotkey == &pause_unpause_hotkey)
+                hotkey_success = hotkey_result.pause_unpause_hotkey_success;
             else if(current_hotkey == &streaming_hotkey)
                 hotkey_success = hotkey_result.streaming_hotkey_success;
             else if(current_hotkey == &replay_start_stop_hotkey)
@@ -2011,6 +2054,8 @@ static gboolean on_hotkey_entry_click(GtkWidget *button, gpointer) {
 
     if(button == record_hotkey_button) {
         current_hotkey = &record_hotkey;
+    } else if(button == pause_unpause_hotkey_button) {
+        current_hotkey = &pause_unpause_hotkey;
     } else if(button == streaming_hotkey_button) {
         current_hotkey = &streaming_hotkey;
     } else if(button == replay_start_stop_hotkey_button) {
@@ -2450,6 +2495,11 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         return true;
     }), nullptr);
 
+    show_notification_button = gtk_check_button_new_with_label("Show status notifications");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_notification_button), true);
+    gtk_widget_set_halign(show_notification_button, GTK_ALIGN_START);
+    gtk_grid_attach(grid, show_notification_button, 0, grid_row++, 2, 1);
+
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, grid_row++, 2, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
@@ -2497,7 +2547,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
         GtkWidget *a = gtk_label_new("Press");
         gtk_widget_set_halign(a, GTK_ALIGN_END);
 
-        GtkWidget *b = gtk_label_new("to start/stop the replay and ");
+        GtkWidget *b = gtk_label_new("to start/stop the replay and");
         gtk_widget_set_halign(b, GTK_ALIGN_START);
 
         GtkWidget *c = gtk_label_new("to save");
@@ -2602,26 +2652,37 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
 
     GtkWidget *hotkey_active_label = NULL;
     if(wayland) {
-        gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 3, 1);
-        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+        gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 5, 1);
+        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
-        gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
+        gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
 
         GtkWidget *a = gtk_label_new("Press");
         gtk_widget_set_halign(a, GTK_ALIGN_END);
 
-        GtkWidget *b = gtk_label_new("to start/stop recording");
+        GtkWidget *b = gtk_label_new("to start/stop recording and");
         gtk_widget_set_halign(b, GTK_ALIGN_START);
+
+        GtkWidget *c = gtk_label_new("to pause/unpause");
+        gtk_widget_set_halign(c, GTK_ALIGN_START);
 
         record_hotkey_button = gtk_entry_new();
         gtk_entry_set_text(GTK_ENTRY(record_hotkey_button), "Alt + F1");
         g_signal_connect(record_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), record_hotkey_button);
+
+        pause_unpause_hotkey_button = gtk_entry_new();
+        gtk_entry_set_text(GTK_ENTRY(pause_unpause_hotkey_button), "Alt + F2");
+        gtk_widget_set_halign(pause_unpause_hotkey_button, GTK_ALIGN_START);
+        g_signal_connect(pause_unpause_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), pause_unpause_hotkey_button);
+
         gtk_grid_attach(grid, a, 0, row, 1, 1);
         gtk_grid_attach(grid, record_hotkey_button, 1, row, 1, 1);
         gtk_grid_attach(grid, b, 2, row, 1, 1);
+        gtk_grid_attach(grid, pause_unpause_hotkey_button, 3, row, 1, 1);
+        gtk_grid_attach(grid, c, 4, row, 1, 1);
         ++row;
-        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
     }
 
     record_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
@@ -2629,10 +2690,15 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     record_hotkey.hotkey_entry = record_hotkey_button;
     record_hotkey.hotkey_active_label = hotkey_active_label;
 
+    pause_unpause_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
+    pause_unpause_hotkey.keysym = XK_F2;
+    pause_unpause_hotkey.hotkey_entry = pause_unpause_hotkey_button;
+    pause_unpause_hotkey.hotkey_active_label = hotkey_active_label;
+
     GtkWidget *save_icon = gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_BUTTON);
 
     GtkGrid *file_chooser_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, row++, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(file_chooser_grid), 0, row++, 5, 1);
     gtk_grid_set_column_spacing(file_chooser_grid, 10);
     GtkWidget *file_chooser_label = gtk_label_new("Where do you want to save the video?");
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(file_chooser_label), 0, 0, 1, 1);
@@ -2645,7 +2711,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(file_chooser_grid, GTK_WIDGET(record_file_chooser_button), 1, 0, 1, 1);
 
     GtkGrid *container_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, row++, 3, 1);
+    gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, row++, 5, 1);
     gtk_grid_attach(container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
     record_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     for(auto &supported_container : supported_containers) {
@@ -2656,15 +2722,23 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_combo_box_set_active(GTK_COMBO_BOX(record_container), 0); // TODO:
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 3, 1);
+
+    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 5, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
     record_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(record_back_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(record_back_button), 0, 0, 1, 1);
+
     start_recording_button = GTK_BUTTON(gtk_button_new_with_label("Start recording"));
     gtk_widget_set_hexpand(GTK_WIDGET(start_recording_button), true);
     g_signal_connect(start_recording_button, "clicked", G_CALLBACK(on_start_recording_button_click), app);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(start_recording_button), 1, 0, 1, 1);
+
+    pause_recording_button = GTK_BUTTON(gtk_button_new_with_label("Pause recording"));
+    gtk_widget_set_hexpand(GTK_WIDGET(pause_recording_button), true);
+    g_signal_connect(pause_recording_button, "clicked", G_CALLBACK(on_pause_unpause_button_click), app);
+    gtk_widget_set_sensitive(GTK_WIDGET(pause_recording_button), false);
+    gtk_grid_attach(start_button_grid, GTK_WIDGET(pause_recording_button), 2, 0, 1, 1);
 
     return GTK_WIDGET(grid);
 }
@@ -2913,6 +2987,7 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_codec_input_menu), config.main_config.audio_codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(framerate_mode_input_menu), config.main_config.framerate_mode.c_str());
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), config.main_config.overclock);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_notification_button), config.main_config.show_notifications);
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
@@ -2928,6 +3003,11 @@ static void load_config(const gpu_info &gpu_inf) {
         record_hotkey.keysym = config.record_config.start_recording_hotkey.keysym;
         record_hotkey.modkey_mask = config.record_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(record_hotkey_button), record_hotkey);
+    }
+    if(!wayland && config.record_config.pause_recording_hotkey.keysym) {
+        pause_unpause_hotkey.keysym = config.record_config.pause_recording_hotkey.keysym;
+        pause_unpause_hotkey.modkey_mask = config.record_config.pause_recording_hotkey.modifiers;
+        set_hotkey_text_from_hotkey_data(GTK_ENTRY(pause_unpause_hotkey_button), pause_unpause_hotkey);
     }
 
     gtk_button_set_label(replay_file_chooser_button, config.replay_config.save_directory.c_str());
@@ -2954,6 +3034,7 @@ static void load_config(const gpu_info &gpu_inf) {
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
     if(!wayland) {
         gtk_widget_set_visible(record_hotkey.hotkey_active_label, false);
+        gtk_widget_set_visible(pause_unpause_hotkey.hotkey_active_label, false);
         gtk_widget_set_visible(streaming_hotkey.hotkey_active_label, false);
         gtk_widget_set_visible(replay_start_stop_hotkey.hotkey_active_label, false);
         gtk_widget_set_visible(replay_save_hotkey.hotkey_active_label, false);

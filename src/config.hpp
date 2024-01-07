@@ -31,6 +31,7 @@ struct MainConfig {
     std::string framerate_mode;
     bool advanced_view = false;
     bool overclock = false;
+    bool show_notifications = true;
 };
 
 struct StreamingConfig {
@@ -43,6 +44,7 @@ struct RecordConfig {
     std::string save_directory;
     std::string container;
     ConfigHotkey start_recording_hotkey;
+    ConfigHotkey pause_recording_hotkey;
 };
 
 struct ReplayConfig {
@@ -277,6 +279,11 @@ static Config read_config(bool &config_empty) {
                 config.main_config.overclock = true;
             else if(value == "false")
                 config.main_config.overclock = false;
+        } else if(key == "main.show_notifications") {
+            if(value == "true")
+                config.main_config.show_notifications = true;
+            else if(value == "false")
+                config.main_config.show_notifications = false;
         } else if(key == "streaming.service") {
             config.streaming_config.streaming_service.assign(value.str, value.size);
         } else if(key == "streaming.key") {
@@ -298,6 +305,13 @@ static Config read_config(bool &config_empty) {
                 fprintf(stderr, "Warning: Invalid config option value for record.start_recording_hotkey\n");
                 config.record_config.start_recording_hotkey.keysym = 0;
                 config.record_config.start_recording_hotkey.modifiers = 0;
+            }
+        } else if(key == "record.pause_recording_hotkey") {
+            std::string value_str(value.str, value.size);
+            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.record_config.pause_recording_hotkey.keysym, &config.record_config.pause_recording_hotkey.modifiers) != 2) {
+                fprintf(stderr, "Warning: Invalid config option value for record.pause_recording_hotkey\n");
+                config.record_config.pause_recording_hotkey.keysym = 0;
+                config.record_config.pause_recording_hotkey.modifiers = 0;
             }
         } else if(key == "replay.save_directory") {
             config.replay_config.save_directory.assign(value.str, value.size);
@@ -364,6 +378,7 @@ static void save_config(const Config &config) {
     fprintf(file, "main.framerate_mode %s\n", config.main_config.framerate_mode.c_str());
     fprintf(file, "main.advanced_view %s\n", config.main_config.advanced_view ? "true" : "false");
     fprintf(file, "main.overclock %s\n", config.main_config.overclock ? "true" : "false");
+    fprintf(file, "main.show_notifications %s\n", config.main_config.show_notifications ? "true" : "false");
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());
@@ -372,6 +387,7 @@ static void save_config(const Config &config) {
     fprintf(file, "record.save_directory %s\n", config.record_config.save_directory.c_str());
     fprintf(file, "record.container %s\n", config.record_config.container.c_str());
     fprintf(file, "record.start_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.record_config.start_recording_hotkey.keysym, config.record_config.start_recording_hotkey.modifiers);
+    fprintf(file, "record.pause_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.record_config.pause_recording_hotkey.keysym, config.record_config.pause_recording_hotkey.modifiers);
 
     fprintf(file, "replay.save_directory %s\n", config.replay_config.save_directory.c_str());
     fprintf(file, "replay.container %s\n", config.replay_config.container.c_str());

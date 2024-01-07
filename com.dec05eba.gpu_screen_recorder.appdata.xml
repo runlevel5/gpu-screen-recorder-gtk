@@ -50,9 +50,18 @@
             <caption>Advanced view</caption>
             <image>https://raw.githubusercontent.com/dec05eba/com.dec05eba.gpu_screen_recorder/master/resources/screenshot2.png</image>
         </screenshot>
+        <screenshot>
+            <caption>Recording page</caption>
+            <image>https://raw.githubusercontent.com/dec05eba/com.dec05eba.gpu_screen_recorder/master/resources/screenshot3.png</image>
+        </screenshot>
     </screenshots>
 
     <releases>
+        <release version="3.4.0" date="2024-01-07">
+            <description>
+                <p>Add option to pause recording</p>
+            </description>
+        </release>
         <release version="3.3.2" date="2023-12-31">
             <description>
                 <p>Fix monitor capture on AMD/Intel or NVIDIA Wayland on some distros, such as OpenSUSE</p>
