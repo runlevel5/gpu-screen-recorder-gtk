@@ -223,6 +223,130 @@ static bool flatpak_is_installed_as_system(void) {
     return installed_as_system;
 }
 
+static void pa_state_cb(pa_context *c, void *userdata) {
+    pa_context_state state = pa_context_get_state(c);
+    int *pa_ready = (int*)userdata;
+    switch(state) {
+        case PA_CONTEXT_UNCONNECTED:
+        case PA_CONTEXT_CONNECTING:
+        case PA_CONTEXT_AUTHORIZING:
+        case PA_CONTEXT_SETTING_NAME:
+        default:
+            break;
+        case PA_CONTEXT_FAILED:
+        case PA_CONTEXT_TERMINATED:
+            *pa_ready = 2;
+            break;
+        case PA_CONTEXT_READY:
+            *pa_ready = 1;
+            break;
+    }
+}
+
+static void pa_sourcelist_cb(pa_context*, const pa_source_info *source_info, int eol, void *userdata) {
+    if(eol > 0)
+        return;
+
+    std::vector<AudioInput> *inputs = (std::vector<AudioInput>*)userdata;
+    inputs->push_back({ source_info->name, source_info->description });
+}
+
+static std::vector<AudioInput> get_pulseaudio_inputs() {
+    std::vector<AudioInput> inputs;
+    pa_mainloop *main_loop = pa_mainloop_new();
+
+    pa_context *ctx = pa_context_new(pa_mainloop_get_api(main_loop), "gpu-screen-recorder-gtk");
+    pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL);
+    int state = 0;
+    int pa_ready = 0;
+    pa_context_set_state_callback(ctx, pa_state_cb, &pa_ready);
+
+    pa_operation *pa_op = NULL;
+
+    for(;;) {
+        // Not ready
+        if(pa_ready == 0) {
+            pa_mainloop_iterate(main_loop, 1, NULL);
+            continue;
+        }
+
+        switch(state) {
+            case 0: {
+                pa_op = pa_context_get_source_info_list(ctx, pa_sourcelist_cb, &inputs);
+                ++state;
+                break;
+            }
+        }
+
+        // Couldn't get connection to the server
+        if(pa_ready == 2 || (state == 1 && pa_op && pa_operation_get_state(pa_op) == PA_OPERATION_DONE)) {
+            if(pa_op)
+                pa_operation_unref(pa_op);
+            pa_context_disconnect(ctx);
+            pa_context_unref(ctx);
+            pa_mainloop_free(main_loop);
+            return inputs;
+        }
+
+        pa_mainloop_iterate(main_loop, 1, NULL);
+    }
+
+    pa_mainloop_free(main_loop);
+    return {};
+}
+
+static void server_info_callback(pa_context*, const pa_server_info *server_info, void *userdata) {
+    PulseAudioServerInfo *u = (PulseAudioServerInfo*)userdata;
+    if(server_info->default_sink_name)
+        u->default_sink_name = std::string(server_info->default_sink_name) + ".monitor";
+    if(server_info->default_source_name)
+        u->default_source_name = server_info->default_source_name;
+}
+
+static PulseAudioServerInfo get_pulseaudio_default_inputs() {
+    PulseAudioServerInfo server_info;
+    pa_mainloop *main_loop = pa_mainloop_new();
+
+    pa_context *ctx = pa_context_new(pa_mainloop_get_api(main_loop), "gpu-screen-recorder-gtk");
+    pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL);
+    int state = 0;
+    int pa_ready = 0;
+    pa_context_set_state_callback(ctx, pa_state_cb, &pa_ready);
+
+    pa_operation *pa_op = NULL;
+
+    for(;;) {
+        // Not ready
+        if(pa_ready == 0) {
+            pa_mainloop_iterate(main_loop, 1, NULL);
+            continue;
+        }
+
+        switch(state) {
+            case 0: {
+                pa_op = pa_context_get_server_info(ctx, server_info_callback, &server_info);
+                ++state;
+                break;
+            }
+        }
+
+        // Couldn't get connection to the server
+        if(pa_ready == 2 || (state == 1 && pa_op && pa_operation_get_state(pa_op) == PA_OPERATION_DONE)) {
+            if(pa_op)
+                pa_operation_unref(pa_op);
+            pa_context_disconnect(ctx);
+            pa_context_unref(ctx);
+            pa_mainloop_free(main_loop);
+            return server_info;
+        }
+
+        pa_mainloop_iterate(main_loop, 1, NULL);
+    }
+
+    pa_mainloop_free(main_loop);
+    return server_info;
+}
+
 static void used_audio_input_loop_callback(GtkWidget *row, gpointer userdata) {
     const AudioRow *audio_row = (AudioRow*)g_object_get_data(G_OBJECT(row), "audio-row");
     std::function<void(const AudioRow*)> &callback = *(std::function<void(const AudioRow*)>*)userdata;
@@ -1326,19 +1450,31 @@ static bool kill_gpu_screen_recorder_get_result() {
     return exit_success;
 }
 
+static const gchar* audio_row_get_id(const AudioRow *audio_row) {
+    const char *text = gtk_combo_box_text_get_active_text(audio_row->input_list);
+    if(strcmp(text, "Default output") == 0 && !pa_default_sources.default_sink_name.empty())
+        return pa_default_sources.default_sink_name.c_str();
+    else if(strcmp(text, "Default input") == 0 && !pa_default_sources.default_source_name.empty())
+        return pa_default_sources.default_source_name.c_str();
+    else
+        return gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_row->input_list));
+}
+
 static void add_audio_command_line_args(std::vector<const char*> &args, std::string &merge_audio_tracks_arg_value) {
+    pa_default_sources = get_pulseaudio_default_inputs();
+
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
         for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&merge_audio_tracks_arg_value](const AudioRow *audio_row) {
             if(!merge_audio_tracks_arg_value.empty())
                 merge_audio_tracks_arg_value += '|';
-            merge_audio_tracks_arg_value += gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_row->input_list));
+            merge_audio_tracks_arg_value += audio_row_get_id(audio_row);
         });
 
         if(!merge_audio_tracks_arg_value.empty())
             args.insert(args.end(), { "-a", merge_audio_tracks_arg_value.c_str() });
     } else {
         for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&args](const AudioRow *audio_row) {
-            args.insert(args.end(), { "-a", gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_row->input_list)) });
+            args.insert(args.end(), { "-a", audio_row_get_id(audio_row) });
         });
     }
 }
@@ -1714,130 +1850,6 @@ static void gtk_widget_set_margin(GtkWidget *widget, int top, int bottom, int le
     gtk_widget_set_margin_bottom(widget, bottom);
     gtk_widget_set_margin_start(widget, left);
     gtk_widget_set_margin_end(widget, right);
-}
-
-static void pa_state_cb(pa_context *c, void *userdata) {
-    pa_context_state state = pa_context_get_state(c);
-    int *pa_ready = (int*)userdata;
-    switch(state) {
-        case PA_CONTEXT_UNCONNECTED:
-        case PA_CONTEXT_CONNECTING:
-        case PA_CONTEXT_AUTHORIZING:
-        case PA_CONTEXT_SETTING_NAME:
-        default:
-            break;
-        case PA_CONTEXT_FAILED:
-        case PA_CONTEXT_TERMINATED:
-            *pa_ready = 2;
-            break;
-        case PA_CONTEXT_READY:
-            *pa_ready = 1;
-            break;
-    }
-}
-
-static void pa_sourcelist_cb(pa_context*, const pa_source_info *source_info, int eol, void *userdata) {
-    if(eol > 0)
-        return;
-
-    std::vector<AudioInput> *inputs = (std::vector<AudioInput>*)userdata;
-    inputs->push_back({ source_info->name, source_info->description });
-}
-
-static std::vector<AudioInput> get_pulseaudio_inputs() {
-    std::vector<AudioInput> inputs;
-    pa_mainloop *main_loop = pa_mainloop_new();
-
-    pa_context *ctx = pa_context_new(pa_mainloop_get_api(main_loop), "gpu-screen-recorder-gtk");
-    pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL);
-    int state = 0;
-    int pa_ready = 0;
-    pa_context_set_state_callback(ctx, pa_state_cb, &pa_ready);
-
-    pa_operation *pa_op = NULL;
-
-    for(;;) {
-        // Not ready
-        if(pa_ready == 0) {
-            pa_mainloop_iterate(main_loop, 1, NULL);
-            continue;
-        }
-
-        switch(state) {
-            case 0: {
-                pa_op = pa_context_get_source_info_list(ctx, pa_sourcelist_cb, &inputs);
-                ++state;
-                break;
-            }
-        }
-
-        // Couldn't get connection to the server
-        if(pa_ready == 2 || (state == 1 && pa_op && pa_operation_get_state(pa_op) == PA_OPERATION_DONE)) {
-            if(pa_op)
-                pa_operation_unref(pa_op);
-            pa_context_disconnect(ctx);
-            pa_context_unref(ctx);
-            pa_mainloop_free(main_loop);
-            return inputs;
-        }
-
-        pa_mainloop_iterate(main_loop, 1, NULL);
-    }
-
-    pa_mainloop_free(main_loop);
-    return {};
-}
-
-static void server_info_callback(pa_context*, const pa_server_info *server_info, void *userdata) {
-    PulseAudioServerInfo *u = (PulseAudioServerInfo*)userdata;
-    if(server_info->default_sink_name)
-        u->default_sink_name = std::string(server_info->default_sink_name) + ".monitor";
-    if(server_info->default_source_name)
-        u->default_source_name = server_info->default_source_name;
-}
-
-static PulseAudioServerInfo get_pulseaudio_default_inputs() {
-    PulseAudioServerInfo server_info;
-    pa_mainloop *main_loop = pa_mainloop_new();
-
-    pa_context *ctx = pa_context_new(pa_mainloop_get_api(main_loop), "gpu-screen-recorder-gtk");
-    pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL);
-    int state = 0;
-    int pa_ready = 0;
-    pa_context_set_state_callback(ctx, pa_state_cb, &pa_ready);
-
-    pa_operation *pa_op = NULL;
-
-    for(;;) {
-        // Not ready
-        if(pa_ready == 0) {
-            pa_mainloop_iterate(main_loop, 1, NULL);
-            continue;
-        }
-
-        switch(state) {
-            case 0: {
-                pa_op = pa_context_get_server_info(ctx, server_info_callback, &server_info);
-                ++state;
-                break;
-            }
-        }
-
-        // Couldn't get connection to the server
-        if(pa_ready == 2 || (state == 1 && pa_op && pa_operation_get_state(pa_op) == PA_OPERATION_DONE)) {
-            if(pa_op)
-                pa_operation_unref(pa_op);
-            pa_context_disconnect(ctx);
-            pa_context_unref(ctx);
-            pa_mainloop_free(main_loop);
-            return server_info;
-        }
-
-        pa_mainloop_iterate(main_loop, 1, NULL);
-    }
-
-    pa_mainloop_free(main_loop);
-    return server_info;
 }
 
 static void record_area_item_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -2369,7 +2381,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(audio_grid, GTK_WIDGET(add_audio_grid), 0, audio_input_area_row++, 1, 1);
 
     // TODO:
-    const PulseAudioServerInfo pa_server_info = get_pulseaudio_default_inputs();
+    //const PulseAudioServerInfo pa_server_info = get_pulseaudio_default_inputs();
 
     // if(!pa_server_info.default_sink_name.empty() && audio_inputs_contains(audio_inputs, pa_server_info.default_sink_name)) {
     //     gtk_combo_box_text_append(audio_input_menu_todo, pa_server_info.default_sink_name.c_str(), "Default output");
@@ -2495,7 +2507,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         return true;
     }), nullptr);
 
-    show_notification_button = gtk_check_button_new_with_label("Show status notifications");
+    show_notification_button = gtk_check_button_new_with_label("Show video saved notification");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_notification_button), true);
     gtk_widget_set_halign(show_notification_button, GTK_ALIGN_START);
     gtk_grid_attach(grid, show_notification_button, 0, grid_row++, 2, 1);
