@@ -57,6 +57,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.4.1" date="2024-01-16">
+            <description>
+                <p>Improve audio drifting in some cases</p>
+            </description>
+        </release>
         <release version="3.4.0" date="2024-01-07">
             <description>
                 <p>Add option to pause recording</p>
