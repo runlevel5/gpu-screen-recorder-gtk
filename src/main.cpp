@@ -1038,7 +1038,7 @@ struct CustomKeyName {
 };
 
 static int key_get_name(KeySym key_sym, char *buffer, int buffer_size) {
-    if(buffer_size == 0)
+    if(buffer_size == 0 || key_sym == None)
         return 0;
 
     #define CUSTOM_KEY_NAME_LEN 23
@@ -1965,6 +1965,19 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
         return GDK_FILTER_CONTINUE;
     }
 
+    if(ev->type == KeyPress && key_sym == XK_BackSpace) {
+        if(pressed_hotkey.modkey_mask == None && pressed_hotkey.keysym == None) {
+            ungrab_keyboard(display);
+            gtk_entry_set_text(GTK_ENTRY(current_hotkey->hotkey_entry), "");
+            current_hotkey->keysym = None;
+            current_hotkey->modkey_mask = 0;
+            current_hotkey = nullptr;
+            hotkey_mode = HotkeyMode::Record;
+            save_configs();
+        }
+        return GDK_FILTER_CONTINUE;
+    }
+
     if(ev->type == KeyPress) {
         // Ignore already pressed key
         if(key_is_modifier(key_sym)) {
@@ -2553,7 +2566,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
         gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 5, 1);
         gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
     } else {
-        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
 
         GtkWidget *a = gtk_label_new("Press");
@@ -2667,7 +2680,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
         gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 5, 1);
         gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
     } else {
-        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
 
         GtkWidget *a = gtk_label_new("Press");
@@ -2771,7 +2784,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
         gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 3, 1);
         gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
     } else {
-        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey or Esc to cancel");
+        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
 
         GtkWidget *a = gtk_label_new("Press");
@@ -3003,7 +3016,7 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
-    if(!wayland && config.streaming_config.start_recording_hotkey.keysym) {
+    if(!wayland && streaming_hotkey_button && !config_empty) {
         streaming_hotkey.keysym = config.streaming_config.start_recording_hotkey.keysym;
         streaming_hotkey.modkey_mask = config.streaming_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(streaming_hotkey_button), streaming_hotkey);
@@ -3011,12 +3024,12 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_button_set_label(record_file_chooser_button, config.record_config.save_directory.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(record_container), config.record_config.container.c_str());
-    if(!wayland && config.record_config.start_recording_hotkey.keysym) {
+    if(!wayland && record_hotkey_button && !config_empty) {
         record_hotkey.keysym = config.record_config.start_recording_hotkey.keysym;
         record_hotkey.modkey_mask = config.record_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(record_hotkey_button), record_hotkey);
     }
-    if(!wayland && config.record_config.pause_recording_hotkey.keysym) {
+    if(!wayland && pause_unpause_hotkey_button && !config_empty) {
         pause_unpause_hotkey.keysym = config.record_config.pause_recording_hotkey.keysym;
         pause_unpause_hotkey.modkey_mask = config.record_config.pause_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(pause_unpause_hotkey_button), pause_unpause_hotkey);
@@ -3025,12 +3038,12 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_button_set_label(replay_file_chooser_button, config.replay_config.save_directory.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(replay_container), config.replay_config.container.c_str());
     gtk_spin_button_set_value(replay_time_entry, config.replay_config.replay_time);
-    if(!wayland && config.replay_config.start_recording_hotkey.keysym) {
+    if(!wayland && replay_start_stop_hotkey_button && !config_empty) {
         replay_start_stop_hotkey.keysym = config.replay_config.start_recording_hotkey.keysym;
         replay_start_stop_hotkey.modkey_mask = config.replay_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(replay_start_stop_hotkey_button), replay_start_stop_hotkey);
     }
-    if(!wayland && config.replay_config.save_recording_hotkey.keysym) {
+    if(!wayland && replay_save_hotkey_button && !config_empty) {
         replay_save_hotkey.keysym = config.replay_config.save_recording_hotkey.keysym;
         replay_save_hotkey.modkey_mask = config.replay_config.save_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(replay_save_hotkey_button), replay_save_hotkey);
