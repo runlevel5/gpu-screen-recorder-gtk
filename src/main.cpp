@@ -91,6 +91,17 @@ static GtkGrid *overclock_grid;
 static GtkWidget *overclock_button;
 static GtkButton *remove_password_prompts_button = NULL;
 static GtkButton *restore_password_prompts_button = NULL;
+static GtkGrid *recording_bottom_panel_grid;
+static GtkWidget *recording_record_time_label;
+static GtkWidget *recording_record_icon;
+static GtkGrid *streaming_bottom_panel_grid;
+static GtkWidget *streaming_record_time_label;
+static GtkGrid *replay_bottom_panel_grid;
+static GtkWidget *replay_record_time_label;
+
+static double record_start_time_sec = 0.0;
+static double pause_start_sec = 0.0;
+static double paused_time_offset_sec = 0.0;
 
 static XIM xim;
 static XIC xic;
@@ -221,6 +232,14 @@ static bool flatpak_is_installed_as_system(void) {
         installed_as_system = system("flatpak-spawn --host flatpak run --system --command=pwd com.dec05eba.gpu_screen_recorder") == 0;
     }
     return installed_as_system;
+}
+
+static double clock_get_monotonic_seconds(void) {
+    struct timespec ts;
+    ts.tv_sec = 0;
+    ts.tv_nsec = 0;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 0.000000001;
 }
 
 static void pa_state_cb(pa_context *c, void *userdata) {
@@ -1494,6 +1513,9 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), true);
         gtk_widget_set_sensitive(GTK_WIDGET(replay_save_button), false);
 
+        gtk_widget_set_opacity(GTK_WIDGET(replay_bottom_panel_grid), 0.5);
+        gtk_label_set_text(GTK_LABEL(replay_record_time_label), "00:00:00");
+
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
@@ -1587,6 +1609,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     replaying = true;
     gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), false);
     gtk_widget_set_sensitive(GTK_WIDGET(replay_save_button), true);
+    gtk_widget_set_opacity(GTK_WIDGET(replay_bottom_panel_grid), 1.0);
+    record_start_time_sec = clock_get_monotonic_seconds();
     return true;
 }
 
@@ -1601,10 +1625,15 @@ static gboolean on_replay_save_button_click(GtkButton*, gpointer userdata) {
 static gboolean on_pause_unpause_button_click(GtkButton*, gpointer) {
     kill(gpu_screen_recorder_process, SIGUSR2);
     paused = !paused;
-    if(paused)
+    if(paused) {
         gtk_button_set_label(pause_recording_button, "Unpause recording");
-    else
+        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "gtk-media-pause", GTK_ICON_SIZE_SMALL_TOOLBAR);
+        pause_start_sec = clock_get_monotonic_seconds();
+    } else {
         gtk_button_set_label(pause_recording_button, "Pause recording");
+        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+        paused_time_offset_sec += (clock_get_monotonic_seconds() - pause_start_sec);
+    }
     return true;
 }
 
@@ -1625,6 +1654,10 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         paused = false;
         gtk_widget_set_sensitive(GTK_WIDGET(pause_recording_button), false);
         gtk_button_set_label(pause_recording_button, "Pause recording");
+
+        gtk_widget_set_opacity(GTK_WIDGET(recording_bottom_panel_grid), 0.5);
+        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+        gtk_label_set_text(GTK_LABEL(recording_record_time_label), "00:00:00");
 
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
@@ -1723,6 +1756,9 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     recording = true;
     gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), false);
     gtk_widget_set_sensitive(GTK_WIDGET(pause_recording_button), true);
+    gtk_widget_set_opacity(GTK_WIDGET(recording_bottom_panel_grid), 1.0);
+    record_start_time_sec = clock_get_monotonic_seconds();
+    paused_time_offset_sec = 0.0;
     return true;
 }
 
@@ -1738,6 +1774,9 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         streaming = false;
         gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(stream_back_button), true);
+
+        gtk_widget_set_opacity(GTK_WIDGET(streaming_bottom_panel_grid), 0.5);
+        gtk_label_set_text(GTK_LABEL(streaming_record_time_label), "00:00:00");
 
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
@@ -1842,6 +1881,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
     streaming = true;
     gtk_widget_set_sensitive(GTK_WIDGET(stream_back_button), false);
+    gtk_widget_set_opacity(GTK_WIDGET(streaming_bottom_panel_grid), 1.0);
+    record_start_time_sec = clock_get_monotonic_seconds();
     return true;
 }
 
@@ -2659,6 +2700,22 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_sensitive(GTK_WIDGET(replay_save_button), false);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(replay_save_button), 2, 0, 1, 1);
 
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
+
+    replay_bottom_panel_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(replay_bottom_panel_grid), 0, row++, 5, 1);
+    gtk_grid_set_column_spacing(replay_bottom_panel_grid, 5);
+    gtk_widget_set_opacity(GTK_WIDGET(replay_bottom_panel_grid), 0.5);
+    gtk_widget_set_halign(GTK_WIDGET(replay_bottom_panel_grid), GTK_ALIGN_END);
+
+    GtkWidget *record_icon = gtk_image_new_from_icon_name("gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+    gtk_widget_set_valign(record_icon, GTK_ALIGN_CENTER);
+    gtk_grid_attach(replay_bottom_panel_grid, record_icon, 0, 0, 1, 1);
+
+    replay_record_time_label = gtk_label_new("00:00:00");
+    gtk_widget_set_valign(replay_record_time_label, GTK_ALIGN_CENTER);
+    gtk_grid_attach(replay_bottom_panel_grid, replay_record_time_label, 1, 0, 1, 1);
+
     return GTK_WIDGET(grid);
 }
 
@@ -2747,9 +2804,9 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_combo_box_set_active(GTK_COMBO_BOX(record_container), 0); // TODO:
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 5, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
+
     record_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
     gtk_widget_set_hexpand(GTK_WIDGET(record_back_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(record_back_button), 0, 0, 1, 1);
@@ -2764,6 +2821,22 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     g_signal_connect(pause_recording_button, "clicked", G_CALLBACK(on_pause_unpause_button_click), app);
     gtk_widget_set_sensitive(GTK_WIDGET(pause_recording_button), false);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(pause_recording_button), 2, 0, 1, 1);
+
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
+
+    recording_bottom_panel_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(recording_bottom_panel_grid), 0, row++, 5, 1);
+    gtk_grid_set_column_spacing(recording_bottom_panel_grid, 5);
+    gtk_widget_set_opacity(GTK_WIDGET(recording_bottom_panel_grid), 0.5);
+    gtk_widget_set_halign(GTK_WIDGET(recording_bottom_panel_grid), GTK_ALIGN_END);
+
+    recording_record_icon = gtk_image_new_from_icon_name("gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+    gtk_widget_set_valign(recording_record_icon, GTK_ALIGN_CENTER);
+    gtk_grid_attach(recording_bottom_panel_grid, recording_record_icon, 0, 0, 1, 1);
+
+    recording_record_time_label = gtk_label_new("00:00:00");
+    gtk_widget_set_valign(recording_record_time_label, GTK_ALIGN_CENTER);
+    gtk_grid_attach(recording_bottom_panel_grid, recording_record_time_label, 1, 0, 1, 1);
 
     return GTK_WIDGET(grid);
 }
@@ -2844,6 +2917,22 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     g_signal_connect(start_streaming_button, "clicked", G_CALLBACK(on_start_streaming_button_click), app);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(start_streaming_button), 1, 0, 1, 1);
 
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+
+    streaming_bottom_panel_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(streaming_bottom_panel_grid), 0, row++, 3, 1);
+    gtk_grid_set_column_spacing(streaming_bottom_panel_grid, 5);
+    gtk_widget_set_opacity(GTK_WIDGET(streaming_bottom_panel_grid), 0.5);
+    gtk_widget_set_halign(GTK_WIDGET(streaming_bottom_panel_grid), GTK_ALIGN_END);
+
+    GtkWidget *record_icon = gtk_image_new_from_icon_name("gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+    gtk_widget_set_valign(record_icon, GTK_ALIGN_CENTER);
+    gtk_grid_attach(streaming_bottom_panel_grid, record_icon, 0, 0, 1, 1);
+
+    streaming_record_time_label = gtk_label_new("00:00:00");
+    gtk_widget_set_valign(streaming_record_time_label, GTK_ALIGN_CENTER);
+    gtk_grid_attach(streaming_bottom_panel_grid, streaming_record_time_label, 1, 0, 1, 1);
+
     return GTK_WIDGET(grid);
 }
 
@@ -2860,23 +2949,63 @@ static gboolean on_destroy_window(GtkWidget*, GdkEvent*, gpointer) {
     return true;
 }
 
-static gboolean handle_child_process_death(gpointer userdata) {
-    if(gpu_screen_recorder_process != -1) {
-        int status = 0;
-        if(waitpid(gpu_screen_recorder_process, &status, WNOHANG) != 0) {
-            prev_exit_status = -1;
-            if(WIFEXITED(status))
-                prev_exit_status = WEXITSTATUS(status);
+static void handle_child_process_death(gpointer userdata) {
+    if(gpu_screen_recorder_process == -1)
+        return;
 
-            if(replaying) {
-                on_start_replay_button_click(start_replay_button, userdata);
-            } else if(recording) {
-                on_start_recording_button_click(start_recording_button, userdata);
-            } else if(streaming) {
-                on_start_streaming_button_click(start_streaming_button, userdata);
-            }
-        }
+    int status = 0;
+    if(waitpid(gpu_screen_recorder_process, &status, WNOHANG) == 0)
+        return;
+
+    prev_exit_status = -1;
+    if(WIFEXITED(status))
+        prev_exit_status = WEXITSTATUS(status);
+
+    if(replaying) {
+        on_start_replay_button_click(start_replay_button, userdata);
+    } else if(recording) {
+        on_start_recording_button_click(start_recording_button, userdata);
+    } else if(streaming) {
+        on_start_streaming_button_click(start_streaming_button, userdata);
     }
+}
+
+static void seconds_to_record_time_format(int seconds, char *buffer, size_t buffer_size) {
+    const int hours = seconds / 60 / 60;
+    seconds -= (hours * 60 * 60);
+
+    const int mins = seconds / 60;
+    seconds -= (mins * 60);
+
+    snprintf(buffer, buffer_size, "%02d:%02d:%02d", hours, mins, seconds);
+}
+
+static void handle_record_timer() {
+    if(streaming) {
+        const double recording_time_passed_seconds = clock_get_monotonic_seconds() - record_start_time_sec;
+        char record_time_str[32];
+        seconds_to_record_time_format(recording_time_passed_seconds, record_time_str, sizeof(record_time_str));
+        gtk_label_set_text(GTK_LABEL(streaming_record_time_label), record_time_str);
+    }
+
+    if(recording && !paused) {
+        const double recording_time_passed_seconds = (clock_get_monotonic_seconds() - record_start_time_sec) - paused_time_offset_sec;
+        char record_time_str[32];
+        seconds_to_record_time_format(recording_time_passed_seconds, record_time_str, sizeof(record_time_str));
+        gtk_label_set_text(GTK_LABEL(recording_record_time_label), record_time_str);
+    }
+
+    if(replaying) {
+        const double recording_time_passed_seconds = clock_get_monotonic_seconds() - record_start_time_sec;
+        char record_time_str[32];
+        seconds_to_record_time_format(recording_time_passed_seconds, record_time_str, sizeof(record_time_str));
+        gtk_label_set_text(GTK_LABEL(replay_record_time_label), record_time_str);
+    }
+}
+
+static gboolean timer_timeout_handler(gpointer userdata) {
+    handle_child_process_death(userdata);
+    handle_record_timer();
     return G_SOURCE_CONTINUE;
 }
 
@@ -3277,7 +3406,7 @@ static void activate(GtkApplication *app, gpointer) {
         gdk_window_add_filter(root_window, hotkey_filter_callback, &page_navigation_userdata);
     }
 
-    g_timeout_add(1000, handle_child_process_death, app);
+    g_timeout_add(500, timer_timeout_handler, app);
 
     gtk_widget_show_all(window);
     load_config(gpu_inf);
