@@ -23,13 +23,13 @@
         <p>
             This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few minutes are saved.
         </p>
-        Supported video codecs:
+        <p>Supported video codecs:</p>
         <ul>
             <li>H264 (default on Intel)</li>
             <li>HEVC (default on AMD and NVIDIA)</li>
             <li>AV1 (not currently supported on NVIDIA in the flatpak)</li>
         </ul>
-        Supported audio codecs:
+        <p>Supported audio codecs:</p>
         <ul>
             <li>Opus (default)</li>
             <li>AAC</li>
