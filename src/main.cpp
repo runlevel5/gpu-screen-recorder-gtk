@@ -1627,11 +1627,11 @@ static gboolean on_pause_unpause_button_click(GtkButton*, gpointer) {
     paused = !paused;
     if(paused) {
         gtk_button_set_label(pause_recording_button, "Unpause recording");
-        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "gtk-media-pause", GTK_ICON_SIZE_SMALL_TOOLBAR);
+        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "media-playback-pause", GTK_ICON_SIZE_SMALL_TOOLBAR);
         pause_start_sec = clock_get_monotonic_seconds();
     } else {
         gtk_button_set_label(pause_recording_button, "Pause recording");
-        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
         paused_time_offset_sec += (clock_get_monotonic_seconds() - pause_start_sec);
     }
     return true;
@@ -1656,7 +1656,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         gtk_button_set_label(pause_recording_button, "Pause recording");
 
         gtk_widget_set_opacity(GTK_WIDGET(recording_bottom_panel_grid), 0.5);
-        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+        gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
         gtk_label_set_text(GTK_LABEL(recording_record_time_label), "00:00:00");
 
         if(exit_status == 10) {
@@ -2708,7 +2708,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_opacity(GTK_WIDGET(replay_bottom_panel_grid), 0.5);
     gtk_widget_set_halign(GTK_WIDGET(replay_bottom_panel_grid), GTK_ALIGN_END);
 
-    GtkWidget *record_icon = gtk_image_new_from_icon_name("gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+    GtkWidget *record_icon = gtk_image_new_from_icon_name("media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
     gtk_widget_set_valign(record_icon, GTK_ALIGN_CENTER);
     gtk_grid_attach(replay_bottom_panel_grid, record_icon, 0, 0, 1, 1);
 
@@ -2830,7 +2830,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_opacity(GTK_WIDGET(recording_bottom_panel_grid), 0.5);
     gtk_widget_set_halign(GTK_WIDGET(recording_bottom_panel_grid), GTK_ALIGN_END);
 
-    recording_record_icon = gtk_image_new_from_icon_name("gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+    recording_record_icon = gtk_image_new_from_icon_name("media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
     gtk_widget_set_valign(recording_record_icon, GTK_ALIGN_CENTER);
     gtk_grid_attach(recording_bottom_panel_grid, recording_record_icon, 0, 0, 1, 1);
 
@@ -2925,7 +2925,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_opacity(GTK_WIDGET(streaming_bottom_panel_grid), 0.5);
     gtk_widget_set_halign(GTK_WIDGET(streaming_bottom_panel_grid), GTK_ALIGN_END);
 
-    GtkWidget *record_icon = gtk_image_new_from_icon_name("gtk-media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+    GtkWidget *record_icon = gtk_image_new_from_icon_name("media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
     gtk_widget_set_valign(record_icon, GTK_ALIGN_CENTER);
     gtk_grid_attach(streaming_bottom_panel_grid, record_icon, 0, 0, 1, 1);
 
