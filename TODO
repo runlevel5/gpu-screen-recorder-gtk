@@ -19,3 +19,4 @@ Add option to start replay on system startup (use the gpu screen recorder system
     Add note about replaying can get bugged on suspend unless nvidia reg for suspend is added (because cuda breaks, nvidia driver bug).
     Detect suspend before it happens and unload cuda/nvenc then and reload after suspend. This is a workaround to nvidia driver bug that breaks cuda on suspend.
 The program should minimize to taskbar on minimize.
+Fix issue where flatpak update removes cap on kms server, requiring removing password prompt again. Maybe have a kms server proxy that only does execvp kms server, and setcap on that (after moving it to ~/.cache, or something like that).
