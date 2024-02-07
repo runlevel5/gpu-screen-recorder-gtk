@@ -114,6 +114,9 @@ static std::map<std::string, std::string> get_xdg_variables() {
         if(len < 2)
             continue;
 
+        if(line[0] == '#')
+            continue;
+
         if(line[len - 1] == '\n') {
             line[len - 1] = '\0';
             len--;
