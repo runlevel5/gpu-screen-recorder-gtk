@@ -4,6 +4,7 @@
 #include <string>
 #include <string.h>
 #include <functional>
+#include <map>
 #include <unistd.h>
 #include <limits.h>
 #include <inttypes.h>
@@ -89,15 +90,66 @@ static std::string get_config_dir() {
     return config_dir;
 }
 
-static std::string get_videos_dir() {
-    std::string videos_dir;
-    const char *xdg_videos_dir = getenv("XDG_VIDEOS_DIR");
-    if(xdg_videos_dir) {
-        videos_dir = xdg_videos_dir;
+// Whoever designed xdg-user-dirs is retarded. Why are some XDG variables environment variables
+// while others are in this pseudo shell config file ~/.config/user-dirs.dirs
+static std::map<std::string, std::string> get_xdg_variables() {
+    std::string user_dirs_filepath;
+    const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
+    if(xdg_config_home) {
+        user_dirs_filepath = xdg_config_home;
     } else {
-        videos_dir = get_home_dir() + "/Videos";
+        user_dirs_filepath = get_home_dir() + "/.config";
     }
-    return videos_dir;
+
+    user_dirs_filepath += "/user-dirs.dirs";
+
+    std::map<std::string, std::string> result;
+    FILE *f = fopen(user_dirs_filepath.c_str(), "rb");
+    if(!f)
+        return result;
+
+    char line[PATH_MAX];
+    while(fgets(line, sizeof(line), f)) {
+        int len = strlen(line);
+        if(len < 2)
+            continue;
+
+        if(line[len - 1] == '\n') {
+            line[len - 1] = '\0';
+            len--;
+        }
+
+        if(line[len - 1] != '"')
+            continue;
+
+        line[len - 1] = '\0';
+        len--;
+
+        const char *sep = strchr(line, '=');
+        if(!sep)
+            continue;
+
+        if(sep[1] != '\"')
+            continue;
+
+        std::string value(sep + 2);
+        if(strncmp(value.c_str(), "$HOME/", 6) == 0)
+            value = get_home_dir() + value.substr(5);
+
+        std::string key(line, sep - line);
+        result[std::move(key)] = std::move(value);
+    }
+
+    fclose(f);
+    return result;
+}
+
+static std::string get_videos_dir() {
+    auto xdg_vars = get_xdg_variables();
+    std::string xdg_videos_dir = xdg_vars["XDG_VIDEOS_DIR"];
+    if(xdg_videos_dir.empty())
+        xdg_videos_dir = get_home_dir() + "/Videos";
+    return xdg_videos_dir;
 }
 
 static int create_directory_recursive(char *path) {
