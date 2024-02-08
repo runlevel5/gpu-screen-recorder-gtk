@@ -8,7 +8,6 @@
 
 #include <wayland-client.h>
 #include <wayland-egl.h>
-#include "../external/wlr-export-dmabuf-unstable-v1-client-protocol.h"
 #include <unistd.h>
 
 static void output_handle_geometry(void *data, struct wl_output *wl_output,
@@ -102,12 +101,6 @@ static void registry_add_object(void *data, struct wl_registry *registry, uint32
             .name = NULL,
         };
         wl_output_add_listener(gsr_output->output, &output_listener, gsr_output);
-    } else if(strcmp(interface, zwlr_export_dmabuf_manager_v1_interface.name) == 0) {
-        if(egl->wayland.export_manager) {
-            zwlr_export_dmabuf_manager_v1_destroy(egl->wayland.export_manager);
-            egl->wayland.export_manager = NULL;
-        }
-        egl->wayland.export_manager = wl_registry_bind(registry, name, &zwlr_export_dmabuf_manager_v1_interface, 1);
     }
 }
 
@@ -318,11 +311,6 @@ void gsr_egl_unload(gsr_egl *self) {
         self->x11.window = None;
     }
 
-    if(self->wayland.export_manager) {
-        zwlr_export_dmabuf_manager_v1_destroy(self->wayland.export_manager);
-        self->wayland.export_manager = NULL;
-    }
-
     if(self->wayland.window) {
         wl_egl_window_destroy(self->wayland.window);
         self->wayland.window = NULL;
@@ -372,12 +360,4 @@ void gsr_egl_unload(gsr_egl *self) {
     }
 
     memset(self, 0, sizeof(gsr_egl));
-}
-
-bool gsr_egl_supports_wayland_capture(gsr_egl *self) {
-    // TODO: wlroots capture is broken right now (black screen) on amd and multiple monitors
-    // so it has to be disabled right now. Find out why it happens and fix it.
-    (void)self;
-    return false;
-    //return !!self->wayland.export_manager && self->wayland.num_outputs > 0;
 }

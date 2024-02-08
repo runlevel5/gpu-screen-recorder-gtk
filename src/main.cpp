@@ -117,7 +117,6 @@ static std::string record_file_current_filename;
 static bool nvfbc_installed = false;
 
 static bool wayland = false;
-static char drm_card_path[128];
 static gsr_egl egl;
 
 struct AudioInput {
@@ -664,7 +663,7 @@ static const XRRModeInfo* get_mode_info(const XRRScreenResources *sr, RRMode id)
     return NULL;
 }
 
-static void for_each_active_monitor_output_x11(Display *display, active_monitor_callback &callback, void *userdata) {
+static void for_each_active_monitor_output_x11(Display *display, active_monitor_callback callback, void *userdata) {
     XRRScreenResources *screen_res = XRRGetScreenResources(display, DefaultRootWindow(display));
     if(!screen_res)
         return;
@@ -738,10 +737,7 @@ static bool connector_get_property_by_name(int drmfd, drmModeConnectorPtr props,
     return false;
 }
 
-static void for_each_active_monitor_output_wayland(gsr_egl *egl, active_monitor_callback callback, void *userdata) {
-    if(!gsr_egl_supports_wayland_capture(egl))
-        return;
-
+static void for_each_active_monitor_output_wayland(const gsr_egl *egl, active_monitor_callback callback, void *userdata) {
     for(int i = 0; i < egl->wayland.num_outputs; ++i) {
         if(!egl->wayland.outputs[i].name)
             continue;
@@ -757,8 +753,8 @@ static void for_each_active_monitor_output_wayland(gsr_egl *egl, active_monitor_
     }
 }
 
-static void for_each_active_monitor_output_drm(const char *drm_card_path, active_monitor_callback callback, void *userdata) {
-    int fd = open(drm_card_path, O_RDONLY);
+static void for_each_active_monitor_output_drm(const gsr_egl *egl, active_monitor_callback callback, void *userdata) {
+    int fd = open(egl->card_path, O_RDONLY);
     if(fd == -1)
         return;
 
@@ -813,16 +809,16 @@ static void for_each_active_monitor_output_drm(const char *drm_card_path, active
     close(fd);
 }
 
-static void for_each_active_monitor_output(void *connection, gsr_connection_type connection_type, active_monitor_callback callback, void *userdata) {
+static void for_each_active_monitor_output(const gsr_egl *egl, gsr_connection_type connection_type, active_monitor_callback callback, void *userdata) {
     switch(connection_type) {
         case GSR_CONNECTION_X11:
-            for_each_active_monitor_output_x11((Display*)connection, callback, userdata);
+            for_each_active_monitor_output_x11(egl->x11.dpy, callback, userdata);
             break;
         case GSR_CONNECTION_WAYLAND:
-            for_each_active_monitor_output_wayland((gsr_egl*)connection, callback, userdata);
+            for_each_active_monitor_output_wayland(egl, callback, userdata);
             break;
         case GSR_CONNECTION_DRM:
-            for_each_active_monitor_output_drm((const char*)connection, callback, userdata);
+            for_each_active_monitor_output_drm(egl, callback, userdata);
             break;
     }
 }
@@ -1293,7 +1289,7 @@ static HotkeyResult replace_grabbed_keys_depending_on_active_page() {
 
 static bool show_pkexec_flatpak_error_if_needed() {
     const std::string window_str = record_area_selection_menu_get_active_id();
-    if(!gsr_egl_supports_wayland_capture(&egl) && (wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA) && window_str != "window" && window_str != "focused") {
+    if((wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA) && window_str != "window" && window_str != "focused") {
         if(!is_pkexec_installed()) {
             GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "pkexec needs to be installed to record a monitor with an AMD/Intel GPU. Please install and run polkit. Alternatively, record a single window which doesn't require root access.");
@@ -2153,18 +2149,11 @@ static bool audio_inputs_contains(const std::vector<AudioInput> &audio_inputs, c
     return false;
 }
 
-static void get_connection_by_active_type(void **connection, gsr_connection_type *connection_type) {
+static gsr_connection_type get_connection_type() {
     if(wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
-        if(gsr_egl_supports_wayland_capture(&egl)) {
-            *connection = &egl;
-            *connection_type = GSR_CONNECTION_WAYLAND;
-        } else {
-            *connection = (void*)drm_card_path;
-            *connection_type = GSR_CONNECTION_DRM;
-        }
+        return GSR_CONNECTION_DRM;
     } else {
-        *connection = gdk_x11_get_default_xdisplay();
-        *connection_type = GSR_CONNECTION_X11;
+        return GSR_CONNECTION_X11;
     }
 }
 
@@ -2284,7 +2273,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
 
-    if(is_inside_flatpak() && flatpak_is_installed_as_system() && drm_card_path[0] != '\0') {
+    if(is_inside_flatpak() && flatpak_is_installed_as_system() && egl.card_path[0] != '\0') {
         GtkGrid *password_prompt_grid = GTK_GRID(gtk_grid_new());
         gtk_grid_attach(grid, GTK_WIDGET(password_prompt_grid), 0, grid_row++, 2, 1);
         gtk_grid_set_column_spacing(password_prompt_grid, 10);
@@ -2344,11 +2333,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_list_store_set(store, &iter, 1, "screen", -1);
         }
 
-        void *connection = NULL;
-        gsr_connection_type connection_type = GSR_CONNECTION_DRM;
-        get_connection_by_active_type(&connection, &connection_type);
+        gsr_connection_type connection_type = get_connection_type();
 
-        for_each_active_monitor_output(connection, connection_type, [&](const gsr_monitor *monitor, void*) {
+        for_each_active_monitor_output(&egl, connection_type, [&](const gsr_monitor *monitor, void*) {
             std::string label = "Monitor ";
             label.append(monitor->name, monitor->name_len);
             label += " (";
@@ -2356,8 +2343,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             label += "x";
             label += std::to_string(monitor->size.y);
             if(wayland) {
-                if(!gsr_egl_supports_wayland_capture(&egl))
-                    label += ", requires root access";
+                label += ", requires root access";
             } else if(gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
                 label += ", requires root access";
             }
@@ -3046,13 +3032,11 @@ static void load_config(const gpu_info &gpu_inf) {
     } else if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "screen") == 0) {
         //
     } else {
-        void *connection = NULL;
-        gsr_connection_type connection_type = GSR_CONNECTION_DRM;
-        get_connection_by_active_type(&connection, &connection_type);
+        gsr_connection_type connection_type = get_connection_type();
 
         bool found_monitor = false;
         int monitor_name_size = strlen(config.main_config.record_area_option.c_str());
-        for_each_active_monitor_output(connection, connection_type, [&](const gsr_monitor *monitor, void*) {
+        for_each_active_monitor_output(&egl, connection_type, [&](const gsr_monitor *monitor, void*) {
             if(first_monitor.empty()) {
                 first_monitor.assign(monitor->name, monitor->name_len);
             }
@@ -3265,7 +3249,7 @@ static bool is_xwayland(Display *dpy) {
         return true;
 
     bool xwayland_found = false;
-    for_each_active_monitor_output(dpy, GSR_CONNECTION_X11, [&xwayland_found](const gsr_monitor *monitor, void*) {
+    for_each_active_monitor_output_x11(dpy, [&xwayland_found](const gsr_monitor *monitor, void*) {
         if(monitor->name_len >= 8 && strncmp(monitor->name, "XWAYLAND", 8) == 0)
             xwayland_found = true;
         else if(memmem(monitor->name, monitor->name_len, "X11", 3))
@@ -3315,8 +3299,8 @@ static void activate(GtkApplication *app, gpointer) {
         return;
     }
 
-    if((gpu_inf.vendor != GPU_VENDOR_NVIDIA) || (wayland && !gsr_egl_supports_wayland_capture(&egl))) {
-        if(!gsr_get_valid_card_path(drm_card_path)) {
+    if((gpu_inf.vendor != GPU_VENDOR_NVIDIA) || wayland) {
+        if(!gsr_get_valid_card_path(egl.card_path)) {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "Failed to find a valid DRM card.");
             gtk_dialog_run(GTK_DIALOG(dialog));
@@ -3325,7 +3309,7 @@ static void activate(GtkApplication *app, gpointer) {
             return;
         }
     } else {
-        drm_card_path[0] = '\0';
+        egl.card_path[0] = '\0';
     }
 
     if(gpu_inf.vendor == GPU_VENDOR_NVIDIA) {

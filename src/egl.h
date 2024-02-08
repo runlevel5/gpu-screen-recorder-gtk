@@ -68,10 +68,8 @@ typedef struct {
     void *registry;
     void *surface;
     void *compositor;
-    void *export_manager;
     gsr_wayland_output outputs[GSR_MAX_OUTPUTS];
     int num_outputs;
-    gsr_wayland_output *output_to_capture;
 } gsr_wayland;
 
 typedef struct {
@@ -84,6 +82,7 @@ typedef struct {
 
     gsr_x11 x11;
     gsr_wayland wayland;
+    char card_path[128];
 
     EGLDisplay (*eglGetDisplay)(EGLNativeDisplayType display_id);
     unsigned int (*eglInitialize)(EGLDisplay dpy, int32_t *major, int32_t *minor);
@@ -101,8 +100,5 @@ typedef struct {
 
 bool gsr_egl_load(gsr_egl *self, Display *dpy, bool wayland);
 void gsr_egl_unload(gsr_egl *self);
-
-/* wayland protocol capture, does not include kms capture */
-bool gsr_egl_supports_wayland_capture(gsr_egl *self);
 
 #endif /* GSR_EGL_H */
