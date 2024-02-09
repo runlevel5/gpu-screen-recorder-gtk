@@ -26,6 +26,7 @@ struct MainConfig {
     int fps = 60;
     bool merge_audio_tracks = true;
     std::vector<std::string> audio_input;
+    std::string color_range;
     std::string quality;
     std::string codec; // Video codec
     std::string audio_codec;
@@ -316,6 +317,8 @@ static Config read_config(bool &config_empty) {
                 config.main_config.merge_audio_tracks = false;
         } else if(key == "main.audio_input") {
             config.main_config.audio_input.emplace_back(value.str, value.size);
+        } else if(key == "main.color_range") {
+            config.main_config.color_range.assign(value.str, value.size);
         } else if(key == "main.quality") {
             config.main_config.quality.assign(value.str, value.size);
         } else if(key == "main.codec") {
@@ -427,6 +430,7 @@ static void save_config(const Config &config) {
     for(const std::string &audio_input : config.main_config.audio_input) {
         fprintf(file, "main.audio_input %s\n", audio_input.c_str());
     }
+    fprintf(file, "main.color_range %s\n", config.main_config.color_range.c_str());
     fprintf(file, "main.quality %s\n", config.main_config.quality.c_str());
     fprintf(file, "main.codec %s\n", config.main_config.codec.c_str());
     fprintf(file, "main.audio_codec %s\n", config.main_config.audio_codec.c_str());

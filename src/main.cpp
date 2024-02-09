@@ -53,6 +53,7 @@ static GtkTreeModel *record_area_selection_model;
 static GtkComboBoxText *quality_input_menu;
 static GtkComboBoxText *video_codec_input_menu;
 static GtkComboBoxText *audio_codec_input_menu;
+static GtkComboBoxText *color_range_input_menu;
 static GtkComboBoxText *framerate_mode_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
 static GtkComboBoxText *record_container;
@@ -85,6 +86,7 @@ static GtkWidget *merge_audio_tracks_button;
 static GtkWidget *show_notification_button;
 static GtkGrid *video_codec_grid;
 static GtkGrid *audio_codec_grid;
+static GtkGrid *color_range_grid;
 static GtkGrid *framerate_mode_grid;
 static GtkComboBoxText *view_combo_box;
 static GtkGrid *overclock_grid;
@@ -599,6 +601,7 @@ static void save_configs() {
     for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [](const AudioRow *audio_row) {
         config.main_config.audio_input.push_back(gtk_combo_box_text_get_active_text(audio_row->input_list));
     });
+    config.main_config.color_range = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
     config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     config.main_config.codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     config.main_config.audio_codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
@@ -1553,6 +1556,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     std::string replay_time_str = std::to_string(replay_time);
 
     const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(replay_container));
+    const gchar* color_range_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
@@ -1562,7 +1566,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-r", replay_time_str.c_str(), "-o", dir
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cr", color_range_input_str, "-r", replay_time_str.c_str(), "-o", dir
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -1700,6 +1704,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     std::string fps_str = std::to_string(fps);
 
     const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_container));
+    const gchar* color_range_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
@@ -1709,7 +1714,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-o", record_file_current_filename.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cr", color_range_input_str, "-o", record_file_current_filename.c_str()
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -1827,6 +1832,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     }
 
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
+    const gchar* color_range_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
@@ -1835,7 +1841,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-o", stream_url.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cr", color_range_input_str, "-o", stream_url.c_str()
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -1903,6 +1909,7 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     (void)userdata;
     const gchar *selected_view = gtk_combo_box_get_active_id(widget);
     const bool advanced_view = strcmp(selected_view, "advanced") == 0;
+    gtk_widget_set_visible(GTK_WIDGET(color_range_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(video_codec_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(framerate_mode_grid), advanced_view);
@@ -2465,6 +2472,16 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_spin_button_set_value(fps_entry, 60.0);
     gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
     gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
+
+    color_range_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(color_range_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(color_range_grid, gtk_label_new("Color range: "), 0, 0, 1, 1);
+    color_range_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(color_range_input_menu, "limited", "Limited");
+    gtk_combo_box_text_append(color_range_input_menu, "full", "Full");
+    gtk_widget_set_hexpand(GTK_WIDGET(color_range_input_menu), true);
+    gtk_grid_attach(color_range_grid, GTK_WIDGET(color_range_input_menu), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(color_range_input_menu), 0);
 
     GtkGrid *quality_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(quality_grid), 0, grid_row++, 2, 1);
@@ -3076,6 +3093,9 @@ static void load_config(const gpu_info &gpu_inf) {
     else if(config.main_config.fps > 5000)
         config.main_config.fps = 5000;
 
+    if(config.main_config.color_range != "limited" && config.main_config.color_range != "full")
+        config.main_config.color_range = "limited";
+
     if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
         config.main_config.quality = "very_high";
 
@@ -3120,6 +3140,7 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config_empty && config.main_config.audio_input.empty())
         add_audio_input_track("Default output");
 
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(color_range_input_menu), config.main_config.color_range.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(quality_input_menu), config.main_config.quality.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_codec_input_menu), config.main_config.audio_codec.c_str());
