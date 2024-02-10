@@ -165,6 +165,7 @@ struct SupportedVideoCodecs {
 };
 
 static SupportedVideoCodecs supported_video_codecs;
+static bool got_supported_video_codecs = false;
 
 struct Container {
     const char *container_name;
@@ -2500,7 +2501,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
     video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
-    if(get_supported_video_codecs(&supported_video_codecs)) {
+    if(got_supported_video_codecs) {
         if(supported_video_codecs.h264) {
             gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
         }
@@ -3365,7 +3366,7 @@ static void activate(GtkApplication *app, gpointer) {
         }
     }
 
-    get_supported_video_codecs(&supported_video_codecs);
+    got_supported_video_codecs = get_supported_video_codecs(&supported_video_codecs);
 
     std::string window_title = "GPU Screen Recorder | Running on ";
     window_title += gpu_vendor_to_name(gpu_inf.vendor);
