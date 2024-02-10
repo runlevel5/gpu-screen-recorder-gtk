@@ -2507,18 +2507,18 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         }
         if(supported_video_codecs.hevc) {
             gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
-            if(wayland)
+            if(wayland && gpu_inf.vendor != GPU_VENDOR_NVIDIA)
                 gtk_combo_box_text_append(video_codec_input_menu, "h265_hdr", "HEVC (HDR)");
         }
         if(supported_video_codecs.av1) {
             gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
-            if(wayland)
+            if(wayland && gpu_inf.vendor != GPU_VENDOR_NVIDIA)
                 gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
         }
     } else {
         gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
         gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
-        if(wayland)
+        if(wayland && gpu_inf.vendor != GPU_VENDOR_NVIDIA)
             gtk_combo_box_text_append(video_codec_input_menu, "h265_hdr", "HEVC (HDR)");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(video_codec_input_menu), true);
@@ -3112,7 +3112,7 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265" && config.main_config.codec != "hevc" && config.main_config.codec != "av1" && config.main_config.codec != "hevc_hdr" && config.main_config.codec != "av1_hdr")
         config.main_config.codec = "auto";
 
-    if(!wayland && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
+    if((!wayland || gpu_inf.vendor == GPU_VENDOR_NVIDIA) && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
         config.main_config.codec = "auto";
 
     if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac" && config.main_config.audio_codec != "flac")
