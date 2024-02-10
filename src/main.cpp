@@ -2501,15 +2501,24 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
     if(get_supported_video_codecs(&supported_video_codecs)) {
-        if(supported_video_codecs.h264)
+        if(supported_video_codecs.h264) {
             gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
-        if(supported_video_codecs.hevc)
+        }
+        if(supported_video_codecs.hevc) {
             gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
-        if(supported_video_codecs.av1)
+            if(wayland)
+                gtk_combo_box_text_append(video_codec_input_menu, "h265_hdr", "HEVC (HDR)");
+        }
+        if(supported_video_codecs.av1) {
             gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
+            if(wayland)
+                gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
+        }
     } else {
         gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
         gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
+        if(wayland)
+            gtk_combo_box_text_append(video_codec_input_menu, "h265_hdr", "HEVC (HDR)");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(video_codec_input_menu), true);
     gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_input_menu), 1, 0, 1, 1);
@@ -3099,7 +3108,10 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
         config.main_config.quality = "very_high";
 
-    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265" && config.main_config.codec != "av1")
+    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265" && config.main_config.codec != "hevc" && config.main_config.codec != "av1" && config.main_config.codec != "hevc_hdr" && config.main_config.codec != "av1_hdr")
+        config.main_config.codec = "auto";
+
+    if(!wayland && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
         config.main_config.codec = "auto";
 
     if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac" && config.main_config.audio_codec != "flac")
