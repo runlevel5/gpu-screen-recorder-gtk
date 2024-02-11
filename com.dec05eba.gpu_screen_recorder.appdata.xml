@@ -69,6 +69,16 @@
     </screenshots>
 
     <releases>
+        <release version="3.5.0" date="2024-02-11">
+            <description>
+                <ul>
+                    <li>Support monitor rotation</li>
+                    <li>Support hdr capture on amd/intel wayland (currently missing hdr metadata because of driver bugs)</li>
+                    <li>Default to variable framerate videos on nvidia x11 as well</li>
+                    <li>Center capture window/follow focused and clear background</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.4.2" date="2024-01-27">
             <description>
                 <ul>
