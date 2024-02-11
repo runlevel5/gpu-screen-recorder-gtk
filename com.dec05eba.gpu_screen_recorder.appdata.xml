@@ -69,6 +69,14 @@
     </screenshots>
 
     <releases>
+        <release version="3.5.1" date="2024-02-11">
+            <description>
+                <ul>
+                    <li>Fix crash on x11 nvidia when recording monitor</li>
+                    <li>Fix color issue when recording window on amd/intel</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.5.0" date="2024-02-11">
             <description>
                 <ul>
