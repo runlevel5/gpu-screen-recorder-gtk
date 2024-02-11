@@ -76,6 +76,7 @@
                     <li>Support hdr capture on amd/intel wayland (currently missing hdr metadata because of driver bugs)</li>
                     <li>Default to variable framerate videos on nvidia x11 as well</li>
                     <li>Center capture window/follow focused and clear background</li>
+                    <li>Remove 'remove password prompts' button. Only ask for password once and never again</li>
                 </ul>
             </description>
         </release>
