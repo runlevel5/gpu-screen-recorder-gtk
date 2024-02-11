@@ -2437,9 +2437,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
         }
         if(supported_video_codecs.hevc) {
-            gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
+            gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
             if(wayland && gpu_inf.vendor != GPU_VENDOR_NVIDIA)
-                gtk_combo_box_text_append(video_codec_input_menu, "h265_hdr", "HEVC (HDR)");
+                gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
         }
         if(supported_video_codecs.av1) {
             gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
@@ -2448,9 +2448,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         }
     } else {
         gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
-        gtk_combo_box_text_append(video_codec_input_menu, "h265", "HEVC");
+        gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
         if(wayland && gpu_inf.vendor != GPU_VENDOR_NVIDIA)
-            gtk_combo_box_text_append(video_codec_input_menu, "h265_hdr", "HEVC (HDR)");
+            gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(video_codec_input_menu), true);
     gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_input_menu), 1, 0, 1, 1);
