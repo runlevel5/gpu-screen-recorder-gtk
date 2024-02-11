@@ -29,7 +29,7 @@ NVIDIA driver has a "feature" (read: bug) where it will downclock memory transfe
 ## Installation
 This program depends on [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
 Run `sudo ./install.sh` or if you are running Arch Linux, then you can find gpu screen recorder gtk on aur under the name gpu-screen-recorder-gtk-git (`yay -S gpu-screen-recorder-gtk-git`).\
-Dependencies needed when building using `build.sh` or `install.sh`: `gtk3 libx11 libxrandr libpulse libcap libdrm wayland-client`.\
+Dependencies needed when building using `build.sh` or `install.sh`: `gtk3 libx11 libxrandr libpulse libdrm wayland-client`.\
 You can also install gpu screen recorder (the gtk gui version) from [flathub](https://flathub.org/apps/details/com.dec05eba.gpu_screen_recorder). This flatpak includes gpu-screen-recorder so no need to install that first.\
 Note that if you use the flatpak version then you wont be able to use overclocking unless you set "Coolbits" NVIDIA X setting. See https://git.dec05eba.com/gpu-screen-recorder/about/ for more information and how to overcome this.
 

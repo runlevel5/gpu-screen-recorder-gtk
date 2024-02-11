@@ -21,7 +21,6 @@ extern "C" {
 }
 #include <xf86drmMode.h>
 #include <xf86drm.h>
-#include <sys/capability.h>
 
 typedef struct {
     Display *display;
@@ -91,8 +90,6 @@ static GtkGrid *framerate_mode_grid;
 static GtkComboBoxText *view_combo_box;
 static GtkGrid *overclock_grid;
 static GtkWidget *overclock_button;
-static GtkButton *remove_password_prompts_button = NULL;
-static GtkButton *restore_password_prompts_button = NULL;
 static GtkGrid *recording_bottom_panel_grid;
 static GtkWidget *recording_record_time_label;
 static GtkWidget *recording_record_icon;
@@ -2196,53 +2193,6 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
     return true;
 }
 
-static gboolean on_remove_password_prompts_button_click(GtkButton*, gpointer) {
-    int result = system("flatpak-spawn --host pkexec setcap cap_sys_admin+ep /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
-    if(result != 0) {
-        // This can happen on some distros such as OpenSUSE because setcap is not found by which by the user
-        // and neither pkexec, and only by the root user directly. In such cases we guess the path to setcap.
-        int result2 = system("flatpak-spawn --host pkexec /usr/sbin/setcap cap_sys_admin+ep /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
-        if(result2 == 0)
-            result = 0;
-    }
-    switch(result) {
-        case 0: {
-            gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
-            gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), true);
-            save_configs();
-            break;
-        }
-        case 127: {
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Unable to remove password prompts as it appears you don't have setcap installed on your system");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            break;
-        }
-        default: {
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Unable to remove password prompts (/var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server may not exist or it may be read-only or setcap is not installed on your system)");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            break;
-        }
-    }
-    return true;
-}
-
-static gboolean on_restore_password_prompts_button_click(GtkButton*, gpointer) {
-    int result = system("flatpak-spawn --host pkexec setcap -r /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/gsr-kms-server");
-    switch(result) {
-        case 0: {
-            gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), true);
-            gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
-            save_configs();
-            break;
-        }
-    }
-    return true;
-}
-
 static void record_area_set_sensitive(GtkCellLayout *cell_layout, GtkCellRenderer *cell, GtkTreeModel *tree_model, GtkTreeIter *iter, gpointer data) {
     (void)cell_layout;
     (void)data;
@@ -2280,25 +2230,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(simple_advanced_grid, GTK_WIDGET(view_combo_box), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
-
-    if(is_inside_flatpak() && flatpak_is_installed_as_system() && egl.card_path[0] != '\0') {
-        GtkGrid *password_prompt_grid = GTK_GRID(gtk_grid_new());
-        gtk_grid_attach(grid, GTK_WIDGET(password_prompt_grid), 0, grid_row++, 2, 1);
-        gtk_grid_set_column_spacing(password_prompt_grid, 10);
-
-        remove_password_prompts_button = GTK_BUTTON(gtk_button_new_with_label("Remove password prompts"));
-        gtk_widget_set_hexpand(GTK_WIDGET(remove_password_prompts_button), true);
-        gtk_grid_attach(password_prompt_grid, GTK_WIDGET(remove_password_prompts_button), 0, 0, 1, 1);
-        g_signal_connect(remove_password_prompts_button, "clicked", G_CALLBACK(on_remove_password_prompts_button_click), NULL);
-
-        restore_password_prompts_button = GTK_BUTTON(gtk_button_new_with_label("Restore password prompts"));
-        gtk_widget_set_hexpand(GTK_WIDGET(restore_password_prompts_button), true);
-        gtk_grid_attach(password_prompt_grid, GTK_WIDGET(restore_password_prompts_button), 1, 0, 1, 1);
-        g_signal_connect(restore_password_prompts_button, "clicked", G_CALLBACK(on_restore_password_prompts_button_click), NULL);
-
-        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), false);
-        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), false);
-    }
 
     GtkFrame *record_area_frame = GTK_FRAME(gtk_frame_new("Record area"));
     gtk_grid_attach(grid, GTK_WIDGET(record_area_frame), 0, grid_row++, 2, 1);
@@ -3035,18 +2966,6 @@ static void add_audio_input_track(const char *name) {
     gtk_list_box_insert (GTK_LIST_BOX(audio_input_used_list), row, -1);
 }
 
-// Checks for flatpak gsr kms server specifically
-static bool kms_server_has_admin_privileges(void) {
-    cap_t kms_server_cap = cap_get_file("/app/bin/gsr-kms-server");
-    if(kms_server_cap) {
-        cap_flag_value_t res = CAP_CLEAR;
-        cap_get_flag(kms_server_cap, CAP_SYS_ADMIN, CAP_PERMITTED, &res);
-        cap_free(kms_server_cap);
-        return res == CAP_SET;
-    }
-    return false;
-}
-
 static void load_config(const gpu_info &gpu_inf) {
     bool config_empty = false;
     config = read_config(config_empty);
@@ -3197,11 +3116,6 @@ static void load_config(const gpu_info &gpu_inf) {
     }
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
-    if(remove_password_prompts_button) {
-        bool password_prompts_removed = kms_server_has_admin_privileges();
-        gtk_widget_set_sensitive(GTK_WIDGET(remove_password_prompts_button), !password_prompts_removed);
-        gtk_widget_set_sensitive(GTK_WIDGET(restore_password_prompts_button), password_prompts_removed);
-    }
 
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
     if(!wayland) {
