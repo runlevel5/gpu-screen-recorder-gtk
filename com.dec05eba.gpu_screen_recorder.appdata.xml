@@ -43,13 +43,14 @@
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
         </p>
         <p>
-            Some distros such as manjaro disable hardware accelerated H264/HEVC which means GPU Screen Recorder wont work on AMD/Intel and you have to either switch to another distro or install mesa
-            from source (or install mesa-git for example).
+            Some distros such as manjaro and fedora disable hardware accelerated H264/HEVC which means GPU Screen Recorder wont work on AMD/Intel and you have to either switch to another distro or install mesa
+            from source (or install mesa-git for example). On fedora based distros you can follow this: <a href="https://rpmfusion.org/Howto/Multimedia">Hardware Accelerated Codec section</a>.
         </p>
         <p>
             Recording a single window is also only possible on X11. Hotkeys are not supported on wayland either (wayland doesn't really support this). Use X11 if you want a proper desktop experience in general.
         </p>
         <p>AV1 is currently not supported in the flatpak for Nvidia since GPU Screen Recorder uses an older ffmpeg version to support older Nvidia cards. Install GPU Screen Recorder from source or from AUR if you want to use AV1 on Nvidia.</p>
+        <p>On some Intel integrated GPUs the video can appear glitched when recording on Wayland. The only known workaround at the moment is to record on X11.</p>
     </description>
 
     <launchable type="desktop-id">com.dec05eba.gpu_screen_recorder.desktop</launchable>
