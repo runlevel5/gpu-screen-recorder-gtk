@@ -3130,8 +3130,8 @@ static void load_config(const gpu_info &gpu_inf) {
     if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor != GPU_VENDOR_NVIDIA && config.main_config.codec != "av1") {
         if(supported_video_codecs.av1) {
             GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
-                "Switched video codec to AV1 since H264/HEVC video encoding is either missing or disabled on your system. If your know that your system supports H264/HEVC video encoding then "
-                "try installing mesa-extra freedesktop runtime by running this command:\n"
+                "Switched video codec to AV1 since H264/HEVC video encoding is either missing or disabled on your system. If you know that your system supports H264/HEVC video encoding and "
+                "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
                 "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
                 "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.");
             gtk_dialog_run(GTK_DIALOG(dialog));
@@ -3140,8 +3140,8 @@ static void load_config(const gpu_info &gpu_inf) {
             gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
         } else {
             GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "H264/HEVC video encoding is either missing or disabled on your system. If your know that your system supports H264/HEVC video encoding then "
-                "try installing mesa-extra freedesktop runtime by running this command:\n"
+                "H264/HEVC video encoding is either missing or disabled on your system. If you know that your system supports H264/HEVC video encoding and "
+                "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
                 "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
                 "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.");
             gtk_dialog_run(GTK_DIALOG(dialog));
