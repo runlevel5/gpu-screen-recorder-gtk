@@ -43,7 +43,7 @@
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
         </p>
         <p>
-            If H264/HEVC video encoding is not available on your AMD/Intel system that you know supports those codecs then you may need to install mesa-extra freedesktop runtime by running this command: flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra
+            If H264/HEVC video encoding option is not available on your AMD/Intel system but you know that your supports those codecs then you may need to install mesa-extra freedesktop runtime by running this command: flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra
         </p>
         <p>
             Recording a single window is also only possible on X11. Hotkeys are not supported on wayland either (wayland doesn't really support this). Use X11 if you want a proper desktop experience in general.
@@ -69,6 +69,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.5.2" date="2024-02-14">
+            <description>
+                <p>Better error message for missing h264/hevc, ignore user nvidia vaapi setting</p>
+            </description>
+        </release>
         <release version="3.5.1" date="2024-02-11">
             <description>
                 <ul>
