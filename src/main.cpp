@@ -3133,7 +3133,8 @@ static void load_config(const gpu_info &gpu_inf) {
                 "Switched video codec to AV1 since H264/HEVC video encoding is either missing or disabled on your system. If you know that your system supports H264/HEVC video encoding and "
                 "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
                 "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
-                "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.");
+                "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
+                "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the flatpak version of GPU Screen Recorder instead which doesn't have this issue");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             config.main_config.codec = "av1";
@@ -3143,7 +3144,8 @@ static void load_config(const gpu_info &gpu_inf) {
                 "H264/HEVC video encoding is either missing or disabled on your system. If you know that your system supports H264/HEVC video encoding and "
                 "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
                 "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
-                "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.");
+                "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
+                "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the flatpak version of GPU Screen Recorder instead which doesn't have this issue");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(select_window_userdata.app));
