@@ -69,6 +69,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.5.3" date="2024-02-16">
+            <description>
+                <p>Fix minor permissions issue</p>
+            </description>
+        </release>
         <release version="3.5.2" date="2024-02-14">
             <description>
                 <p>Better error message for missing h264/hevc, ignore user nvidia vaapi setting</p>

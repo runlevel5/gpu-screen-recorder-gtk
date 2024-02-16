@@ -2281,19 +2281,10 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             label += std::to_string(monitor->size.x);
             label += "x";
             label += std::to_string(monitor->size.y);
-            if(wayland) {
-                label += ", requires root access";
-            } else if(gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
-                label += ", requires root access";
-            }
             label += ")";
 
             // Leak on purpose, what are you gonna do? stab me?
             char *id = (char*)malloc(monitor->name_len + 1);
-            if(!id) {
-                fprintf(stderr, "Failed to allocate memory\n");
-                abort();
-            }
             memcpy(id, monitor->name, monitor->name_len);
             id[monitor->name_len] = '\0';
 
@@ -3134,7 +3125,7 @@ static void load_config(const gpu_info &gpu_inf) {
                 "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
                 "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
                 "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
-                "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the flatpak version of GPU Screen Recorder instead which doesn't have this issue");
+                "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             config.main_config.codec = "av1";
@@ -3145,7 +3136,7 @@ static void load_config(const gpu_info &gpu_inf) {
                 "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
                 "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
                 "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
-                "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the flatpak version of GPU Screen Recorder instead which doesn't have this issue");
+                "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(select_window_userdata.app));
