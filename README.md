@@ -25,6 +25,9 @@ When recording GTA V at 4k on highest settings, fps drops from 60 to 23 when usi
 It is recommended to save the video to a SSD because of the large file size, which a slow HDD might not be fast enough to handle.
 ## Note about optimal performance on NVIDIA
 NVIDIA driver has a "feature" (read: bug) where it will downclock memory transfer rate when a program uses cuda (or nvenc, which uses cuda), such as GPU Screen Recorder. See https://git.dec05eba.com/gpu-screen-recorder/about/ for more information and how to overcome this.
+## Hotkey
+Hotkeys are currently only supported on X11. Most Wayland compositors are missing a way to bind hotkeys programatically. If you want to have hotkeys then you can bind hotkeys in your Wayland compositors settings.
+Bind a key to "killall -SIGINT gpu-screen-recorder" to stop recording (also saves the video when recording a regular video). Bind another key to "killall -SIGUSR1 gpu-screen-recorder" to save a replay and another key to "killall -SIGUSR2 gpu-screen-recorder" to pause/unpause the recording (when recording a regular video).
 
 ## Installation
 This program depends on [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
