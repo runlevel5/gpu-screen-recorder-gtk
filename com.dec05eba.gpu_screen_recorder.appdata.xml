@@ -39,6 +39,9 @@
             Videos are in variable framerate format. Very out of date video players might have an issue playing such videos. It's recommend to use MPV to play such videos, otherwise you might experience stuttering in the video. You can select constant frame rate mode in advanced view if you need it.
         </p>
         <p>
+            If the video doesn't play or you get green/yellow overlay then your video player is missing H264/HEVC video codec. Either install the video codecs or use mpv.
+        </p>
+        <p>
             Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: flatpak install flathub --system com.dec05eba.gpu_screen_recorder
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
         </p>
