@@ -3239,7 +3239,8 @@ static void activate(GtkApplication *app, gpointer) {
 
     if(!gl_get_gpu_info(&egl, &gpu_inf)) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to get OpenGL information. Make sure your GPU drivers are properly installed.");
+            "Failed to get OpenGL information. Make sure your GPU drivers are properly installed. "
+            "If you are using nvidia then make sure to run \"flatpak update\" to keep all of your flatpaks up to date. You might also need to install a flatpak nvidia driver version that matches your distros nvidia driver version.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
