@@ -116,6 +116,7 @@ static std::string record_file_current_filename;
 static bool nvfbc_installed = false;
 
 static bool wayland = false;
+static bool flatpak = false;
 static gsr_egl egl;
 
 struct AudioInput {
@@ -217,7 +218,7 @@ static bool is_inside_flatpak(void) {
 }
 
 static bool is_pkexec_installed() {
-    if(is_inside_flatpak())
+    if(flatpak)
         return system("flatpak-spawn --host pkexec --version") == 0;
     else
         return is_program_installed({ "pkexec", 6 });
@@ -1299,7 +1300,7 @@ static bool show_pkexec_flatpak_error_if_needed() {
             return true;
         }
 
-        if(is_inside_flatpak() && !flatpak_is_installed_as_system()) {
+        if(flatpak && !flatpak_is_installed_as_system()) {
             if(wayland) {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                     "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland. To install GPU Screen recorder system-wide, you can run this command:\n"
@@ -2281,6 +2282,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             label += std::to_string(monitor->size.x);
             label += "x";
             label += std::to_string(monitor->size.y);
+            if(flatpak && (wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA)) {
+                label += ", requires root access";
+            }
             label += ")";
 
             // Leak on purpose, what are you gonna do? stab me?
@@ -2424,24 +2428,20 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
     if(got_supported_video_codecs) {
-        if(supported_video_codecs.h264) {
+        if(supported_video_codecs.h264) 
             gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
-        }
-        if(supported_video_codecs.hevc) {
+        if(supported_video_codecs.hevc)
             gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
-            if(wayland && gpu_inf.vendor != GPU_VENDOR_NVIDIA)
-                gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
-        }
-        if(supported_video_codecs.av1) {
+        if(supported_video_codecs.av1)
             gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
-            if(wayland && gpu_inf.vendor != GPU_VENDOR_NVIDIA)
-                gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
+
+        if(wayland) {
+            gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
+            gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
         }
     } else {
         gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
         gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
-        if(wayland && gpu_inf.vendor != GPU_VENDOR_NVIDIA)
-            gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(video_codec_input_menu), true);
     gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_input_menu), 1, 0, 1, 1);
@@ -3022,7 +3022,7 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265" && config.main_config.codec != "hevc" && config.main_config.codec != "av1" && config.main_config.codec != "hevc_hdr" && config.main_config.codec != "av1_hdr")
         config.main_config.codec = "auto";
 
-    if((!wayland || gpu_inf.vendor == GPU_VENDOR_NVIDIA) && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
+    if(!wayland && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
         config.main_config.codec = "auto";
 
     if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac" && config.main_config.audio_codec != "flac")
@@ -3215,6 +3215,8 @@ static const char* gpu_vendor_to_name(gpu_vendor vendor) {
 }
 
 static void activate(GtkApplication *app, gpointer) {
+    flatpak = is_inside_flatpak();
+
     Display *dpy = XOpenDisplay(NULL);
     wayland = !dpy || is_xwayland(dpy);
     if(!wayland && !dpy) {
