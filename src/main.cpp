@@ -3275,7 +3275,7 @@ static void activate(GtkApplication *app, gpointer) {
     if((gpu_inf.vendor != GPU_VENDOR_NVIDIA) || wayland) {
         if(!gsr_get_valid_card_path(&egl, egl.card_path)) {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Failed to find a valid DRM card. If you are using prime-run then run without it.");
+                "Failed to find a valid DRM card. If you are running GPU Screen Recorder with prime-run then try running without it.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(app));
