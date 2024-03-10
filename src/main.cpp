@@ -872,12 +872,12 @@ static bool try_card_has_valid_plane(const char *card_path) {
 /* output should be >= 128 bytes */
 static bool gsr_get_valid_card_path(gsr_egl *egl, char *output) {
     if(egl->dri_card_path) {
-        strncpy(output, egl->dri_card_path, 128);
+        strncpy(output, egl->dri_card_path, 127);
         return try_card_has_valid_plane(output);
     }
 
     for(int i = 0; i < 10; ++i) {
-        snprintf(output, 128, DRM_DEV_NAME, DRM_DIR_NAME, i);
+        snprintf(output, 127, DRM_DEV_NAME, DRM_DIR_NAME, i);
         if(try_card_has_valid_plane(output))
             return true;
     }
