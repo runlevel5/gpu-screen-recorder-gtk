@@ -75,6 +75,15 @@
     </screenshots>
 
     <releases>
+        <release version="3.6.0" date="2024-03-10">
+            <description>
+                <ul>
+                    <li>Support HDR capture and full color range on nvidia</li>
+                    <li>Support cursor capture when recording a single window</li>
+                    <li>Show the correct monitors when using prime-run</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.5.3" date="2024-02-16">
             <description>
                 <p>Fix minor permissions issue</p>

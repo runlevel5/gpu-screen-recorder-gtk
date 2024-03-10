@@ -221,6 +221,7 @@ static bool gsr_egl_load_egl(gsr_egl *self, void *library) {
         { (void**)&self->eglDestroyContext, "eglDestroyContext" },
         { (void**)&self->eglDestroySurface, "eglDestroySurface" },
         { (void**)&self->eglBindAPI, "eglBindAPI" },
+        { (void**)&self->eglGetProcAddress, "eglGetProcAddress" },
 
         { NULL, NULL }
     };
@@ -244,6 +245,13 @@ static bool gsr_egl_load_gl(gsr_egl *self, void *library) {
         fprintf(stderr, "gsr error: gsr_egl_load failed: missing required symbols in libGL.so.1\n");
         return false;
     }
+
+    return true;
+}
+
+static bool gsr_egl_proc_load_egl(gsr_egl *self) {
+    self->eglQueryDisplayAttribEXT = (FUNC_eglQueryDisplayAttribEXT)self->eglGetProcAddress("eglQueryDisplayAttribEXT");
+    self->eglQueryDeviceStringEXT = (FUNC_eglQueryDeviceStringEXT)self->eglGetProcAddress("eglQueryDeviceStringEXT");
 
     return true;
 }
@@ -274,8 +282,17 @@ bool gsr_egl_load(gsr_egl *self, Display *dpy, bool wayland) {
     if(!gsr_egl_load_gl(self, gl_lib))
         goto fail;
 
+    if(!gsr_egl_proc_load_egl(self))
+        goto fail;
+
     if(!gsr_egl_create_window(self, wayland))
         goto fail;
+
+    if(self->eglQueryDisplayAttribEXT && self->eglQueryDeviceStringEXT) {
+        intptr_t device = 0;
+        if(self->eglQueryDisplayAttribEXT(self->egl_display, EGL_DEVICE_EXT, &device) && device)
+            self->dri_card_path = self->eglQueryDeviceStringEXT((void*)device, EGL_DRM_DEVICE_FILE_EXT);
+    }
 
     self->egl_library = egl_lib;
     self->gl_library = gl_lib;

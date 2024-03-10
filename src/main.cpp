@@ -825,48 +825,60 @@ static void for_each_active_monitor_output(const gsr_egl *egl, gsr_connection_ty
     }
 }
 
-/* output should be >= 128 bytes */
-static bool gsr_get_valid_card_path(char *output) {
-    for(int i = 0; i < 10; ++i) {
-        drmVersion *ver = NULL;
-        drmModePlaneResPtr planes = NULL;
-        bool found_screen_card = false;
+static bool try_card_has_valid_plane(const char *card_path) {
+    drmVersion *ver = NULL;
+    drmModePlaneResPtr planes = NULL;
+    bool found_screen_card = false;
 
-        sprintf(output, DRM_DEV_NAME, DRM_DIR_NAME, i);
-        int fd = open(output, O_RDONLY);
-        if(fd == -1)
+    int fd = open(card_path, O_RDONLY);
+    if(fd == -1)
+        return false;
+
+    ver = drmGetVersion(fd);
+    if(!ver || strstr(ver->name, "nouveau"))
+        goto next;
+
+    drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+
+    planes = drmModeGetPlaneResources(fd);
+    if(!planes)
+        goto next;
+
+    for(uint32_t j = 0; j < planes->count_planes; ++j) {
+        drmModePlanePtr plane = drmModeGetPlane(fd, planes->planes[j]);
+        if(!plane)
             continue;
 
-        ver = drmGetVersion(fd);
-        if(!ver || strstr(ver->name, "nouveau"))
-            goto next;
+        if(plane->fb_id)
+            found_screen_card = true;
 
-        drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
-
-        planes = drmModeGetPlaneResources(fd);
-        if(!planes)
-            goto next;
-
-        for(uint32_t i = 0; i < planes->count_planes; ++i) {
-            drmModePlanePtr plane = drmModeGetPlane(fd, planes->planes[i]);
-            if(!plane)
-                continue;
-
-            if(plane->fb_id)
-                found_screen_card = true;
-
-            drmModeFreePlane(plane);
-            if(found_screen_card)
-                break;
-        }
-
-        next:
-        if(planes)
-            drmModeFreePlaneResources(planes);
-        if(ver)
-            drmFreeVersion(ver);
-        close(fd);
+        drmModeFreePlane(plane);
         if(found_screen_card)
+            break;
+    }
+
+    next:
+    if(planes)
+        drmModeFreePlaneResources(planes);
+    if(ver)
+        drmFreeVersion(ver);
+    close(fd);
+    if(found_screen_card)
+        return true;
+
+    return false;
+}
+
+/* output should be >= 128 bytes */
+static bool gsr_get_valid_card_path(gsr_egl *egl, char *output) {
+    if(egl->dri_card_path) {
+        strncpy(output, egl->dri_card_path, 128);
+        return try_card_has_valid_plane(output);
+    }
+
+    for(int i = 0; i < 10; ++i) {
+        snprintf(output, 128, DRM_DEV_NAME, DRM_DIR_NAME, i);
+        if(try_card_has_valid_plane(output))
             return true;
     }
     return false;
@@ -2436,8 +2448,10 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
 
         if(wayland) {
-            gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
-            gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
+            if(supported_video_codecs.hevc)
+                gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
+            if(supported_video_codecs.av1)
+                gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
         }
     } else {
         gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
@@ -3143,6 +3157,15 @@ static void load_config(const gpu_info &gpu_inf) {
             return;
         }
     }
+
+    if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor == GPU_VENDOR_NVIDIA) {
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Failed to find H264/HEVC video codecs. Your NVIDIA GPU may be missing support for H264/HEVC video codecs for video encoding.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(select_window_userdata.app));
+        return;
+    }
 }
 
 static bool gl_get_gpu_info(gsr_egl *egl, gpu_info *info) {
@@ -3250,9 +3273,9 @@ static void activate(GtkApplication *app, gpointer) {
     }
 
     if((gpu_inf.vendor != GPU_VENDOR_NVIDIA) || wayland) {
-        if(!gsr_get_valid_card_path(egl.card_path)) {
+        if(!gsr_get_valid_card_path(&egl, egl.card_path)) {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Failed to find a valid DRM card.");
+                "Failed to find a valid DRM card. If you are using prime-run then run without it.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(app));

@@ -37,12 +37,17 @@ typedef void* EGLImageKHR;
 typedef void *GLeglImageOES;
 typedef void (*__eglMustCastToProperFunctionPointerType)(void);
 
+typedef int (*FUNC_eglQueryDisplayAttribEXT)(EGLDisplay dpy, int32_t attribute, intptr_t *value);
+typedef const char* (*FUNC_eglQueryDeviceStringEXT)(void *device, int32_t name);
+
 #define EGL_BUFFER_SIZE                         0x3020
 #define EGL_RENDERABLE_TYPE                     0x3040
 #define EGL_OPENGL_BIT                          0x0008
 #define EGL_OPENGL_API                          0x30A2
 #define EGL_NONE                                0x3038
 #define EGL_CONTEXT_CLIENT_VERSION              0x3098
+#define EGL_DEVICE_EXT                          0x322C
+#define EGL_DRM_DEVICE_FILE_EXT                 0x3233
 
 #define GL_VENDOR                               0x1F00
 #define GL_RENDERER                             0x1F01
@@ -79,6 +84,7 @@ typedef struct {
     EGLDisplay egl_display;
     EGLSurface egl_surface;
     EGLContext egl_context;
+    const char *dri_card_path;
 
     gsr_x11 x11;
     gsr_wayland wayland;
@@ -94,6 +100,10 @@ typedef struct {
     unsigned int (*eglDestroyContext)(EGLDisplay dpy, EGLContext ctx);
     unsigned int (*eglDestroySurface)(EGLDisplay dpy, EGLSurface surface);
     unsigned int (*eglBindAPI)(unsigned int api);
+    __eglMustCastToProperFunctionPointerType (*eglGetProcAddress)(const char *procname);
+
+    FUNC_eglQueryDisplayAttribEXT eglQueryDisplayAttribEXT;
+    FUNC_eglQueryDeviceStringEXT eglQueryDeviceStringEXT;
 
     const unsigned char* (*glGetString)(unsigned int name);
 } gsr_egl;
