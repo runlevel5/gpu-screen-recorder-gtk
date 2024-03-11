@@ -83,6 +83,7 @@ static GtkWidget *replay_save_hotkey_button;
 static GtkWidget *streaming_hotkey_button;
 static GtkWidget *merge_audio_tracks_button;
 static GtkWidget *show_notification_button;
+static GtkWidget *record_cursor_button;
 static GtkGrid *video_codec_grid;
 static GtkGrid *audio_codec_grid;
 static GtkGrid *color_range_grid;
@@ -608,6 +609,7 @@ static void save_configs() {
     config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
     config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
     config.main_config.show_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button));
+    config.main_config.record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
@@ -1572,12 +1574,13 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
+    const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cr", color_range_input_str, "-r", replay_time_str.c_str(), "-o", dir
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-cr", color_range_input_str, "-r", replay_time_str.c_str(), "-o", dir
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -1720,12 +1723,13 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
+    const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cr", color_range_input_str, "-o", record_file_current_filename.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-cr", color_range_input_str, "-o", record_file_current_filename.c_str()
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -1847,12 +1851,13 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
+    const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cr", color_range_input_str, "-o", stream_url.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-cr", color_range_input_str, "-o", stream_url.c_str()
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -2515,6 +2520,11 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_halign(show_notification_button, GTK_ALIGN_START);
     gtk_grid_attach(grid, show_notification_button, 0, grid_row++, 2, 1);
 
+    record_cursor_button = gtk_check_button_new_with_label("Record cursor");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_cursor_button), true);
+    gtk_widget_set_halign(record_cursor_button, GTK_ALIGN_START);
+    gtk_grid_attach(grid, record_cursor_button, 0, grid_row++, 2, 1);
+
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, grid_row++, 2, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
@@ -3084,6 +3094,7 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(framerate_mode_input_menu), config.main_config.framerate_mode.c_str());
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), config.main_config.overclock);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_notification_button), config.main_config.show_notifications);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_cursor_button), config.main_config.record_cursor);
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());

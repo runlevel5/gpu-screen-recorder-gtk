@@ -34,6 +34,7 @@ struct MainConfig {
     bool advanced_view = false;
     bool overclock = false;
     bool show_notifications = true;
+    bool record_cursor = true;
 };
 
 struct StreamingConfig {
@@ -342,6 +343,11 @@ static Config read_config(bool &config_empty) {
                 config.main_config.show_notifications = true;
             else if(value == "false")
                 config.main_config.show_notifications = false;
+        } else if(key == "main.record_cursor") {
+            if(value == "true")
+                config.main_config.record_cursor = true;
+            else if(value == "false")
+                config.main_config.record_cursor = false;
         } else if(key == "streaming.service") {
             config.streaming_config.streaming_service.assign(value.str, value.size);
         } else if(key == "streaming.key") {
@@ -438,6 +444,7 @@ static void save_config(const Config &config) {
     fprintf(file, "main.advanced_view %s\n", config.main_config.advanced_view ? "true" : "false");
     fprintf(file, "main.overclock %s\n", config.main_config.overclock ? "true" : "false");
     fprintf(file, "main.show_notifications %s\n", config.main_config.show_notifications ? "true" : "false");
+    fprintf(file, "main.record_cursor %s\n", config.main_config.record_cursor ? "true" : "false");
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());
