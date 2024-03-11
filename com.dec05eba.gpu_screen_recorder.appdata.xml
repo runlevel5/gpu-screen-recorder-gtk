@@ -75,6 +75,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.6.1" date="2024-03-11">
+            <description>
+                <p>Add the option to not record cursor</p>
+            </description>
+        </release>
         <release version="3.6.0" date="2024-03-10">
             <description>
                 <ul>
