@@ -82,7 +82,10 @@
     <releases>
         <release version="3.6.2" date="2024-03-20">
             <description>
-                <p>Fix incorrect overclocking offset on some nvidia gpus when enabling overclocking option</p>
+                <ul>
+                    <li>Fix incorrect overclocking offset on some nvidia gpus when enabling overclocking option</li>
+                    <li>Ignore color standards for more accurate colors</li>
+                </ul>
             </description>
         </release>
         <release version="3.6.1" date="2024-03-11">
