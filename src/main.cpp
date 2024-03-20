@@ -2504,9 +2504,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             "NVIDIA driver has a \"feature\" (read: bug) where it will downclock memory transfer rate when a program uses CUDA, such as GPU Screen Recorder.\n"
             "To work around this bug, GPU Screen Recorder can overclock your GPU memory transfer rate to it's normal optimal level. To enable overclocking for optimal performance enable the \"Overclock memory transfer rate to workaround NVIDIA driver performance bug\" option.\n"
             "You also need to have \"Coolbits\" NVIDIA X setting set to \"12\" to enable overclocking.\n"
-            "Click <a href=\"https://wiki.archlinux.org/title/NVIDIA/Tips_and_tricks#Enabling_overclocking\">here</a> to see how to set this up manually or if you are using flatpak.\n"
+            "You can set coolbits by running \"sudo nvidia-xconfig --cool-bits=12\" and then rebooting.\n"
             "\n"
-            "Note that this only works when Xorg server is running as root, and using this option will only give you a performance boost if the game you are recording is bottlenecked by your GPU.\n"
+            "Note that this only works when Xorg server is running as root.\n"
             "\n"
             "Note! use at your own risk!");
         gtk_dialog_run(GTK_DIALOG(dialog));

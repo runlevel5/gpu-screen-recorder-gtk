@@ -80,6 +80,11 @@
     </screenshots>
 
     <releases>
+        <release version="3.6.2" date="2024-03-20">
+            <description>
+                <p>Fix incorrect overclocking offset on some nvidia gpus when enabling overclocking option</p>
+            </description>
+        </release>
         <release version="3.6.1" date="2024-03-11">
             <description>
                 <p>Add the option to not record cursor</p>
