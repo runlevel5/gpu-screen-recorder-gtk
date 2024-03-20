@@ -2290,8 +2290,8 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_list_store_set(store, &iter, 1, "screen", -1);
         }
 
-        gsr_connection_type connection_type = get_connection_type();
-
+        const gsr_connection_type connection_type = get_connection_type();
+        int num_monitors = 0;
         for_each_active_monitor_output(&egl, connection_type, [&](const gsr_monitor *monitor, void*) {
             std::string label = "Monitor ";
             label.append(monitor->name, monitor->name_len);
@@ -2312,7 +2312,18 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_list_store_append(store, &iter);
             gtk_list_store_set(store, &iter, 0, label.c_str(), -1);
             gtk_list_store_set(store, &iter, 1, id, -1);
+
+            ++num_monitors;
         }, NULL);
+
+        if(num_monitors == 0 && (wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA)) {
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "No monitors to record found. Make sure GPU Screen Recorder is running on the same GPU device that is displaying graphics on the screen.");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(select_window_userdata.app));
+            return GTK_WIDGET(grid);
+        }
     }
 
     record_area_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(record_area_selection_model));
