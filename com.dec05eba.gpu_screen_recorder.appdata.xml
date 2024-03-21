@@ -80,6 +80,15 @@
     </screenshots>
 
     <releases>
+        <release version="3.6.3" date="2024-03-21">
+            <description>
+                <ul>
+                    <li>Fix nvidia window capture/wayland capture if the user has set __GL_THREADED_OPTIMIZATIONS to 1</li>
+                    <li>Fix full color range capture in nvidia window capture</li>
+                    <li>Properly clear cursor in window capture</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.6.2" date="2024-03-20">
             <description>
                 <ul>
