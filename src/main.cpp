@@ -3393,6 +3393,17 @@ static void activate(GtkApplication *app, gpointer) {
 
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
+
+    // Stop nvidia driver from buffering frames
+    setenv("__GL_MaxFramesAllowed", "1", true);
+    // If this is set to 1 then cuGraphicsGLRegisterImage will fail for egl context with error: invalid OpenGL or DirectX context,
+    // so we overwrite it
+    setenv("__GL_THREADED_OPTIMIZATIONS", "0", true);
+    // Some people set this to nvidia (for nvdec) or vdpau (for nvidia vdpau), which breaks gpu screen recorder since
+    // nvidia doesn't support vaapi and nvidia-vaapi-driver doesn't support encoding yet.
+    // Let vaapi find the match vaapi driver instead of forcing a specific one.
+    unsetenv("LIBVA_DRIVER_NAME");
+
     GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
     g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
