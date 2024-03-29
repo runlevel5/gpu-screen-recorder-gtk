@@ -116,6 +116,7 @@ static Config config;
 static std::string record_file_current_filename;
 static bool nvfbc_installed = false;
 
+static Display *dpy = NULL;
 static bool wayland = false;
 static bool flatpak = false;
 static gsr_egl egl;
@@ -2559,6 +2560,37 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     return GTK_WIDGET(grid);
 }
 
+static void add_wayland_global_hotkeys_ui(GtkGrid *grid, int &row, int width) {
+    GtkWidget *label = gtk_label_new("Wayland don't support global hotkeys, use X11");
+    gtk_widget_set_hexpand(label, true);
+    gtk_grid_attach(grid, label, 0, row, width - 1, 1);
+
+    GtkButton *question_button = GTK_BUTTON(gtk_button_new_with_label("?"));
+    gtk_grid_attach(grid, GTK_WIDGET(question_button), width - 1, row, 1, 1);
+
+    row++;
+
+    g_signal_connect(question_button, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer userdata){
+        (void)button;
+        (void)userdata;
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Wayland (desktop portal) doesn't support global hotkeys in any meaningful manner to most applications, including GPU Screen Recorder.\n"
+            "If you want to use global hotkeys in GPU Screen Recorder then either use X11 or bind the following commands in your desktop environment settings to keys:\n"
+            "Stop recording (saves video as well when not in replay mode):\n"
+            "  killall -SIGINT gpu-screen-recorder\n"
+            "Save a replay:\n"
+            "  killall -SIGUSR1 gpu-screen-recorder\n"
+            "Pause/unpause recording:\n"
+            "  killall -SIGUSR2 gpu-screen-recorder\n");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+
+        return true;
+    }), nullptr);
+
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, width, 1);
+}
+
 static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     int row = 0;
 
@@ -2574,8 +2606,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
 
     GtkWidget *hotkey_active_label = NULL;
     if(wayland) {
-        gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 5, 1);
-        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
+        add_wayland_global_hotkeys_ui(grid, row, 5);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
@@ -2704,8 +2735,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
 
     GtkWidget *hotkey_active_label = NULL;
     if(wayland) {
-        gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 5, 1);
-        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 5, 1);
+        add_wayland_global_hotkeys_ui(grid, row, 5);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 5, 1);
@@ -2824,8 +2854,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
 
     GtkWidget *hotkey_active_label = NULL;
     if(wayland) {
-        gtk_grid_attach(grid, gtk_label_new("Wayland compositors don't support global hotkeys yet, use X11"), 0, row++, 3, 1);
-        gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, 3, 1);
+        add_wayland_global_hotkeys_ui(grid, row, 3);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, 3, 1);
@@ -3403,6 +3432,15 @@ int main(int argc, char **argv) {
     // nvidia doesn't support vaapi and nvidia-vaapi-driver doesn't support encoding yet.
     // Let vaapi find the match vaapi driver instead of forcing a specific one.
     unsetenv("LIBVA_DRIVER_NAME");
+
+    dpy = XOpenDisplay(NULL);
+    wayland = !dpy || is_xwayland(dpy);
+
+    if(wayland) {
+        setenv("GDK_BACKEND", "wayland", true);
+    } else {
+        setenv("GDK_BACKEND", "x11", true);
+    }
 
     GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
     g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
