@@ -82,10 +82,7 @@
     <releases>
         <release version="3.6.4" date="2024-04-06">
             <description>
-                <ul>
-                    <li>Fix AMD h264 causing stutter in games on some AMD GPUs</li>
-                    <li>Fix recording breaking when updating flatpak on some systems (where $HOME is symlinked to another location), requires password prompt update</li>
-                </ul>
+                <p>Fix recording breaking when updating flatpak on some systems (where $HOME is symlinked to another location), requires password prompt update</p>
             </description>
         </release>
         <release version="3.6.3" date="2024-03-21">
