@@ -84,7 +84,7 @@
             <description>
                 <ul>
                     <li>Fix AMD h264 causing stutter in games on some AMD GPUs</li>
-                    <li>Fix recording breaking when updating flatpak on some systems (where $HOME is symlinked to another location)</li>
+                    <li>Fix recording breaking when updating flatpak on some systems (where $HOME is symlinked to another location), requires password prompt update</li>
                 </ul>
             </description>
         </release>
