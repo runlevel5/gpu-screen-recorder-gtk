@@ -6,7 +6,7 @@ cd "$script_dir"
 CC=${CC:-gcc}
 CXX=${CXX:-g++}
 
-opts="-O2 -g0 -DNDEBUG -Wall -Wextra -Werror -s"
+opts="-O2 -g0 -DNDEBUG -Wall -Wextra -Werror"
 [ -n "$DEBUG" ] && opts="-O0 -g3 -Wall -Wextra -Werror";
 
 build_gsr_gtk() {
