@@ -35,6 +35,7 @@
             <li>AAC</li>
             <li>FLAC</li>
         </ul>
+        <p>Note: Opus and FLAC audio codecs are disabled at the moment because of temporary issues.</p>
         <p>
             Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: flatpak install flathub --system com.dec05eba.gpu_screen_recorder
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
@@ -80,6 +81,15 @@
     </screenshots>
 
     <releases>
+        <release version="3.7.2" date="2024-04-20">
+            <description>
+                <ul>
+                    <li>Improve audio/video sync</li>
+                    <li>Increase audio bitrate</li>
+                    <li>Hide notifications after a few seconds</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.7.1" date="2024-04-12">
             <description>
                 <p>Fix audio sync regression when using mixed audio</p>

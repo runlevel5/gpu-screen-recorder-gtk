@@ -121,6 +121,10 @@ static bool wayland = false;
 static bool flatpak = false;
 static gsr_egl egl;
 
+static bool showing_notification = false;
+static double notification_timeout_seconds = 0.0;
+static double notification_start_seconds = 0.0;
+
 struct AudioInput {
     std::string name;
     std::string description;
@@ -893,6 +897,14 @@ static void show_notification(GtkApplication *app, const char *title, const char
     g_notification_set_body(notification, body);
     g_notification_set_priority(notification, priority);
     g_application_send_notification(&app->parent, "gpu-screen-recorder", notification);
+
+    showing_notification = true;
+    if(priority < G_NOTIFICATION_PRIORITY_URGENT) {
+        notification_timeout_seconds = 2.0;
+    } else {
+        notification_timeout_seconds = 5.0;
+    }
+    notification_start_seconds = clock_get_monotonic_seconds();
 }
 
 static bool window_has_atom(Display *display, Window window, Atom atom) {
@@ -2561,7 +2573,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 }
 
 static void add_wayland_global_hotkeys_ui(GtkGrid *grid, int &row, int width) {
-    GtkWidget *label = gtk_label_new("Wayland don't support global hotkeys, use X11");
+    GtkWidget *label = gtk_label_new("Hotkeys not supported because Wayland doesn't support global hotkeys");
     gtk_widget_set_hexpand(label, true);
     gtk_grid_attach(grid, label, 0, row, width - 1, 1);
 
@@ -2575,7 +2587,7 @@ static void add_wayland_global_hotkeys_ui(GtkGrid *grid, int &row, int width) {
         (void)userdata;
         GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Wayland (desktop portal) doesn't support global hotkeys in any meaningful manner to most applications, including GPU Screen Recorder.\n"
-            "If you want to use global hotkeys in GPU Screen Recorder then either use X11 or bind the following commands in your desktop environment settings to keys:\n"
+            "If you want to use global hotkeys in GPU Screen Recorder then either use X11 or bind the following commands in your Wayland desktop environment hotkey settings to keys:\n"
             "Stop recording (saves video as well when not in replay mode):\n"
             "  killall -SIGINT gpu-screen-recorder\n"
             "Save a replay:\n"
@@ -3002,7 +3014,20 @@ static void handle_record_timer() {
     }
 }
 
+static void handle_notification_timer(GtkApplication *app) {
+    if(!showing_notification)
+        return;
+
+    const double now = clock_get_monotonic_seconds();
+    if(now - notification_start_seconds >= notification_timeout_seconds) {
+        g_application_withdraw_notification(&app->parent, "gpu-screen-recorder");
+        showing_notification = false;
+    }
+}
+
 static gboolean timer_timeout_handler(gpointer userdata) {
+    GtkApplication *app = (GtkApplication*)userdata;
+    handle_notification_timer(app);
     handle_child_process_death(userdata);
     handle_record_timer();
     return G_SOURCE_CONTINUE;
