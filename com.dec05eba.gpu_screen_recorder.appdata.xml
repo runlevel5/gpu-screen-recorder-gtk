@@ -81,7 +81,7 @@
     </screenshots>
 
     <releases>
-        <release version="3.7.2" date="2024-04-26">
+        <release version="3.7.2" date="2024-04-20">
             <description>
                 <ul>
                     <li>Improve nvidia video encoding performance a lot on certain GPUs</li>
