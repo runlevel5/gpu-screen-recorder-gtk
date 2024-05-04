@@ -2554,14 +2554,26 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_set_column_spacing(start_button_grid, 10);
 
     stream_button = GTK_BUTTON(gtk_button_new_with_label("Stream"));
+    GtkWidget *go_next_stream = gtk_image_new_from_icon_name("go-next", GTK_ICON_SIZE_BUTTON);
+    gtk_button_set_image(stream_button, go_next_stream);
+    gtk_button_set_always_show_image(stream_button, true);
+    gtk_button_set_image_position(stream_button, GTK_POS_RIGHT);
     gtk_widget_set_hexpand(GTK_WIDGET(stream_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(stream_button), 0, 0, 1, 1);
 
     record_button = GTK_BUTTON(gtk_button_new_with_label("Record"));
+    GtkWidget *go_next_record = gtk_image_new_from_icon_name("go-next", GTK_ICON_SIZE_BUTTON);
+    gtk_button_set_image(record_button, go_next_record);
+    gtk_button_set_always_show_image(record_button, true);
+    gtk_button_set_image_position(record_button, GTK_POS_RIGHT);
     gtk_widget_set_hexpand(GTK_WIDGET(record_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(record_button), 1, 0, 1, 1);
 
     replay_button = GTK_BUTTON(gtk_button_new_with_label("Replay"));
+    GtkWidget *go_next_replay = gtk_image_new_from_icon_name("go-next", GTK_ICON_SIZE_BUTTON);
+    gtk_button_set_image(replay_button, go_next_replay);
+    gtk_button_set_always_show_image(replay_button, true);
+    gtk_button_set_image_position(replay_button, GTK_POS_RIGHT);
     gtk_widget_set_hexpand(GTK_WIDGET(replay_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(replay_button), 2, 0, 1, 1);
 
@@ -2695,10 +2707,14 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(replay_time_grid, GTK_WIDGET(replay_time_entry), 1, 0, 1, 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 5, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
+
     replay_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
+    GtkWidget *go_previous = gtk_image_new_from_icon_name("go-previous", GTK_ICON_SIZE_BUTTON);
+    gtk_button_set_image(replay_back_button, go_previous);
+    gtk_button_set_always_show_image(replay_back_button, true);
+    gtk_button_set_image_position(replay_back_button, GTK_POS_LEFT);
     gtk_widget_set_hexpand(GTK_WIDGET(replay_back_button), true);
 
     gtk_grid_attach(start_button_grid, GTK_WIDGET(replay_back_button), 0, 0, 1, 1);
@@ -2820,6 +2836,10 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(start_button_grid, 10);
 
     record_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
+    GtkWidget *go_previous = gtk_image_new_from_icon_name("go-previous", GTK_ICON_SIZE_BUTTON);
+    gtk_button_set_image(record_back_button, go_previous);
+    gtk_button_set_always_show_image(record_back_button, true);
+    gtk_button_set_image_position(record_back_button, GTK_POS_LEFT);
     gtk_widget_set_hexpand(GTK_WIDGET(record_back_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(record_back_button), 0, 0, 1, 1);
 
@@ -2920,7 +2940,12 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 3, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
+
     stream_back_button = GTK_BUTTON(gtk_button_new_with_label("Back"));
+    GtkWidget *go_previous = gtk_image_new_from_icon_name("go-previous", GTK_ICON_SIZE_BUTTON);
+    gtk_button_set_image(stream_back_button, go_previous);
+    gtk_button_set_always_show_image(stream_back_button, true);
+    gtk_button_set_image_position(stream_back_button, GTK_POS_LEFT);
     gtk_widget_set_hexpand(GTK_WIDGET(stream_back_button), true);
     gtk_grid_attach(start_button_grid, GTK_WIDGET(stream_back_button), 0, 0, 1, 1);
     start_streaming_button = GTK_BUTTON(gtk_button_new_with_label("Start streaming"));
