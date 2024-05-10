@@ -2505,7 +2505,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     audio_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(audio_codec_input_menu, "opus", "Opus (Recommended)");
     gtk_combo_box_text_append(audio_codec_input_menu, "aac", "AAC");
-    gtk_combo_box_text_append(audio_codec_input_menu, "flac", "FLAC");
     gtk_widget_set_hexpand(GTK_WIDGET(audio_codec_input_menu), true);
     gtk_grid_attach(audio_codec_grid, GTK_WIDGET(audio_codec_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(audio_codec_input_menu), 0);
@@ -3148,7 +3147,7 @@ static void load_config(const gpu_info &gpu_inf) {
     if(!wayland && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
         config.main_config.codec = "auto";
 
-    if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac" && config.main_config.audio_codec != "flac")
+    if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac")
         config.main_config.audio_codec = "opus";
 
     if(config.main_config.framerate_mode != "auto" && config.main_config.framerate_mode != "cfr" && config.main_config.framerate_mode != "vfr")
