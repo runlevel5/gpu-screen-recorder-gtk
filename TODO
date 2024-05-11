@@ -20,3 +20,5 @@ Add option to start replay on system startup (use the gpu screen recorder system
     Disable the gpu screen recorders aur/source package systemd service if enabled in the gui since these are two different services. Or make that service and gui service the same and work with the same (gui) config file.
 The program should minimize to taskbar on minimize.
 Remove the need to install gpu screen recorder flatpak as system. This can now be done because of kms-server-proxy.
+
+
