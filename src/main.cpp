@@ -57,6 +57,7 @@ static GtkComboBoxText *framerate_mode_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
 static GtkComboBoxText *record_container;
 static GtkComboBoxText *replay_container;
+static GtkComboBoxText *stream_container;
 static GtkLabel *stream_key_label;
 static GtkButton *record_file_chooser_button;
 static GtkButton *replay_file_chooser_button;
@@ -94,6 +95,7 @@ static GtkWidget *overclock_button;
 static GtkGrid *recording_bottom_panel_grid;
 static GtkWidget *recording_record_time_label;
 static GtkWidget *recording_record_icon;
+static GtkGrid *stream_container_grid;
 static GtkGrid *streaming_bottom_panel_grid;
 static GtkWidget *streaming_record_time_label;
 static GtkGrid *replay_bottom_panel_grid;
@@ -180,7 +182,8 @@ static const Container supported_containers[] = {
     { "mp4", "mp4" },
     { "flv", "flv" },
     { "matroska", "mkv" }, // TODO: Default to this on amd/intel, add (Recommended on AMD/Intel)
-    { "mov", "mov" }
+    { "mov", "mov" },
+    { "mpegts", "ts" }
 };
 
 struct AudioRow {
@@ -618,6 +621,7 @@ static void save_configs() {
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
+    config.streaming_config.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_container));
     if(!wayland) {
         config.streaming_config.start_recording_hotkey.keysym = streaming_hotkey.keysym;
         config.streaming_config.start_recording_hotkey.modifiers = streaming_hotkey.modkey_mask;
@@ -1849,6 +1853,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     std::string fps_str = std::to_string(fps);
 
     std::string stream_url;
+    const gchar *container_str = "flv";
     const gchar *stream_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     if(strcmp(stream_service, "twitch") == 0) {
         stream_url = "rtmp://live.twitch.tv/app/";
@@ -1858,6 +1863,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         stream_url += stream_id_str;
     } else if(strcmp(stream_service, "custom") == 0) {
         stream_url = stream_id_str;
+        container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_container));
         if(stream_url.size() >= 7 && strncmp(stream_url.c_str(), "rtmp://", 7) == 0)
         {}
         else if(stream_url.size() >= 8 && strncmp(stream_url.c_str(), "rtmps://", 8) == 0)
@@ -1879,7 +1885,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", "flv", "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-cr", color_range_input_str, "-o", stream_url.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-cr", color_range_input_str, "-o", stream_url.c_str()
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -1958,7 +1964,9 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
 static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
     (void)userdata;
     const gchar *selected_stream_service = gtk_combo_box_get_active_id(widget);
-    gtk_label_set_text(stream_key_label, strcmp(selected_stream_service, "custom") == 0 ? "Url: " : "Stream key: ");
+    gboolean custom_stream_service = strcmp(selected_stream_service, "custom") == 0;
+    gtk_label_set_text(stream_key_label, custom_stream_service ? "Url: " : "Stream key: ");
+    gtk_widget_set_visible(GTK_WIDGET(stream_container_grid), custom_stream_service);
 }
 
 static bool is_nv_fbc_installed() {
@@ -2945,6 +2953,17 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_hexpand(GTK_WIDGET(stream_id_entry), true);
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_id_entry), 1, 0, 1, 1);
 
+    stream_container_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(stream_container_grid), 0, row++, 3, 1);
+    gtk_grid_attach(stream_container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
+    stream_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    for(auto &supported_container : supported_containers) {
+        gtk_combo_box_text_append(stream_container, supported_container.container_name, supported_container.file_extension);
+    }
+    gtk_widget_set_hexpand(GTK_WIDGET(stream_container), true);
+    gtk_grid_attach(stream_container_grid, GTK_WIDGET(stream_container), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(stream_container), 1); // TODO:
+
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 3, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
@@ -3156,8 +3175,12 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube" && config.streaming_config.streaming_service != "custom")
         config.streaming_config.streaming_service = "twitch";
 
-    if(config.streaming_config.streaming_service == "custom")
+    if(config.streaming_config.streaming_service == "custom") {
+        gtk_widget_set_visible(GTK_WIDGET(stream_container_grid), TRUE);
         gtk_label_set_text(stream_key_label, "Url: ");
+    } else {
+        gtk_widget_set_visible(GTK_WIDGET(stream_container_grid), FALSE);
+    }
 
     if(config.record_config.save_directory.empty() || !is_directory(config.record_config.save_directory.c_str()))
         config.record_config.save_directory = get_videos_dir();
@@ -3196,6 +3219,7 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_container), config.streaming_config.container.c_str());
     if(!wayland && streaming_hotkey_button && !config_empty) {
         streaming_hotkey.keysym = config.streaming_config.start_recording_hotkey.keysym;
         streaming_hotkey.modkey_mask = config.streaming_config.start_recording_hotkey.modifiers;

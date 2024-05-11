@@ -40,6 +40,7 @@ struct MainConfig {
 struct StreamingConfig {
     std::string streaming_service;
     std::string stream_key;
+    std::string container;
     ConfigHotkey start_recording_hotkey;
 };
 
@@ -352,6 +353,8 @@ static Config read_config(bool &config_empty) {
             config.streaming_config.streaming_service.assign(value.str, value.size);
         } else if(key == "streaming.key") {
             config.streaming_config.stream_key.assign(value.str, value.size);
+        } else if(key == "streaming.container") {
+            config.streaming_config.container.assign(value.str, value.size);
         } else if(key == "streaming.start_recording_hotkey") {
             std::string value_str(value.str, value.size);
             if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.streaming_config.start_recording_hotkey.keysym, &config.streaming_config.start_recording_hotkey.modifiers) != 2) {
@@ -448,6 +451,7 @@ static void save_config(const Config &config) {
 
     fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
     fprintf(file, "streaming.key %s\n", config.streaming_config.stream_key.c_str());
+    fprintf(file, "streaming.container %s\n", config.streaming_config.container.c_str());
     fprintf(file, "streaming.start_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.streaming_config.start_recording_hotkey.keysym, config.streaming_config.start_recording_hotkey.modifiers);
 
     fprintf(file, "record.save_directory %s\n", config.record_config.save_directory.c_str());
