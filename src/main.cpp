@@ -57,7 +57,7 @@ static GtkComboBoxText *framerate_mode_input_menu;
 static GtkComboBoxText *stream_service_input_menu;
 static GtkComboBoxText *record_container;
 static GtkComboBoxText *replay_container;
-static GtkComboBoxText *stream_container;
+static GtkComboBoxText *custom_stream_container;
 static GtkLabel *stream_key_label;
 static GtkButton *record_file_chooser_button;
 static GtkButton *replay_file_chooser_button;
@@ -72,7 +72,9 @@ static GtkButton *start_recording_button;
 static GtkButton *pause_recording_button;
 static GtkButton *start_replay_button;
 static GtkButton *start_streaming_button;
-static GtkEntry *stream_id_entry;
+static GtkEntry *youtube_stream_id_entry;
+static GtkEntry *twitch_stream_id_entry;
+static GtkEntry *custom_stream_url_entry;
 static GtkSpinButton *replay_time_entry;
 static GtkButton *select_window_button;
 static GtkWidget *audio_input_used_list;
@@ -95,7 +97,7 @@ static GtkWidget *overclock_button;
 static GtkGrid *recording_bottom_panel_grid;
 static GtkWidget *recording_record_time_label;
 static GtkWidget *recording_record_icon;
-static GtkGrid *stream_container_grid;
+static GtkGrid *custom_stream_container_grid;
 static GtkGrid *streaming_bottom_panel_grid;
 static GtkWidget *streaming_record_time_label;
 static GtkGrid *replay_bottom_panel_grid;
@@ -620,8 +622,10 @@ static void save_configs() {
     config.main_config.record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
-    config.streaming_config.stream_key = gtk_entry_get_text(stream_id_entry);
-    config.streaming_config.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_container));
+    config.streaming_config.youtube.stream_key = gtk_entry_get_text(youtube_stream_id_entry);
+    config.streaming_config.twitch.stream_key = gtk_entry_get_text(twitch_stream_id_entry);
+    config.streaming_config.custom.url = gtk_entry_get_text(custom_stream_url_entry);
+    config.streaming_config.custom.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(custom_stream_container));
     if(!wayland) {
         config.streaming_config.start_recording_hotkey.keysym = streaming_hotkey.keysym;
         config.streaming_config.start_recording_hotkey.modifiers = streaming_hotkey.modkey_mask;
@@ -1407,7 +1411,6 @@ static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
 
 void on_stream_key_icon_click(GtkWidget *widget, gpointer) {
     gboolean visible = gtk_entry_get_visibility(GTK_ENTRY(widget));
-
     gtk_entry_set_visibility(GTK_ENTRY(widget), !visible);
     gtk_entry_set_icon_from_icon_name(GTK_ENTRY(widget), GTK_ENTRY_ICON_SECONDARY, visible ? "view-reveal-symbolic" : "view-conceal-symbolic");
 }
@@ -1834,7 +1837,6 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
     save_configs();
 
-    const char *stream_id_str = gtk_entry_get_text(stream_id_entry);
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
     int record_width = wayland ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
     int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
@@ -1857,18 +1859,22 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     const gchar *stream_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     if(strcmp(stream_service, "twitch") == 0) {
         stream_url = "rtmp://live.twitch.tv/app/";
-        stream_url += stream_id_str;
+        stream_url += gtk_entry_get_text(youtube_stream_id_entry);
     } else if(strcmp(stream_service, "youtube") == 0) {
         stream_url = "rtmp://a.rtmp.youtube.com/live2/";
-        stream_url += stream_id_str;
+        stream_url += gtk_entry_get_text(twitch_stream_id_entry);
     } else if(strcmp(stream_service, "custom") == 0) {
-        stream_url = stream_id_str;
-        container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_container));
+        stream_url = gtk_entry_get_text(custom_stream_url_entry);
+        container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(custom_stream_container));
         if(stream_url.size() >= 7 && strncmp(stream_url.c_str(), "rtmp://", 7) == 0)
         {}
         else if(stream_url.size() >= 8 && strncmp(stream_url.c_str(), "rtmps://", 8) == 0)
         {}
         else if(stream_url.size() >= 6 && strncmp(stream_url.c_str(), "srt://", 6) == 0)
+        {}
+        else if(stream_url.size() >= 7 && strncmp(stream_url.c_str(), "http://", 7) == 0)
+        {}
+        else if(stream_url.size() >= 8 && strncmp(stream_url.c_str(), "https://", 8) == 0)
         {}
         else
             stream_url = "rtmp://" + stream_url;
@@ -1963,10 +1969,26 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
 
 static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
     (void)userdata;
+
+    GtkEntry *stream_id_entries[3] = { youtube_stream_id_entry, twitch_stream_id_entry, custom_stream_url_entry };
+    for(int i = 0; i < 3; ++i) {
+        gtk_widget_set_visible(GTK_WIDGET(stream_id_entries[i]), false);
+    }
+
     const gchar *selected_stream_service = gtk_combo_box_get_active_id(widget);
-    gboolean custom_stream_service = strcmp(selected_stream_service, "custom") == 0;
-    gtk_label_set_text(stream_key_label, custom_stream_service ? "Url: " : "Stream key: ");
-    gtk_widget_set_visible(GTK_WIDGET(stream_container_grid), custom_stream_service);
+    if(strcmp(selected_stream_service, "youtube") == 0) {
+        gtk_label_set_text(stream_key_label, "Stream key: ");
+        gtk_widget_set_visible(GTK_WIDGET(youtube_stream_id_entry), true);
+        gtk_widget_set_visible(GTK_WIDGET(custom_stream_container_grid), false);
+    } else if(strcmp(selected_stream_service, "twitch") == 0) {
+        gtk_label_set_text(stream_key_label, "Stream key: ");
+        gtk_widget_set_visible(GTK_WIDGET(twitch_stream_id_entry), true);
+        gtk_widget_set_visible(GTK_WIDGET(custom_stream_container_grid), false);
+    } else if(strcmp(selected_stream_service, "custom") == 0) {
+        gtk_label_set_text(stream_key_label, "Url: ");
+        gtk_widget_set_visible(GTK_WIDGET(custom_stream_url_entry), true);
+        gtk_widget_set_visible(GTK_WIDGET(custom_stream_container_grid), true);
+    }
 }
 
 static bool is_nv_fbc_installed() {
@@ -2944,25 +2966,30 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(grid, GTK_WIDGET(stream_id_grid), 0, row++, 3, 1);
     stream_key_label = GTK_LABEL(gtk_label_new("Stream key: "));
     gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_key_label), 0, 0, 1, 1);
-    stream_id_entry = GTK_ENTRY(gtk_entry_new());
-    gtk_entry_set_visibility(stream_id_entry, FALSE);
-    gtk_entry_set_input_purpose(stream_id_entry, GTK_INPUT_PURPOSE_PASSWORD);
-    gtk_entry_set_icon_from_icon_name(stream_id_entry, GTK_ENTRY_ICON_SECONDARY, "view-reveal-symbolic");
-    gtk_entry_set_icon_activatable(stream_id_entry, GTK_ENTRY_ICON_SECONDARY, true);
-    g_signal_connect(stream_id_entry, "icon-press", G_CALLBACK(on_stream_key_icon_click), nullptr);
-    gtk_widget_set_hexpand(GTK_WIDGET(stream_id_entry), true);
-    gtk_grid_attach(stream_id_grid, GTK_WIDGET(stream_id_entry), 1, 0, 1, 1);
 
-    stream_container_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(stream_container_grid), 0, row++, 3, 1);
-    gtk_grid_attach(stream_container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
-    stream_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    for(auto &supported_container : supported_containers) {
-        gtk_combo_box_text_append(stream_container, supported_container.container_name, supported_container.file_extension);
+    GtkEntry **stream_id_entries[3] = { &youtube_stream_id_entry, &twitch_stream_id_entry, &custom_stream_url_entry };
+    for(int i = 0; i < 3; ++i) {
+        *stream_id_entries[i] = GTK_ENTRY(gtk_entry_new());
+        gtk_entry_set_visibility(*stream_id_entries[i], FALSE);
+        gtk_entry_set_input_purpose(*stream_id_entries[i], GTK_INPUT_PURPOSE_PASSWORD);
+        gtk_entry_set_icon_from_icon_name(*stream_id_entries[i], GTK_ENTRY_ICON_SECONDARY, "view-reveal-symbolic");
+        gtk_entry_set_icon_activatable(*stream_id_entries[i], GTK_ENTRY_ICON_SECONDARY, true);
+        g_signal_connect(*stream_id_entries[i], "icon-press", G_CALLBACK(on_stream_key_icon_click), nullptr);
+        gtk_widget_set_hexpand(GTK_WIDGET(*stream_id_entries[i]), true);
+        gtk_grid_attach(stream_id_grid, GTK_WIDGET(*stream_id_entries[i]), 1, 0, 1, 1);
+        gtk_widget_set_visible(GTK_WIDGET(*stream_id_entries[i]), false);
     }
-    gtk_widget_set_hexpand(GTK_WIDGET(stream_container), true);
-    gtk_grid_attach(stream_container_grid, GTK_WIDGET(stream_container), 1, 0, 1, 1);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(stream_container), 1); // TODO:
+
+    custom_stream_container_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(custom_stream_container_grid), 0, row++, 3, 1);
+    gtk_grid_attach(custom_stream_container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
+    custom_stream_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    for(auto &supported_container : supported_containers) {
+        gtk_combo_box_text_append(custom_stream_container, supported_container.container_name, supported_container.file_extension);
+    }
+    gtk_widget_set_hexpand(GTK_WIDGET(custom_stream_container), true);
+    gtk_grid_attach(custom_stream_container_grid, GTK_WIDGET(custom_stream_container), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(custom_stream_container), 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, row++, 3, 1);
@@ -3175,13 +3202,6 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.streaming_config.streaming_service != "twitch" && config.streaming_config.streaming_service != "youtube" && config.streaming_config.streaming_service != "custom")
         config.streaming_config.streaming_service = "twitch";
 
-    if(config.streaming_config.streaming_service == "custom") {
-        gtk_widget_set_visible(GTK_WIDGET(stream_container_grid), TRUE);
-        gtk_label_set_text(stream_key_label, "Url: ");
-    } else {
-        gtk_widget_set_visible(GTK_WIDGET(stream_container_grid), FALSE);
-    }
-
     if(config.record_config.save_directory.empty() || !is_directory(config.record_config.save_directory.c_str()))
         config.record_config.save_directory = get_videos_dir();
 
@@ -3218,8 +3238,10 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_cursor_button), config.main_config.record_cursor);
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
-    gtk_entry_set_text(stream_id_entry, config.streaming_config.stream_key.c_str());
-    gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_container), config.streaming_config.container.c_str());
+    gtk_entry_set_text(youtube_stream_id_entry, config.streaming_config.youtube.stream_key.c_str());
+    gtk_entry_set_text(twitch_stream_id_entry, config.streaming_config.twitch.stream_key.c_str());
+    gtk_entry_set_text(custom_stream_url_entry, config.streaming_config.custom.url.c_str());
+    gtk_combo_box_set_active_id(GTK_COMBO_BOX(custom_stream_container), config.streaming_config.custom.container.c_str());
     if(!wayland && streaming_hotkey_button && !config_empty) {
         streaming_hotkey.keysym = config.streaming_config.start_recording_hotkey.keysym;
         streaming_hotkey.modkey_mask = config.streaming_config.start_recording_hotkey.modifiers;
@@ -3264,6 +3286,7 @@ static void load_config(const gpu_info &gpu_inf) {
         gtk_widget_set_visible(replay_save_hotkey.hotkey_active_label, false);
     }
     enable_stream_record_button_if_info_filled();
+    stream_service_item_change_callback(GTK_COMBO_BOX(stream_service_input_menu), nullptr);
 
     if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor != GPU_VENDOR_NVIDIA && config.main_config.codec != "av1") {
         if(supported_video_codecs.av1) {
