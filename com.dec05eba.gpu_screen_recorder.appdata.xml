@@ -79,6 +79,13 @@
     </screenshots>
 
     <releases>
+        <release version="3.7.4" date="2024-05-13">
+            <description>
+                <ul>
+                    <p>Make audio sync even better. Audio sync is broken in all applications anyways so what can be done really</p>
+                </ul>
+            </description>
+        </release>
         <release version="3.7.3" date="2024-05-12">
             <description>
                 <ul>
