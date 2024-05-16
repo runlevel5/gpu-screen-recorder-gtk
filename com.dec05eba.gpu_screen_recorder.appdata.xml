@@ -60,6 +60,7 @@
             "flatpak install org.freedesktop.Platform.GL.nvidia-version", for example "flatpak install org.freedesktop.Platform.GL.nvidia-550-54-14".
             You can find which NVIDIA driver version is running on your system by running "cat /proc/driver/nvidia/version".
         </p>
+        <p>GPU Screen Recorder flatpak can install files in $HOME/.local/share/gpu-screen-recorder. If you want to uninstall GPU Screen Recorder then you will have to remove this directory manually.</p>
     </description>
 
     <launchable type="desktop-id">com.dec05eba.gpu_screen_recorder.desktop</launchable>
