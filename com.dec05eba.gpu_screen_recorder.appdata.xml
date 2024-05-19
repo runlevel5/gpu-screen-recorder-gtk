@@ -80,6 +80,14 @@
     </screenshots>
 
     <releases>
+        <release version="3.7.5" date="2024-05-19">
+            <description>
+                <ul>
+                    <li>Fix twitch/youtube streaming not working</li>
+                    <li>Fix possible freeze on recording stop if stopping quickly after starting recording</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.7.4" date="2024-05-13">
             <description>
                 <p>Make audio sync even better. Audio sync is broken in all applications anyways so what can be done really</p>
