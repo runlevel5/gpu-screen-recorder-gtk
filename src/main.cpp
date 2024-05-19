@@ -1859,10 +1859,10 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     const gchar *stream_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     if(strcmp(stream_service, "twitch") == 0) {
         stream_url = "rtmp://live.twitch.tv/app/";
-        stream_url += gtk_entry_get_text(youtube_stream_id_entry);
+        stream_url += gtk_entry_get_text(twitch_stream_id_entry);
     } else if(strcmp(stream_service, "youtube") == 0) {
         stream_url = "rtmp://a.rtmp.youtube.com/live2/";
-        stream_url += gtk_entry_get_text(twitch_stream_id_entry);
+        stream_url += gtk_entry_get_text(youtube_stream_id_entry);
     } else if(strcmp(stream_service, "custom") == 0) {
         stream_url = gtk_entry_get_text(custom_stream_url_entry);
         container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(custom_stream_container));
@@ -3396,8 +3396,6 @@ static const char* gpu_vendor_to_name(gpu_vendor vendor) {
 static void activate(GtkApplication *app, gpointer) {
     flatpak = is_inside_flatpak();
 
-    Display *dpy = XOpenDisplay(NULL);
-    wayland = !dpy || is_xwayland(dpy);
     if(!wayland && !dpy) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Neither X11 nor Wayland is running.");
