@@ -81,6 +81,13 @@
     </screenshots>
 
     <releases>
+        <release version="3.7.6" date="2024-05-20">
+            <description>
+                <ul>
+                    <li>Do not force constant framerate for live streams</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.7.5" date="2024-05-19">
             <description>
                 <ul>
