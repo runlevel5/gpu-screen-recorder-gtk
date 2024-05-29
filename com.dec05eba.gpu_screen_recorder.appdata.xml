@@ -81,6 +81,13 @@
     </screenshots>
 
     <releases>
+        <release version="3.7.7" date="2024-05-30">
+            <description>
+                <ul>
+                    <li>Fix recording freeze on nvidia when __GL_SYNC_TO_VBLANK environment variable is set to 1</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.7.6" date="2024-05-20">
             <description>
                 <ul>
