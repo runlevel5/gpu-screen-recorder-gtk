@@ -1506,6 +1506,7 @@ static bool kill_gpu_screen_recorder_get_result() {
         } else {
             exit_success = WIFEXITED(status) && WEXITSTATUS(status) == 0;
         }
+        gpu_screen_recorder_process = -1;
     }
     return exit_success;
 }
@@ -1550,7 +1551,6 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
         gtk_button_set_label(button, "Start replay");
         replaying = false;
-        gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), true);
         gtk_widget_set_sensitive(GTK_WIDGET(replay_save_button), false);
 
@@ -1691,7 +1691,6 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
         gtk_button_set_label(button, "Start recording");
         recording = false;
-        gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), true);
 
         paused = false;
@@ -1817,7 +1816,6 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
         gtk_button_set_label(button, "Start streaming");
         streaming = false;
-        gpu_screen_recorder_process = -1;
         gtk_widget_set_sensitive(GTK_WIDGET(stream_back_button), true);
 
         gtk_widget_set_opacity(GTK_WIDGET(streaming_bottom_panel_grid), 0.5);
@@ -3047,6 +3045,7 @@ static void handle_child_process_death(gpointer userdata) {
     if(waitpid(gpu_screen_recorder_process, &status, WNOHANG) == 0)
         return;
 
+    gpu_screen_recorder_process = -1;
     prev_exit_status = -1;
     if(WIFEXITED(status))
         prev_exit_status = WEXITSTATUS(status);
