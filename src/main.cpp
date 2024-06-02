@@ -21,6 +21,7 @@ extern "C" {
 }
 #include <xf86drmMode.h>
 #include <xf86drm.h>
+#include <libappindicator/app-indicator.h>
 
 typedef struct {
     Display *display;
@@ -38,6 +39,7 @@ typedef struct {
     GtkWidget *streaming_page;
 } PageNavigationUserdata;
 
+static bool window_hidden = false;
 static GtkWidget *window;
 static SelectWindowUserdata select_window_userdata;
 static PageNavigationUserdata page_navigation_userdata;
@@ -102,6 +104,14 @@ static GtkGrid *streaming_bottom_panel_grid;
 static GtkWidget *streaming_record_time_label;
 static GtkGrid *replay_bottom_panel_grid;
 static GtkWidget *replay_record_time_label;
+static GtkWidget *show_hide_menu_item;
+static GtkWidget *recording_menu_separator;
+static GtkWidget *start_stop_streaming_menu_item;
+static GtkWidget *start_stop_recording_menu_item;
+static GtkWidget *pause_recording_menu_item;
+static GtkWidget *start_stop_replay_menu_item;
+static GtkWidget *save_replay_menu_item;
+static GtkWidget *hide_window_when_recording_menu_item;
 
 static double record_start_time_sec = 0.0;
 static double pause_start_sec = 0.0;
@@ -128,6 +138,11 @@ static gsr_egl egl;
 static bool showing_notification = false;
 static double notification_timeout_seconds = 0.0;
 static double notification_start_seconds = 0.0;
+
+static AppIndicator *app_indicator;
+static const char *tray_idle_icon_name = "tray_idle";
+static const char *tray_recording_icon_name = "tray_recording";
+static const char *tray_paused_icon_name = "tray_paused";
 
 struct AudioInput {
     std::string name;
@@ -251,6 +266,135 @@ static double clock_get_monotonic_seconds(void) {
     ts.tv_nsec = 0;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec + (double)ts.tv_nsec * 0.000000001;
+}
+
+static void show_window() {
+    gdk_window_show(gtk_widget_get_window(window));
+    gtk_menu_item_set_label(GTK_MENU_ITEM(show_hide_menu_item), "Hide window");
+    window_hidden = false;
+}
+
+static void hide_window() {
+    gdk_window_hide(gtk_widget_get_window(window));
+    gtk_menu_item_set_label(GTK_MENU_ITEM(show_hide_menu_item), "Show window");
+    window_hidden = true;
+}
+
+static void systray_show_hide_callback(GtkMenuItem*, gpointer) {
+    if(window_hidden) {
+        show_window();
+    } else {
+        hide_window();
+    }
+}
+
+static void hide_window_when_recording_systray_callback(GtkMenuItem*, gpointer) {
+    config.main_config.hide_window_when_recording = gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item));
+}
+
+static void start_stop_streaming_menu_item_systray_callback(GtkMenuItem*, gpointer userdata);
+static void start_stop_recording_systray_callback(GtkMenuItem*, gpointer userdata);
+static void pause_recording_systray_callback(GtkMenuItem*, gpointer userdata);
+static void start_stop_replay_systray_callback(GtkMenuItem*, gpointer userdata);
+static void save_replay_systray_callback(GtkMenuItem*, gpointer userdata);
+
+static void systray_exit_callback(GtkMenuItem*, gpointer) {
+    gtk_window_close(GTK_WINDOW(window));
+}
+
+enum class SystrayPage {
+    FRONT,
+    STREAMING,
+    RECORDING,
+    REPLAY
+};
+
+static GtkMenuShell* create_systray_menu(GtkApplication *app, SystrayPage systray_page) {
+    GtkMenuShell *menu = GTK_MENU_SHELL(gtk_menu_new());
+
+    show_hide_menu_item = gtk_menu_item_new_with_label("Hide window");
+    g_signal_connect(show_hide_menu_item, "activate", G_CALLBACK(systray_show_hide_callback), app);
+    gtk_menu_shell_append(menu, show_hide_menu_item);
+
+    {
+        GtkMenuShell *options_menu = GTK_MENU_SHELL(gtk_menu_new());
+        hide_window_when_recording_menu_item = gtk_check_menu_item_new_with_label("Hide window when recording starts");
+        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item), config.main_config.hide_window_when_recording);
+        g_signal_connect(hide_window_when_recording_menu_item, "activate", G_CALLBACK(hide_window_when_recording_systray_callback), nullptr);
+        gtk_menu_shell_append(options_menu, hide_window_when_recording_menu_item);
+
+        GtkWidget *options_menu_item = gtk_menu_item_new_with_label("Options");
+        gtk_menu_item_set_submenu(GTK_MENU_ITEM(options_menu_item), GTK_WIDGET(options_menu));
+        gtk_menu_shell_append(menu, options_menu_item);
+    }
+
+    recording_menu_separator = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(menu, recording_menu_separator);
+
+    start_stop_streaming_menu_item = gtk_menu_item_new_with_label("Start streaming");
+    g_signal_connect(start_stop_streaming_menu_item, "activate", G_CALLBACK(start_stop_streaming_menu_item_systray_callback), app);
+    gtk_menu_shell_append(menu, start_stop_streaming_menu_item);
+
+    start_stop_recording_menu_item = gtk_menu_item_new_with_label("Start recording");
+    g_signal_connect(start_stop_recording_menu_item, "activate", G_CALLBACK(start_stop_recording_systray_callback), app);
+    gtk_menu_shell_append(menu, start_stop_recording_menu_item);
+
+    pause_recording_menu_item = gtk_menu_item_new_with_label("Pause recording");
+    g_signal_connect(pause_recording_menu_item, "activate", G_CALLBACK(pause_recording_systray_callback), app);
+    gtk_menu_shell_append(menu, pause_recording_menu_item);
+
+    start_stop_replay_menu_item = gtk_menu_item_new_with_label("Start replay");
+    g_signal_connect(start_stop_replay_menu_item, "activate", G_CALLBACK(start_stop_replay_systray_callback), app);
+    gtk_menu_shell_append(menu, start_stop_replay_menu_item);
+
+    save_replay_menu_item = gtk_menu_item_new_with_label("Save replay");
+    g_signal_connect(save_replay_menu_item, "activate", G_CALLBACK(save_replay_systray_callback), app);
+    gtk_menu_shell_append(menu, save_replay_menu_item);
+
+    gtk_menu_shell_append(menu, gtk_separator_menu_item_new());
+
+    GtkWidget *exit_menu_item = gtk_menu_item_new_with_label("Exit");
+    g_signal_connect(exit_menu_item, "activate", G_CALLBACK(systray_exit_callback), nullptr);
+    gtk_menu_shell_append(menu, exit_menu_item);
+
+    gtk_widget_show_all(GTK_WIDGET(menu));
+    gtk_widget_set_visible(recording_menu_separator, false);
+    gtk_widget_set_visible(start_stop_streaming_menu_item, false);
+    gtk_widget_set_visible(start_stop_recording_menu_item, false);
+    gtk_widget_set_visible(pause_recording_menu_item, false);
+    gtk_widget_set_visible(start_stop_replay_menu_item, false);
+    gtk_widget_set_visible(save_replay_menu_item, false);
+
+    switch(systray_page) {
+        case SystrayPage::FRONT:
+            break;
+        case SystrayPage::STREAMING:
+            gtk_widget_set_visible(recording_menu_separator, true);
+            gtk_widget_set_visible(start_stop_streaming_menu_item, true);
+            break;
+        case SystrayPage::RECORDING:
+            gtk_widget_set_visible(recording_menu_separator, true);
+            gtk_widget_set_visible(start_stop_recording_menu_item, true);
+            gtk_widget_set_visible(pause_recording_menu_item, true);
+            gtk_widget_set_sensitive(pause_recording_menu_item, false);
+            break;
+        case SystrayPage::REPLAY:
+            gtk_widget_set_visible(recording_menu_separator, true);
+            gtk_widget_set_visible(start_stop_replay_menu_item, true);
+            gtk_widget_set_visible(save_replay_menu_item, true);
+            gtk_widget_set_sensitive(save_replay_menu_item, false);
+            break;
+    }
+    return menu;
+}
+
+static void setup_systray(GtkApplication *app) {
+    app_indicator = app_indicator_new_with_path("com.dec05eba.gpu_screen_recorder", tray_idle_icon_name, APP_INDICATOR_CATEGORY_APPLICATION_STATUS, "/usr/share/com.dec05eba.gpu_screen_recorder");
+    // This triggers Gdk assert: gdk_window_thaw_toplevel_updates: assertion 'window->update_and_descendants_freeze_count > 0' failed,
+    // dont know why but it works anyways
+    app_indicator_set_status(app_indicator, APP_INDICATOR_STATUS_ACTIVE);
+    app_indicator_set_title(app_indicator, "GPU Screen Recorder");
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(app, SystrayPage::FRONT)));
 }
 
 static void pa_state_cb(pa_context *c, void *userdata) {
@@ -620,6 +764,7 @@ static void save_configs() {
     config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
     config.main_config.show_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button));
     config.main_config.record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
+    config.main_config.hide_window_when_recording = gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.youtube.stream_key = gtk_entry_get_text(youtube_stream_id_entry);
@@ -1371,6 +1516,8 @@ static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
 
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->replay_page);
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::REPLAY)));
+
     if(!wayland) {
         HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
         if(!hotkey_result.replay_start_stop_hotkey_success) {
@@ -1384,6 +1531,7 @@ static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
             replay_save_hotkey.modkey_mask = 0;
         }
     }
+
     return true;
 }
 
@@ -1393,6 +1541,8 @@ static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
 
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::RECORDING)));
+
     if(!wayland) {
         HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
         if(!hotkey_result.record_hotkey_success) {
@@ -1406,6 +1556,7 @@ static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
             pause_unpause_hotkey.modkey_mask = 0;
         }
     }
+
     return true;
 }
 
@@ -1434,6 +1585,8 @@ static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
 
     PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->streaming_page);
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::STREAMING)));
+
     if(!wayland) {
         HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
         if(!hotkey_result.streaming_hotkey_success) {
@@ -1442,6 +1595,7 @@ static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
             streaming_hotkey.modkey_mask = 0;
         }
     }
+
     return true;
 }
 
@@ -1450,6 +1604,7 @@ static gboolean on_streaming_recording_replay_page_back_click(GtkButton*, gpoint
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->common_settings_page);
     ungrab_keys(gdk_x11_get_default_xdisplay());
     hotkey_mode = HotkeyMode::NoAction;
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::FRONT)));
     return true;
 }
 
@@ -1557,6 +1712,10 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         gtk_widget_set_opacity(GTK_WIDGET(replay_bottom_panel_grid), 0.5);
         gtk_label_set_text(GTK_LABEL(replay_record_time_label), "00:00:00");
 
+        gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_replay_menu_item), "Start replay");
+        gtk_widget_set_sensitive(save_replay_menu_item, false);
+        app_indicator_set_icon(app_indicator, tray_idle_icon_name);
+
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
@@ -1626,6 +1785,10 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
     args.push_back(NULL);
 
+    if(gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item))) {
+        hide_window();
+    }
+
     pid_t parent_pid = getpid();
     pid_t pid = fork();
     if(pid == -1) {
@@ -1646,18 +1809,28 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         _exit(127);
     } else { /* parent process */
         gpu_screen_recorder_process = pid;
-        gtk_button_set_label(button, "Stop replay");
     }
 
     replaying = true;
+
+    gtk_button_set_label(button, "Stop replay");
+
     gtk_widget_set_sensitive(GTK_WIDGET(replay_back_button), false);
     gtk_widget_set_sensitive(GTK_WIDGET(replay_save_button), true);
     gtk_widget_set_opacity(GTK_WIDGET(replay_bottom_panel_grid), 1.0);
+
+    gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_replay_menu_item), "Stop replay");
+    gtk_widget_set_sensitive(save_replay_menu_item, true);
+    app_indicator_set_icon(app_indicator, tray_recording_icon_name);
+
     record_start_time_sec = clock_get_monotonic_seconds();
     return true;
 }
 
 static gboolean on_replay_save_button_click(GtkButton*, gpointer userdata) {
+    if(gpu_screen_recorder_process == -1)
+        return true;
+
     GtkApplication *app = (GtkApplication*)userdata;
     kill(gpu_screen_recorder_process, SIGUSR1);
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button)))
@@ -1666,15 +1839,22 @@ static gboolean on_replay_save_button_click(GtkButton*, gpointer userdata) {
 }
 
 static gboolean on_pause_unpause_button_click(GtkButton*, gpointer) {
+    if(gpu_screen_recorder_process == -1)
+        return true;
+
     kill(gpu_screen_recorder_process, SIGUSR2);
     paused = !paused;
     if(paused) {
         gtk_button_set_label(pause_recording_button, "Unpause recording");
         gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "media-playback-pause", GTK_ICON_SIZE_SMALL_TOOLBAR);
+        gtk_menu_item_set_label(GTK_MENU_ITEM(pause_recording_menu_item), "Unpause recording");
+        app_indicator_set_icon(app_indicator, tray_paused_icon_name);
         pause_start_sec = clock_get_monotonic_seconds();
     } else {
         gtk_button_set_label(pause_recording_button, "Pause recording");
         gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
+        gtk_menu_item_set_label(GTK_MENU_ITEM(pause_recording_menu_item), "Pause recording");
+        app_indicator_set_icon(app_indicator, tray_recording_icon_name);
         paused_time_offset_sec += (clock_get_monotonic_seconds() - pause_start_sec);
     }
     return true;
@@ -1700,6 +1880,11 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         gtk_widget_set_opacity(GTK_WIDGET(recording_bottom_panel_grid), 0.5);
         gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
         gtk_label_set_text(GTK_LABEL(recording_record_time_label), "00:00:00");
+
+        gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_recording_menu_item), "Start recording");
+        gtk_menu_item_set_label(GTK_MENU_ITEM(pause_recording_menu_item), "Pause recording");
+        gtk_widget_set_sensitive(pause_recording_menu_item, false);
+        app_indicator_set_icon(app_indicator, tray_idle_icon_name);
 
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
@@ -1774,6 +1959,10 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
     args.push_back(NULL);
 
+    if(gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item))) {
+        hide_window();
+    }
+
     pid_t parent_pid = getpid();
     pid_t pid = fork();
     if(pid == -1) {
@@ -1794,13 +1983,19 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         _exit(127);
     } else { /* parent process */
         gpu_screen_recorder_process = pid;
-        gtk_button_set_label(button, "Stop recording");
     }
 
     recording = true;
+
+    gtk_button_set_label(button, "Stop recording");
     gtk_widget_set_sensitive(GTK_WIDGET(record_back_button), false);
     gtk_widget_set_sensitive(GTK_WIDGET(pause_recording_button), true);
     gtk_widget_set_opacity(GTK_WIDGET(recording_bottom_panel_grid), 1.0);
+
+    gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_recording_menu_item), "Stop recording");
+    gtk_widget_set_sensitive(pause_recording_menu_item, true);
+    app_indicator_set_icon(app_indicator, tray_recording_icon_name);
+
     record_start_time_sec = clock_get_monotonic_seconds();
     paused_time_offset_sec = 0.0;
     return true;
@@ -1820,6 +2015,9 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
         gtk_widget_set_opacity(GTK_WIDGET(streaming_bottom_panel_grid), 0.5);
         gtk_label_set_text(GTK_LABEL(streaming_record_time_label), "00:00:00");
+
+        gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_streaming_menu_item), "Start streaming");
+        app_indicator_set_icon(app_indicator, tray_idle_icon_name);
 
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
@@ -1906,6 +2104,10 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
     args.push_back(NULL);
 
+    if(gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item))) {
+        hide_window();
+    }
+
     pid_t parent_pid = getpid();
     pid_t pid = fork();
     if(pid == -1) {
@@ -1926,14 +2128,40 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         _exit(127);
     } else { /* parent process */
         gpu_screen_recorder_process = pid;
-        gtk_button_set_label(button, "Stop streaming");
     }
 
     streaming = true;
+
+    gtk_button_set_label(button, "Stop streaming");
+
     gtk_widget_set_sensitive(GTK_WIDGET(stream_back_button), false);
     gtk_widget_set_opacity(GTK_WIDGET(streaming_bottom_panel_grid), 1.0);
+
+    gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_streaming_menu_item), "Stop streaming");
+    app_indicator_set_icon(app_indicator, tray_recording_icon_name);
+
     record_start_time_sec = clock_get_monotonic_seconds();
     return true;
+}
+
+static void start_stop_streaming_menu_item_systray_callback(GtkMenuItem*, gpointer userdata) {
+    on_start_streaming_button_click(start_streaming_button, userdata);
+}
+
+static void start_stop_recording_systray_callback(GtkMenuItem*, gpointer userdata) {
+    on_start_recording_button_click(start_recording_button, userdata);
+}
+
+static void pause_recording_systray_callback(GtkMenuItem*, gpointer userdata) {
+    on_pause_unpause_button_click(pause_recording_button, userdata);
+}
+
+static void start_stop_replay_systray_callback(GtkMenuItem*, gpointer userdata) {
+    on_start_replay_button_click(start_replay_button, userdata);
+}
+
+static void save_replay_systray_callback(GtkMenuItem*, gpointer userdata) {
+    on_replay_save_button_click(replay_save_button, userdata);
 }
 
 static void gtk_widget_set_margin(GtkWidget *widget, int top, int bottom, int left, int right) {
@@ -3237,6 +3465,7 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), config.main_config.overclock);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_notification_button), config.main_config.show_notifications);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_cursor_button), config.main_config.record_cursor);
+    gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item), config.main_config.hide_window_when_recording);
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(youtube_stream_id_entry, config.streaming_config.youtube.stream_key.c_str());
@@ -3517,6 +3746,8 @@ static void activate(GtkApplication *app, gpointer) {
         GdkWindow *root_window = gdk_get_default_root_window();
         gdk_window_add_filter(root_window, hotkey_filter_callback, &page_navigation_userdata);
     }
+
+    setup_systray(app);
 
     g_timeout_add(500, timer_timeout_handler, app);
 

@@ -9,9 +9,16 @@ cd "$script_dir"
 strip gpu-screen-recorder-gtk
 
 install -Dm755 "gpu-screen-recorder-gtk" "/usr/bin/gpu-screen-recorder-gtk"
+
 install -Dm644 "gpu-screen-recorder-gtk.desktop" "/usr/share/applications/com.dec05eba.gpu_screen_recorder.desktop"
 install -Dm644 com.dec05eba.gpu_screen_recorder.appdata.xml "/usr/share/metainfo/com.dec05eba.gpu_screen_recorder.appdata.xml"
-install -Dm644 icons/hicolor/64x64/apps/com.dec05eba.gpu_screen_recorder.png "/usr/share/icons/hicolor/64x64/apps/com.dec05eba.gpu_screen_recorder.png"
-install -Dm644 icons/hicolor/128x128/apps/com.dec05eba.gpu_screen_recorder.png "/usr/share/icons/hicolor/128x128/apps/com.dec05eba.gpu_screen_recorder.png"
+
+install -Dm644 "icons/hicolor/32x32/apps/com.dec05eba.gpu_screen_recorder.png" "/usr/share/icons/hicolor/32x32/apps/com.dec05eba.gpu_screen_recorder.png"
+install -Dm644 "icons/hicolor/64x64/apps/com.dec05eba.gpu_screen_recorder.png" "/usr/share/icons/hicolor/64x64/apps/com.dec05eba.gpu_screen_recorder.png"
+install -Dm644 "icons/hicolor/128x128/apps/com.dec05eba.gpu_screen_recorder.png" "/usr/share/icons/hicolor/128x128/apps/com.dec05eba.gpu_screen_recorder.png"
+
+install -Dm644 "icons/tray_idle.png" "/usr/share/com.dec05eba.gpu_screen_recorder/tray_idle.png"
+install -Dm644 "icons/tray_recording.png" "/usr/share/com.dec05eba.gpu_screen_recorder/tray_recording.png"
+install -Dm644 "icons/tray_paused.png" "/usr/share/com.dec05eba.gpu_screen_recorder/tray_paused.png"
 
 echo "Successfully installed gpu-screen-recorder-gtk"

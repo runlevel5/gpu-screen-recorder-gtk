@@ -35,6 +35,7 @@ struct MainConfig {
     bool overclock = false;
     bool show_notifications = true;
     bool record_cursor = true;
+    bool hide_window_when_recording = false;
 };
 
 struct YoutubeStreamConfig {
@@ -308,6 +309,7 @@ static std::map<std::string, ConfigValue> get_config_options(Config &config) {
         {"main.overclock", {CONFIG_TYPE_BOOL, &config.main_config.overclock}},
         {"main.show_notifications", {CONFIG_TYPE_BOOL, &config.main_config.show_notifications}},
         {"main.record_cursor", {CONFIG_TYPE_BOOL, &config.main_config.record_cursor}},
+        {"main.hide_window_when_recording", {CONFIG_TYPE_BOOL, &config.main_config.hide_window_when_recording}},
 
         {"streaming.service", {CONFIG_TYPE_STRING, &config.streaming_config.streaming_service}},
         {"streaming.youtube.key", {CONFIG_TYPE_STRING, &config.streaming_config.youtube.stream_key}},
