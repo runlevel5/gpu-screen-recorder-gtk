@@ -21,9 +21,9 @@ struct ConfigHotkey {
 
 struct MainConfig {
     std::string record_area_option;
-    int record_area_width = 0;
-    int record_area_height = 0;
-    int fps = 60;
+    int32_t record_area_width = 0;
+    int32_t record_area_height = 0;
+    int32_t fps = 60;
     bool merge_audio_tracks = true;
     std::vector<std::string> audio_input;
     std::string color_range;
@@ -68,7 +68,7 @@ struct RecordConfig {
 struct ReplayConfig {
     std::string save_directory;
     std::string container;
-    int replay_time = 30;
+    int32_t replay_time = 30;
     ConfigHotkey start_recording_hotkey;
     ConfigHotkey save_recording_hotkey;
 };
@@ -78,6 +78,19 @@ struct Config {
     StreamingConfig streaming_config;
     RecordConfig record_config;
     ReplayConfig replay_config;
+};
+
+typedef enum {
+    CONFIG_TYPE_BOOL,
+    CONFIG_TYPE_STRING,         // std::string
+    CONFIG_TYPE_I32,
+    CONFIG_TYPE_HOTKEY,         // ConfigHotkey
+    CONFIG_TYPE_STRING_ARRAY,   // std::vector<std::string>
+} ConfigValueType;
+
+struct ConfigValue {
+    ConfigValueType type;
+    void *data;
 };
 
 static std::string get_home_dir() {
@@ -278,16 +291,45 @@ static bool config_split_key_value(const StringView str, StringView &key, String
     return true;
 }
 
-static bool string_to_int(std::string str, int &value) {
-    value = 0;
-    errno = 0;
-    char *endptr;
-    value = (int)strtoll(str.c_str(), &endptr, 10);
-    if(endptr == str.c_str() || errno != 0)
-        return false;
-    return true;
+static std::map<std::string, ConfigValue> get_config_options(Config &config) {
+    return {
+        {"main.record_area_option", {CONFIG_TYPE_STRING, &config.main_config.record_area_option}},
+        {"main.record_area_width", {CONFIG_TYPE_I32, &config.main_config.record_area_width}},
+        {"main.record_area_height", {CONFIG_TYPE_I32, &config.main_config.record_area_height}},
+        {"main.fps", {CONFIG_TYPE_I32, &config.main_config.fps}},
+        {"main.merge_audio_tracks", {CONFIG_TYPE_BOOL, &config.main_config.merge_audio_tracks}},
+        {"main.audio_input", {CONFIG_TYPE_STRING_ARRAY, &config.main_config.audio_input}},
+        {"main.color_range", {CONFIG_TYPE_STRING, &config.main_config.color_range}},
+        {"main.quality", {CONFIG_TYPE_STRING, &config.main_config.quality}},
+        {"main.codec", {CONFIG_TYPE_STRING, &config.main_config.codec}},
+        {"main.audio_codec", {CONFIG_TYPE_STRING, &config.main_config.audio_codec}},
+        {"main.framerate_mode", {CONFIG_TYPE_STRING, &config.main_config.framerate_mode}},
+        {"main.advanced_view", {CONFIG_TYPE_BOOL, &config.main_config.advanced_view}},
+        {"main.overclock", {CONFIG_TYPE_BOOL, &config.main_config.overclock}},
+        {"main.show_notifications", {CONFIG_TYPE_BOOL, &config.main_config.show_notifications}},
+        {"main.record_cursor", {CONFIG_TYPE_BOOL, &config.main_config.record_cursor}},
+
+        {"streaming.service", {CONFIG_TYPE_STRING, &config.streaming_config.streaming_service}},
+        {"streaming.youtube.key", {CONFIG_TYPE_STRING, &config.streaming_config.youtube.stream_key}},
+        {"streaming.twitch.key", {CONFIG_TYPE_STRING, &config.streaming_config.twitch.stream_key}},
+        {"streaming.custom.url", {CONFIG_TYPE_STRING, &config.streaming_config.custom.url}},
+        {"streaming.custom.container", {CONFIG_TYPE_STRING, &config.streaming_config.custom.container}},
+        {"streaming.start_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.streaming_config.start_recording_hotkey}},
+
+        {"record.save_directory", {CONFIG_TYPE_STRING, &config.record_config.save_directory}},
+        {"record.container", {CONFIG_TYPE_STRING, &config.record_config.container}},
+        {"record.start_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.record_config.start_recording_hotkey}},
+        {"record.pause_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.record_config.pause_recording_hotkey}},
+
+        {"replay.save_directory", {CONFIG_TYPE_STRING, &config.replay_config.save_directory}},
+        {"replay.container", {CONFIG_TYPE_STRING, &config.replay_config.container}},
+        {"replay.time", {CONFIG_TYPE_I32, &config.replay_config.replay_time}},
+        {"replay.start_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.replay_config.start_recording_hotkey}},
+        {"replay.save_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.replay_config.save_recording_hotkey}}
+    };
 }
 
+#define FORMAT_I32 "%" PRIi32
 #define FORMAT_I64 "%" PRIi64
 #define FORMAT_U32 "%" PRIu32
 
@@ -302,6 +344,8 @@ static Config read_config(bool &config_empty) {
         return config;
     }
 
+    auto config_options = get_config_options(config);
+
     string_split_char(file_content, '\n', [&](StringView line) {
         StringView key, value;
         if(!config_split_key_value(line, key, value)) {
@@ -309,120 +353,46 @@ static Config read_config(bool &config_empty) {
             return true;
         }
 
-        if(key == "main.record_area_option") {
-            config.main_config.record_area_option.assign(value.str, value.size);
-        } else if(key == "main.record_area_width") {
-            if(!string_to_int(std::string(value.str, value.size), config.main_config.record_area_width)) {
-                fprintf(stderr, "Warning: Invalid config option value for main.record_area_width\n");
-                config.main_config.record_area_width = 0;
+        if(key.size == 0 || value.size == 0)
+            return true;
+
+        auto it = config_options.find(std::string(key.str, key.size));
+        if(it == config_options.end())
+            return true;
+
+        switch(it->second.type) {
+            case CONFIG_TYPE_BOOL: {
+                *(bool*)it->second.data = value == "true";
+                break;
             }
-        } else if(key == "main.record_area_height") {
-            if(!string_to_int(std::string(value.str, value.size), config.main_config.record_area_height)) {
-                fprintf(stderr, "Warning: Invalid config option value for main.record_area_height\n");
-                config.main_config.record_area_height = 0;
+            case CONFIG_TYPE_STRING: {
+                ((std::string*)it->second.data)->assign(value.str, value.size);
+                break;
             }
-        } else if(key == "main.fps") {
-            if(!string_to_int(std::string(value.str, value.size), config.main_config.fps)) {
-                fprintf(stderr, "Warning: Invalid config option value for main.fps\n");
-                config.main_config.fps = 60;
+            case CONFIG_TYPE_I32: {
+                std::string value_str(value.str, value.size);
+                int32_t *value = (int32_t*)it->second.data;
+                if(sscanf(value_str.c_str(), FORMAT_I32, value) != 1) {
+                    fprintf(stderr, "Warning: Invalid config option value for %.*s\n", (int)key.size, key.str);
+                    *value = 0;
+                }
+                break;
             }
-        } else if(key == "main.merge_audio_tracks") {
-            if(value == "true")
-                config.main_config.merge_audio_tracks = true;
-            else if(value == "false")
-                config.main_config.merge_audio_tracks = false;
-        } else if(key == "main.audio_input") {
-            config.main_config.audio_input.emplace_back(value.str, value.size);
-        } else if(key == "main.color_range") {
-            config.main_config.color_range.assign(value.str, value.size);
-        } else if(key == "main.quality") {
-            config.main_config.quality.assign(value.str, value.size);
-        } else if(key == "main.codec") {
-            config.main_config.codec.assign(value.str, value.size);
-        } else if(key == "main.audio_codec") {
-            config.main_config.audio_codec.assign(value.str, value.size);
-        } else if(key == "main.framerate_mode") {
-            config.main_config.framerate_mode.assign(value.str, value.size);
-        } else if(key == "main.advanced_view") {
-            if(value == "true")
-                config.main_config.advanced_view = true;
-            else if(value == "false")
-                config.main_config.advanced_view = false;
-        } else if(key == "main.overclock") {
-            if(value == "true")
-                config.main_config.overclock = true;
-            else if(value == "false")
-                config.main_config.overclock = false;
-        } else if(key == "main.show_notifications") {
-            if(value == "true")
-                config.main_config.show_notifications = true;
-            else if(value == "false")
-                config.main_config.show_notifications = false;
-        } else if(key == "main.record_cursor") {
-            if(value == "true")
-                config.main_config.record_cursor = true;
-            else if(value == "false")
-                config.main_config.record_cursor = false;
-        } else if(key == "streaming.service") {
-            config.streaming_config.streaming_service.assign(value.str, value.size);
-        } else if(key == "streaming.youtube.key") {
-            config.streaming_config.youtube.stream_key.assign(value.str, value.size);
-        } else if(key == "streaming.twitch.key") {
-            config.streaming_config.twitch.stream_key.assign(value.str, value.size);
-        } else if(key == "streaming.custom.url") {
-            config.streaming_config.custom.url.assign(value.str, value.size);
-        } else if(key == "streaming.custom.container") {
-            config.streaming_config.custom.container.assign(value.str, value.size);
-        } else if(key == "streaming.start_recording_hotkey") {
-            std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.streaming_config.start_recording_hotkey.keysym, &config.streaming_config.start_recording_hotkey.modifiers) != 2) {
-                fprintf(stderr, "Warning: Invalid config option value for streaming.start_recording_hotkey\n");
-                config.streaming_config.start_recording_hotkey.keysym = 0;
-                config.streaming_config.start_recording_hotkey.modifiers = 0;
+            case CONFIG_TYPE_HOTKEY: {
+                std::string value_str(value.str, value.size);
+                ConfigHotkey *config_hotkey = (ConfigHotkey*)it->second.data;
+                if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config_hotkey->keysym, &config_hotkey->modifiers) != 2) {
+                    fprintf(stderr, "Warning: Invalid config option value for %.*s\n", (int)key.size, key.str);
+                    config_hotkey->keysym = 0;
+                    config_hotkey->modifiers = 0;
+                }
+                break;
             }
-        } else if(key == "record.save_directory") {
-            config.record_config.save_directory.assign(value.str, value.size);
-        } else if(key == "record.container") {
-            config.record_config.container.assign(value.str, value.size);
-        } else if(key == "record.start_recording_hotkey") {
-            std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.record_config.start_recording_hotkey.keysym, &config.record_config.start_recording_hotkey.modifiers) != 2) {
-                fprintf(stderr, "Warning: Invalid config option value for record.start_recording_hotkey\n");
-                config.record_config.start_recording_hotkey.keysym = 0;
-                config.record_config.start_recording_hotkey.modifiers = 0;
+            case CONFIG_TYPE_STRING_ARRAY: {
+                std::string array_value(value.str, value.size);
+                ((std::vector<std::string>*)it->second.data)->push_back(std::move(array_value));
+                break;
             }
-        } else if(key == "record.pause_recording_hotkey") {
-            std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.record_config.pause_recording_hotkey.keysym, &config.record_config.pause_recording_hotkey.modifiers) != 2) {
-                fprintf(stderr, "Warning: Invalid config option value for record.pause_recording_hotkey\n");
-                config.record_config.pause_recording_hotkey.keysym = 0;
-                config.record_config.pause_recording_hotkey.modifiers = 0;
-            }
-        } else if(key == "replay.save_directory") {
-            config.replay_config.save_directory.assign(value.str, value.size);
-        } else if(key == "replay.container") {
-            config.replay_config.container.assign(value.str, value.size);
-        } else if(key == "replay.time") {
-            if(!string_to_int(std::string(value.str, value.size), config.replay_config.replay_time)) {
-                fprintf(stderr, "Warning: Invalid config option value for replay.time\n");
-                config.replay_config.replay_time = 30;
-            }
-        } else if(key == "replay.start_recording_hotkey") {
-            std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.replay_config.start_recording_hotkey.keysym, &config.replay_config.start_recording_hotkey.modifiers) != 2) {
-                fprintf(stderr, "Warning: Invalid config option value for replay.start_recording_hotkey\n");
-                config.replay_config.start_recording_hotkey.keysym = 0;
-                config.replay_config.start_recording_hotkey.modifiers = 0;
-            }
-        } else if(key == "replay.save_recording_hotkey") {
-            std::string value_str(value.str, value.size);
-            if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config.replay_config.save_recording_hotkey.keysym, &config.replay_config.save_recording_hotkey.modifiers) != 2) {
-                fprintf(stderr, "Warning: Invalid config option value for replay.save_recording_hotkey\n");
-                config.replay_config.save_recording_hotkey.keysym = 0;
-                config.replay_config.save_recording_hotkey.modifiers = 0;
-            }
-        } else {
-            fprintf(stderr, "Warning: Invalid config option: %.*s\n", (int)line.size, line.str);
         }
 
         return true;
@@ -431,7 +401,7 @@ static Config read_config(bool &config_empty) {
     return config;
 }
 
-static void save_config(const Config &config) {
+static void save_config(Config &config) {
     const std::string config_path = get_config_dir() + "/config";
 
     char dir_tmp[PATH_MAX];
@@ -449,41 +419,34 @@ static void save_config(const Config &config) {
         return;
     }
 
-    fprintf(file, "main.record_area_option %s\n", config.main_config.record_area_option.c_str());
-    fprintf(file, "main.record_area_width %d\n", config.main_config.record_area_width);
-    fprintf(file, "main.record_area_height %d\n", config.main_config.record_area_height);
-    fprintf(file, "main.fps %d\n", config.main_config.fps);
-    fprintf(file, "main.merge_audio_tracks %s\n", config.main_config.merge_audio_tracks ? "true" : "false");
-    for(const std::string &audio_input : config.main_config.audio_input) {
-        fprintf(file, "main.audio_input %s\n", audio_input.c_str());
+    const auto config_options = get_config_options(config);
+    for(auto it : config_options) {
+        switch(it.second.type) {
+            case CONFIG_TYPE_BOOL: {
+                fprintf(file, "%s %s\n", it.first.c_str(), *(bool*)it.second.data ? "true" : "false");
+                break;
+            }
+            case CONFIG_TYPE_STRING: {
+                fprintf(file, "%s %s\n", it.first.c_str(), ((std::string*)it.second.data)->c_str());
+                break;
+            }
+            case CONFIG_TYPE_I32: {
+                fprintf(file, "%s " FORMAT_I32 "\n", it.first.c_str(), *(int32_t*)it.second.data);
+                break;
+            }
+            case CONFIG_TYPE_HOTKEY: {
+                const ConfigHotkey *config_hotkey = (const ConfigHotkey*)it.second.data;
+                fprintf(file, "%s " FORMAT_I64 " " FORMAT_U32 "\n", it.first.c_str(), config_hotkey->keysym, config_hotkey->modifiers);
+                break;
+            }
+            case CONFIG_TYPE_STRING_ARRAY: {
+                for(const std::string &value : *(std::vector<std::string>*)it.second.data) {
+                    fprintf(file, "%s %s\n", it.first.c_str(), value.c_str());
+                }
+                break;
+            }
+        }
     }
-    fprintf(file, "main.color_range %s\n", config.main_config.color_range.c_str());
-    fprintf(file, "main.quality %s\n", config.main_config.quality.c_str());
-    fprintf(file, "main.codec %s\n", config.main_config.codec.c_str());
-    fprintf(file, "main.audio_codec %s\n", config.main_config.audio_codec.c_str());
-    fprintf(file, "main.framerate_mode %s\n", config.main_config.framerate_mode.c_str());
-    fprintf(file, "main.advanced_view %s\n", config.main_config.advanced_view ? "true" : "false");
-    fprintf(file, "main.overclock %s\n", config.main_config.overclock ? "true" : "false");
-    fprintf(file, "main.show_notifications %s\n", config.main_config.show_notifications ? "true" : "false");
-    fprintf(file, "main.record_cursor %s\n", config.main_config.record_cursor ? "true" : "false");
-
-    fprintf(file, "streaming.service %s\n", config.streaming_config.streaming_service.c_str());
-    fprintf(file, "streaming.youtube.key %s\n", config.streaming_config.youtube.stream_key.c_str());
-    fprintf(file, "streaming.twitch.key %s\n", config.streaming_config.twitch.stream_key.c_str());
-    fprintf(file, "streaming.custom.url %s\n", config.streaming_config.custom.url.c_str());
-    fprintf(file, "streaming.custom.container %s\n", config.streaming_config.custom.container.c_str());
-    fprintf(file, "streaming.start_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.streaming_config.start_recording_hotkey.keysym, config.streaming_config.start_recording_hotkey.modifiers);
-
-    fprintf(file, "record.save_directory %s\n", config.record_config.save_directory.c_str());
-    fprintf(file, "record.container %s\n", config.record_config.container.c_str());
-    fprintf(file, "record.start_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.record_config.start_recording_hotkey.keysym, config.record_config.start_recording_hotkey.modifiers);
-    fprintf(file, "record.pause_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.record_config.pause_recording_hotkey.keysym, config.record_config.pause_recording_hotkey.modifiers);
-
-    fprintf(file, "replay.save_directory %s\n", config.replay_config.save_directory.c_str());
-    fprintf(file, "replay.container %s\n", config.replay_config.container.c_str());
-    fprintf(file, "replay.time %d\n", config.replay_config.replay_time);
-    fprintf(file, "replay.start_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.replay_config.start_recording_hotkey.keysym, config.replay_config.start_recording_hotkey.modifiers);
-    fprintf(file, "replay.save_recording_hotkey " FORMAT_I64 " " FORMAT_U32 "\n", config.replay_config.save_recording_hotkey.keysym, config.replay_config.save_recording_hotkey.modifiers);
 
     fclose(file);
 }

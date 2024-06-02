@@ -3175,7 +3175,9 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.main_config.record_area_height == 0)
         config.main_config.record_area_height = 1080;
 
-    if(config.main_config.fps < 1)
+    if(config.main_config.fps == 0)
+        config.main_config.fps = 60;
+    else if(config.main_config.fps < 1)
         config.main_config.fps = 1;
     else if(config.main_config.fps > 5000)
         config.main_config.fps = 5000;
