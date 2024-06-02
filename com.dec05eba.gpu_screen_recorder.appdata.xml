@@ -81,6 +81,14 @@
     </screenshots>
 
     <releases>
+        <release version="3.8.0" date="2024-06-02">
+            <description>
+                <ul>
+                    <li>Add system tray icon</li>
+                    <li>Notify recording as successful when closing window while recording</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.7.7" date="2024-05-29">
             <description>
                 <ul>
