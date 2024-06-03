@@ -86,6 +86,7 @@
                 <ul>
                     <li>Add system tray icon</li>
                     <li>Notify recording as successful when closing window while recording</li>
+                    <li>Add hls (m3u8) container option</li>
                 </ul>
             </description>
         </release>

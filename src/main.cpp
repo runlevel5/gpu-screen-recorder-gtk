@@ -200,7 +200,8 @@ static const Container supported_containers[] = {
     { "flv", "flv" },
     { "matroska", "mkv" }, // TODO: Default to this on amd/intel, add (Recommended on AMD/Intel)
     { "mov", "mov" },
-    { "mpegts", "ts" }
+    { "mpegts", "ts" },
+    { "hls", "m3u8" }
 };
 
 struct AudioRow {
