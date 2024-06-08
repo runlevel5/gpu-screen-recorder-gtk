@@ -10,7 +10,7 @@ opts="-O2 -g0 -DNDEBUG -Wall -Wextra -Werror"
 [ -n "$DEBUG" ] && opts="-O0 -g3 -Wall -Wextra -Werror";
 
 build_gsr_gtk() {
-    dependencies="gtk+-3.0 x11 xrandr libpulse libdrm wayland-egl wayland-client appindicator3-0.1"
+    dependencies="gtk+-3.0 x11 xrandr libpulse libdrm wayland-egl wayland-client ayatana-appindicator3-0.1"
     includes="$(pkg-config --cflags $dependencies)"
     libs="$(pkg-config --libs $dependencies) -ldl"
     $CC -c src/egl.c $opts $includes
