@@ -10,6 +10,10 @@ rm -f "/usr/share/icons/hicolor/32x32/apps/com.dec05eba.gpu_screen_recorder.png"
 rm -f "/usr/share/icons/hicolor/64x64/apps/com.dec05eba.gpu_screen_recorder.png"
 rm -f "/usr/share/icons/hicolor/128x128/apps/com.dec05eba.gpu_screen_recorder.png"
 
+rm -f "/usr/share/com.dec05eba.gpu_screen_recorder/tray_idle.png"
+rm -f "/usr/share/com.dec05eba.gpu_screen_recorder/tray_recording.png"
+rm -f "/usr/share/com.dec05eba.gpu_screen_recorder/tray_paused.png"
+
 rm -rf "/usr/share/com.dec05eba.gpu_screen_recorder"
 
 echo "Successfully uninstalled gpu-screen-recorder-gtk"
