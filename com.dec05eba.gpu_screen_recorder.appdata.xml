@@ -49,6 +49,9 @@
             If the video doesn't play or you get green/yellow overlay then your video player is missing H264/HEVC video codec. Either install the video codecs or use mpv.
         </p>
         <p>
+            By default on AMD/NVIDIA HEVC video codec is used. This may not play in your video player or browser of choice or discord. The video will still work if you upload it to a site such as youtube. Alternatively you can switch to H264 video codec in advanced view for compatibility with outdated video players/websites.
+        </p>
+        <p>
             If the video is glitched with checkerboard pattern and you are using and Intel integrated GPU on wayland then this is a known issue and right now the only solution is to record on X11 instead.
         </p>
         <p>AMD has a driver/hardware fault that causes black bars/distorted colors on the right side/bottom of the video for certain video resolutions. This happens for both av1 and hevc, so if you have this issue then switch to h264 video codec option in advanced settings.</p>
@@ -81,11 +84,13 @@
     </screenshots>
 
     <releases>
-        <release version="3.8.0" date="2024-06-02">
+        <release version="3.8.0" date="2024-06-10">
             <description>
                 <ul>
                     <li>Add system tray icon</li>
-                    <li>Notify recording as successful when closing window while recording</li>
+                    <li>Fix screen recording on Intel ARC GPU</li>
+                    <li>Workaround AMD driver bug with HEVC video codec that causes glitched graphics on the right/bottom side with certain video resolutions. It's now replaced with black color</li>
+                    <li>Fix possible incorrect monitor rotation when using multiple monitors with one monitor rotated on GNOME Wayland</li>
                     <li>Add hls (m3u8) container option</li>
                 </ul>
             </description>
