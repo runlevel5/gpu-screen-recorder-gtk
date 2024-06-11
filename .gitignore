@@ -10,4 +10,5 @@ external/wlr-export-dmabuf-unstable-v1-protocol.c
 *.o
 
 .clangd/
+build/
 gpu-screen-recorder-gtk
