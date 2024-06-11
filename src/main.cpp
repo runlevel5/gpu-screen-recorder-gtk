@@ -140,9 +140,9 @@ static double notification_timeout_seconds = 0.0;
 static double notification_start_seconds = 0.0;
 
 static AppIndicator *app_indicator;
-static const char *tray_idle_icon_name = "/usr/share/com.dec05eba.gpu_screen_recorder/tray_idle.png";
-static const char *tray_recording_icon_name = "/usr/share/com.dec05eba.gpu_screen_recorder/tray_recording.png";
-static const char *tray_paused_icon_name = "/usr/share/com.dec05eba.gpu_screen_recorder/tray_paused.png";
+static const char *tray_idle_icon_name = "tray_idle";
+static const char *tray_recording_icon_name = "tray_recording";
+static const char *tray_paused_icon_name = "tray_paused";
 
 struct AudioInput {
     std::string name;
@@ -390,7 +390,7 @@ static GtkMenuShell* create_systray_menu(GtkApplication *app, SystrayPage systra
 }
 
 static void setup_systray(GtkApplication *app) {
-    app_indicator = app_indicator_new("com.dec05eba.gpu_screen_recorder", tray_idle_icon_name, APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
+    app_indicator = app_indicator_new_with_path("com.dec05eba.gpu_screen_recorder", tray_idle_icon_name, APP_INDICATOR_CATEGORY_APPLICATION_STATUS, "/usr/share/com.dec05eba.gpu_screen_recorder");
     // This triggers Gdk assert: gdk_window_thaw_toplevel_updates: assertion 'window->update_and_descendants_freeze_count > 0' failed,
     // dont know why but it works anyways
     app_indicator_set_status(app_indicator, APP_INDICATOR_STATUS_ACTIVE);
