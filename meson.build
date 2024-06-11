@@ -25,7 +25,7 @@ dep = [
 
 executable('gpu-screen-recorder-gtk', src, dependencies : dep, install : true)
 
-install_data('gpu-screen-recorder-gtk.desktop', install_dir : '/usr/share/applications')
-install_data('com.dec05eba.gpu_screen_recorder.appdata.xml', install_dir : '/usr/share/metainfo')
+install_data(files('gpu-screen-recorder-gtk.desktop'), install_dir : '/usr/share/applications')
+install_data(files('com.dec05eba.gpu_screen_recorder.appdata.xml'), install_dir : '/usr/share/metainfo')
 
 install_subdir('icons/hicolor', install_dir : '/usr/share/icons/hicolor')
