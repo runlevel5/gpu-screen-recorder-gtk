@@ -2697,7 +2697,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     merge_audio_tracks_button = gtk_check_button_new_with_label("Merge audio tracks");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button), true);
     gtk_widget_set_halign(merge_audio_tracks_button, GTK_ALIGN_START);
-    gtk_grid_attach(grid, merge_audio_tracks_button, 0, grid_row++, 2, 1);
+    gtk_grid_attach(audio_grid, merge_audio_tracks_button, 0, audio_input_area_row++, 2, 1);
 
     GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, grid_row++, 2, 1);
@@ -3650,7 +3650,7 @@ static void activate(GtkApplication *app, gpointer) {
     if(!gl_get_gpu_info(&egl, &gpu_inf)) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to get OpenGL information. Make sure your GPU drivers are properly installed. "
-            "If you are using nvidia then make sure to run \"flatpak update\" to keep all of your flatpaks up to date. You might also need to install a flatpak nvidia driver version that matches your distros nvidia driver version.");
+            "If you are using nvidia then make sure to run \"flatpak update\" to make sure that your flatpak nvidia driver version matches your distros nvidia driver version. If this doesn't work then you might need to manually install a flatpak nvidia driver version that matches your distros nvidia driver version.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));

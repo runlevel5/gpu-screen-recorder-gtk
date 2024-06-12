@@ -21,3 +21,5 @@ Add option to start replay on system startup (use the gpu screen recorder system
 Remove the need to install gpu screen recorder flatpak as system. This can now be done because of kms-server-proxy.
 Implement profiles to quickly switch between settings.
 Use https://hosted.weblate.org/ for translation.
+
+Detect game name by using x11 window class or title. Fallback to finding pressure vessel, find the binary is runs and get the directory name directly under the proton game list directory. Fallback to pure wine.
