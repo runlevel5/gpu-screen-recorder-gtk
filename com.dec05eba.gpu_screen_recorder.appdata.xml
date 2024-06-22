@@ -25,8 +25,8 @@
         </p>
         <p>Supported video codecs:</p>
         <ul>
-            <li>H264 (default on Intel)</li>
-            <li>HEVC (default on AMD and NVIDIA)</li>
+            <li>H264 (default)</li>
+            <li>HEVC</li>
             <li>AV1 (not currently supported on NVIDIA in the flatpak)</li>
         </ul>
         <p>Supported audio codecs:</p>
@@ -49,12 +49,10 @@
             If the video doesn't play or you get green/yellow overlay then your video player is missing H264/HEVC video codec. Either install the video codecs or use mpv.
         </p>
         <p>
-            By default on AMD/NVIDIA HEVC video codec is used. This may not play in your video player or browser of choice or discord. The video will still work if you upload it to a site such as youtube. Alternatively you can switch to H264 video codec in advanced view for compatibility with outdated video players/websites.
-        </p>
-        <p>
             If the video is glitched with checkerboard pattern and you are using and Intel integrated GPU on wayland then this is a known issue and right now the only solution is to record on X11 instead.
         </p>
-        <p>AMD has a driver/hardware fault that causes black bars/distorted colors on the right side/bottom of the video for certain video resolutions. This happens for both av1 and hevc, so if you have this issue then switch to h264 video codec option in advanced settings.</p>
+        <p>AMD has a driver/hardware fault that causes black bars/distorted colors on the right side/bottom of the video for certain video resolutions. This happens for both av1 and hevc, so if you have this issue then switch to h264 video codec option in advanced settings.
+        </p>
         <p>
             If H264/HEVC video encoding option is not available on your AMD/Intel system but you know that your supports those codecs then you may need to install mesa-extra freedesktop runtime by running this command: "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra".
         </p>
@@ -84,6 +82,13 @@
     </screenshots>
 
     <releases>
+        <release version="3.8.2" date="2024-06-22">
+            <description>
+                <ul>
+                    <li>Default to h264 video codec because of amd driver issues (black bar) and for better compatibility with software</li>
+                </ul>
+            </description>
+        </release>
         <release version="3.8.1" date="2024-06-16">
             <description>
                 <ul>

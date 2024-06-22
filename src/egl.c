@@ -210,7 +210,7 @@ static bool gsr_egl_create_window(gsr_egl *self, bool wayland) {
 }
 
 static bool gsr_egl_load_egl(gsr_egl *self, void *library) {
-    dlsym_assign required_dlsym[] = {
+    const dlsym_assign required_dlsym[] = {
         { (void**)&self->eglGetDisplay, "eglGetDisplay" },
         { (void**)&self->eglInitialize, "eglInitialize" },
         { (void**)&self->eglTerminate, "eglTerminate" },
@@ -235,7 +235,7 @@ static bool gsr_egl_load_egl(gsr_egl *self, void *library) {
 }
 
 static bool gsr_egl_load_gl(gsr_egl *self, void *library) {
-    dlsym_assign required_dlsym[] = {
+    const dlsym_assign required_dlsym[] = {
         { (void**)&self->glGetString, "glGetString" },
 
         { NULL, NULL }

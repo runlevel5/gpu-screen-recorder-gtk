@@ -394,6 +394,7 @@ static void setup_systray(GtkApplication *app) {
     app_indicator_set_icon_full(app_indicator, tray_idle_icon_name, "Idle");
     // This triggers Gdk assert: gdk_window_thaw_toplevel_updates: assertion 'window->update_and_descendants_freeze_count > 0' failed,
     // dont know why but it works anyways
+    app_indicator_set_title(app_indicator, "GPU Screen Recorder");
     app_indicator_set_status(app_indicator, APP_INDICATOR_STATUS_ACTIVE);
     app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(app, SystrayPage::FRONT)));
 }
