@@ -140,9 +140,9 @@ static double notification_timeout_seconds = 0.0;
 static double notification_start_seconds = 0.0;
 
 static AppIndicator *app_indicator;
-static const char *tray_idle_icon_name = "/usr/share/icons/hicolor/32x32/status/com.dec05eba.gpu_screen_recorder.tray-idle.png";
-static const char *tray_recording_icon_name = "/usr/share/icons/hicolor/32x32/status/com.dec05eba.gpu_screen_recorder.tray-recording.png";
-static const char *tray_paused_icon_name = "/usr/share/icons/hicolor/32x32/status/com.dec05eba.gpu_screen_recorder.tray-paused.png";
+static const char *tray_idle_icon_name = "com.dec05eba.gpu_screen_recorder.tray-idle";
+static const char *tray_recording_icon_name = "com.dec05eba.gpu_screen_recorder.tray-recording";
+static const char *tray_paused_icon_name = "com.dec05eba.gpu_screen_recorder.tray-paused";
 
 struct AudioInput {
     std::string name;
