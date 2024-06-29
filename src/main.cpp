@@ -188,7 +188,7 @@ struct SupportedVideoCodecs {
 };
 
 static SupportedVideoCodecs supported_video_codecs;
-static bool got_supported_video_codecs = false;
+static int supported_video_codecs_exit_status = 0;
 
 struct Container {
     const char *container_name;
@@ -2068,11 +2068,17 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         {}
         else if(stream_url.size() >= 8 && strncmp(stream_url.c_str(), "rtmps://", 8) == 0)
         {}
+        else if(stream_url.size() >= 7 && strncmp(stream_url.c_str(), "rtsp://", 7) == 0)
+        {}
         else if(stream_url.size() >= 6 && strncmp(stream_url.c_str(), "srt://", 6) == 0)
         {}
         else if(stream_url.size() >= 7 && strncmp(stream_url.c_str(), "http://", 7) == 0)
         {}
         else if(stream_url.size() >= 8 && strncmp(stream_url.c_str(), "https://", 8) == 0)
+        {}
+        else if(stream_url.size() >= 6 && strncmp(stream_url.c_str(), "tcp://", 6) == 0)
+        {}
+        else if(stream_url.size() >= 6 && strncmp(stream_url.c_str(), "udp://", 6) == 0)
         {}
         else
             stream_url = "rtmp://" + stream_url;
@@ -2460,7 +2466,8 @@ static gsr_connection_type get_connection_type() {
     }
 }
 
-static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_codecs) {
+// Returns the exit status
+static int get_supported_video_codecs(SupportedVideoCodecs *supported_video_codecs) {
     supported_video_codecs->h264 = false;
     supported_video_codecs->hevc = false;
     supported_video_codecs->av1 = false;
@@ -2468,7 +2475,7 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
     FILE *f = popen("gpu-screen-recorder --list-supported-video-codecs", "r");
     if(!f) {
         fprintf(stderr, "error: 'gpu-screen-recorder --list-supported-video-codecs' failed\n");
-        return false;
+        return -1;
     }
 
     char output[1024];
@@ -2476,7 +2483,7 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
     if(bytes_read < 0 || ferror(f)) {
         fprintf(stderr, "error: failed to read 'gpu-screen-recorder --list-supported-video-codecs' output\n");
         pclose(f);
-        return false;
+        return -1;
     }
     output[bytes_read] = '\0';
 
@@ -2487,8 +2494,10 @@ static bool get_supported_video_codecs(SupportedVideoCodecs *supported_video_cod
     if(strstr(output, "av1"))
         supported_video_codecs->av1 = true;
 
-    pclose(f);
-    return true;
+    int status = pclose(f);
+    if(WIFEXITED(status))
+        return WEXITSTATUS(status);
+    return 0;
 }
 
 static void record_area_set_sensitive(GtkCellLayout *cell_layout, GtkCellRenderer *cell, GtkTreeModel *tree_model, GtkTreeIter *iter, gpointer data) {
@@ -2735,7 +2744,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
     video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
-    if(got_supported_video_codecs) {
+    if(supported_video_codecs_exit_status == 0) {
         if(supported_video_codecs.h264) 
             gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
         if(supported_video_codecs.hevc)
@@ -3520,6 +3529,18 @@ static void load_config(const gpu_info &gpu_inf) {
     enable_stream_record_button_if_info_filled();
     stream_service_item_change_callback(GTK_COMBO_BOX(stream_service_input_menu), nullptr);
 
+    if(supported_video_codecs_exit_status != 0) {
+        const char *cmd = flatpak ? "flatpak run --command=gpu-screen-recorder com.dec05eba.gpu_screen_recorder -w screen -f 60 -o video.mp4" : "gpu-screen-recorder -w screen -f 60 -o video.mp4";
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Failed to run 'gpu-screen-recorder' command. If you are using gpu-screen-recorder flatpak then this is a bug. Otherwise you need to make sure gpu-screen-recorder is installed on your system and working properly. Run:\n"
+                "%s\n"
+                "in a terminal to see more information about the issue.", cmd);
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            g_application_quit(G_APPLICATION(select_window_userdata.app));
+            return;
+    }
+
     if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor != GPU_VENDOR_NVIDIA && config.main_config.codec != "av1") {
         if(supported_video_codecs.av1) {
             GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
@@ -3691,7 +3712,7 @@ static void activate(GtkApplication *app, gpointer) {
         }
     }
 
-    got_supported_video_codecs = get_supported_video_codecs(&supported_video_codecs);
+    supported_video_codecs_exit_status = get_supported_video_codecs(&supported_video_codecs);
 
     std::string window_title = "GPU Screen Recorder | Running on ";
     window_title += gpu_vendor_to_name(gpu_inf.vendor);
