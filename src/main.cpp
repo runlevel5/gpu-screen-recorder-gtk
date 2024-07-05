@@ -3551,7 +3551,7 @@ static void load_config(const gpu_info &gpu_inf) {
     if(supported_video_codecs_exit_status != 0) {
         const char *cmd = flatpak ? "flatpak run --command=gpu-screen-recorder com.dec05eba.gpu_screen_recorder -w screen -f 60 -o video.mp4" : "gpu-screen-recorder -w screen -f 60 -o video.mp4";
         GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Failed to run 'gpu-screen-recorder' command. If you are using gpu-screen-recorder flatpak then this is a bug. Otherwise you need to make sure gpu-screen-recorder is installed on your system and working properly. Run:\n"
+                "Failed to run 'gpu-screen-recorder' command. If you are using gpu-screen-recorder flatpak then this is a bug. Otherwise you need to make sure gpu-screen-recorder is installed on your system and working properly (install necessary depedencies depending on your GPU, such as libva-mesa-driver, libva-intel-driver, intel-media-driver and linux-firmware). Run:\n"
                 "%s\n"
                 "in a terminal to see more information about the issue.", cmd);
             gtk_dialog_run(GTK_DIALOG(dialog));
