@@ -140,9 +140,6 @@ static double notification_timeout_seconds = 0.0;
 static double notification_start_seconds = 0.0;
 
 static AppIndicator *app_indicator;
-static const char *tray_idle_icon_name = "com.dec05eba.gpu_screen_recorder.tray-idle";
-static const char *tray_recording_icon_name = "com.dec05eba.gpu_screen_recorder.tray-recording";
-static const char *tray_paused_icon_name = "com.dec05eba.gpu_screen_recorder.tray-paused";
 
 struct AudioInput {
     std::string name;
@@ -221,6 +218,28 @@ typedef struct {
 } gpu_info;
 
 static gpu_info gpu_inf;
+
+// Dumb hacks below!! why dont these fking paths work outside flatpak.. except in kde. TODO: fix this!
+static const char* get_tray_idle_icon_name() {
+    if(flatpak)
+        return "com.dec05eba.gpu_screen_recorder.tray-idle";
+    else
+        return "/usr/share/icons/hicolor/32x32/status/com.dec05eba.gpu_screen_recorder.tray-idle.png";
+}
+
+static const char* get_tray_recording_icon_name() {
+    if(flatpak)
+        return "com.dec05eba.gpu_screen_recorder.tray-recording";
+    else
+        return "/usr/share/icons/hicolor/32x32/status/com.dec05eba.gpu_screen_recorder.tray-recording.png";
+}
+
+static const char* get_tray_paused_icon_name() {
+    if(flatpak)
+        return "com.dec05eba.gpu_screen_recorder.tray-paused";
+    else
+        return "/usr/share/icons/hicolor/32x32/status/com.dec05eba.gpu_screen_recorder.tray-paused.png";
+}
 
 static bool is_program_installed(const StringView program_name) {
     const char *path = getenv("PATH");
@@ -391,7 +410,7 @@ static GtkMenuShell* create_systray_menu(GtkApplication *app, SystrayPage systra
 
 static void setup_systray(GtkApplication *app) {
     app_indicator = app_indicator_new("com.dec05eba.gpu_screen_recorder", "", APP_INDICATOR_CATEGORY_APPLICATION_STATUS);
-    app_indicator_set_icon_full(app_indicator, tray_idle_icon_name, "Idle");
+    app_indicator_set_icon_full(app_indicator, get_tray_idle_icon_name(), "Idle");
     // This triggers Gdk assert: gdk_window_thaw_toplevel_updates: assertion 'window->update_and_descendants_freeze_count > 0' failed,
     // dont know why but it works anyways
     app_indicator_set_title(app_indicator, "GPU Screen Recorder");
@@ -1716,7 +1735,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
         gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_replay_menu_item), "Start replay");
         gtk_widget_set_sensitive(save_replay_menu_item, false);
-        app_indicator_set_icon_full(app_indicator, tray_idle_icon_name, "Idle");
+        app_indicator_set_icon_full(app_indicator, get_tray_idle_icon_name(), "Idle");
 
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
@@ -1823,7 +1842,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
     gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_replay_menu_item), "Stop replay");
     gtk_widget_set_sensitive(save_replay_menu_item, true);
-    app_indicator_set_icon_full(app_indicator, tray_recording_icon_name, "Recording");
+    app_indicator_set_icon_full(app_indicator, get_tray_recording_icon_name(), "Recording");
 
     record_start_time_sec = clock_get_monotonic_seconds();
     return true;
@@ -1850,13 +1869,13 @@ static gboolean on_pause_unpause_button_click(GtkButton*, gpointer) {
         gtk_button_set_label(pause_recording_button, "Unpause recording");
         gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "media-playback-pause", GTK_ICON_SIZE_SMALL_TOOLBAR);
         gtk_menu_item_set_label(GTK_MENU_ITEM(pause_recording_menu_item), "Unpause recording");
-        app_indicator_set_icon_full(app_indicator, tray_paused_icon_name, "Paused");
+        app_indicator_set_icon_full(app_indicator, get_tray_paused_icon_name(), "Paused");
         pause_start_sec = clock_get_monotonic_seconds();
     } else {
         gtk_button_set_label(pause_recording_button, "Pause recording");
         gtk_image_set_from_icon_name(GTK_IMAGE(recording_record_icon), "media-record", GTK_ICON_SIZE_SMALL_TOOLBAR);
         gtk_menu_item_set_label(GTK_MENU_ITEM(pause_recording_menu_item), "Pause recording");
-        app_indicator_set_icon_full(app_indicator, tray_recording_icon_name, "Recording");
+        app_indicator_set_icon_full(app_indicator, get_tray_recording_icon_name(), "Recording");
         paused_time_offset_sec += (clock_get_monotonic_seconds() - pause_start_sec);
     }
     return true;
@@ -1886,7 +1905,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_recording_menu_item), "Start recording");
         gtk_menu_item_set_label(GTK_MENU_ITEM(pause_recording_menu_item), "Pause recording");
         gtk_widget_set_sensitive(pause_recording_menu_item, false);
-        app_indicator_set_icon_full(app_indicator, tray_idle_icon_name, "Idle");
+        app_indicator_set_icon_full(app_indicator, get_tray_idle_icon_name(), "Idle");
 
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
@@ -1996,7 +2015,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
     gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_recording_menu_item), "Stop recording");
     gtk_widget_set_sensitive(pause_recording_menu_item, true);
-    app_indicator_set_icon_full(app_indicator, tray_recording_icon_name, "recording");
+    app_indicator_set_icon_full(app_indicator, get_tray_recording_icon_name(), "Recording");
 
     record_start_time_sec = clock_get_monotonic_seconds();
     paused_time_offset_sec = 0.0;
@@ -2019,7 +2038,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         gtk_label_set_text(GTK_LABEL(streaming_record_time_label), "00:00:00");
 
         gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_streaming_menu_item), "Start streaming");
-        app_indicator_set_icon_full(app_indicator, tray_idle_icon_name, "Idle");
+        app_indicator_set_icon_full(app_indicator, get_tray_idle_icon_name(), "Idle");
 
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
@@ -2146,7 +2165,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     gtk_widget_set_opacity(GTK_WIDGET(streaming_bottom_panel_grid), 1.0);
 
     gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_streaming_menu_item), "Stop streaming");
-    app_indicator_set_icon_full(app_indicator, tray_recording_icon_name, "Recording");
+    app_indicator_set_icon_full(app_indicator, get_tray_recording_icon_name(), "Recording");
 
     record_start_time_sec = clock_get_monotonic_seconds();
     return true;
