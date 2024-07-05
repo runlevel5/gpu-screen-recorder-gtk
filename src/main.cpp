@@ -182,6 +182,8 @@ struct SupportedVideoCodecs {
     bool h264;
     bool hevc;
     bool av1;
+    bool vp8;
+    bool vp9;
 };
 
 static SupportedVideoCodecs supported_video_codecs;
@@ -2490,6 +2492,8 @@ static int get_supported_video_codecs(SupportedVideoCodecs *supported_video_code
     supported_video_codecs->h264 = false;
     supported_video_codecs->hevc = false;
     supported_video_codecs->av1 = false;
+    supported_video_codecs->vp8 = false;
+    supported_video_codecs->vp9 = false;
 
     FILE *f = popen("gpu-screen-recorder --list-supported-video-codecs", "r");
     if(!f) {
@@ -2512,6 +2516,10 @@ static int get_supported_video_codecs(SupportedVideoCodecs *supported_video_code
         supported_video_codecs->hevc = true;
     if(strstr(output, "av1"))
         supported_video_codecs->av1 = true;
+    if(strstr(output, "vp8"))
+        supported_video_codecs->vp8 = true;
+    if(strstr(output, "vp9"))
+        supported_video_codecs->vp9 = true;
 
     int status = pclose(f);
     if(WIFEXITED(status))
@@ -2770,6 +2778,10 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
         if(supported_video_codecs.av1)
             gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
+        if(supported_video_codecs.vp8)
+            gtk_combo_box_text_append(video_codec_input_menu, "vp8", "VP8");
+        if(supported_video_codecs.vp9)
+            gtk_combo_box_text_append(video_codec_input_menu, "vp9", "VP9");
 
         if(wayland) {
             if(supported_video_codecs.hevc)
@@ -2988,6 +3000,9 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(replay_container, supported_container.container_name, supported_container.file_extension);
     }
+    if(supported_video_codecs.vp8 || supported_video_codecs.vp9) {
+        gtk_combo_box_text_append(replay_container, "webm", "webm");
+    }
     gtk_widget_set_hexpand(GTK_WIDGET(replay_container), true);
     gtk_grid_attach(container_grid, GTK_WIDGET(replay_container), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(replay_container), 0); // TODO:
@@ -3121,6 +3136,9 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(record_container, supported_container.container_name, supported_container.file_extension);
     }
+    if(supported_video_codecs.vp8 || supported_video_codecs.vp9) {
+        gtk_combo_box_text_append(record_container, "webm", "webm");
+    }
     gtk_widget_set_hexpand(GTK_WIDGET(record_container), true);
     gtk_grid_attach(container_grid, GTK_WIDGET(record_container), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(record_container), 0); // TODO:
@@ -3242,6 +3260,9 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     custom_stream_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(custom_stream_container, supported_container.container_name, supported_container.file_extension);
+    }
+    if(supported_video_codecs.vp8 || supported_video_codecs.vp9) {
+        gtk_combo_box_text_append(custom_stream_container, "webm", "webm");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(custom_stream_container), true);
     gtk_grid_attach(custom_stream_container_grid, GTK_WIDGET(custom_stream_container), 1, 0, 1, 1);
@@ -3446,8 +3467,13 @@ static void load_config(const gpu_info &gpu_inf) {
     if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
         config.main_config.quality = "very_high";
 
-    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265" && config.main_config.codec != "hevc" && config.main_config.codec != "av1" && config.main_config.codec != "hevc_hdr" && config.main_config.codec != "av1_hdr")
+    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265"
+        && config.main_config.codec != "hevc" && config.main_config.codec != "av1"
+        && config.main_config.codec != "hevc_hdr" && config.main_config.codec != "av1_hdr"
+        && config.main_config.codec != "vp8" && config.main_config.codec != "vp9")
+    {
         config.main_config.codec = "auto";
+    }
 
     if(!wayland && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
         config.main_config.codec = "auto";

@@ -23,3 +23,5 @@ Implement profiles to quickly switch between settings.
 Use https://hosted.weblate.org/ for translation.
 
 Detect game name by using x11 window class or title. Fallback to finding pressure vessel, find the binary is runs and get the directory name directly under the proton game list directory. Fallback to pure wine.
+
+Add option to use software encoder (-encoder cpu).
