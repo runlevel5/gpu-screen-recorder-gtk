@@ -37,12 +37,12 @@
             <li>AAC</li>
         </ul>
         <p>
-            Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: flatpak install flathub --system com.dec05eba.gpu_screen_recorder
+            Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: "flatpak install flathub --system com.dec05eba.gpu_screen_recorder"
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
         </p>
         <p>Recording a single window is only possible on X11. Hotkeys are not supported on wayland either (wayland doesn't really support this). Use X11 if you want a proper desktop experience in general.</p>
         <p>AV1 is currently not supported in the flatpak for Nvidia since GPU Screen Recorder uses an older ffmpeg version to support older Nvidia cards. Install GPU Screen Recorder from source or from AUR if you want to use AV1 on Nvidia.</p>
-        <p>On some Intel integrated GPUs the video can appear glitched when recording on Wayland. The only known workaround at the moment is to record on X11.</p>
+        <p>On some Intel integrated GPUs the video can appear glitched or be a black screen when recording on Wayland. The only known workaround at the moment is to record on X11. This will be fixed in a future version.</p>
         <p>
             Videos are in variable framerate format. Very out of date video players might have an issue playing such videos. It's recommend to use MPV to play such videos, otherwise you might experience stuttering in the video.
             You can select constant frame rate mode in advanced view if you need it.
@@ -50,13 +50,10 @@
         <p>
             If the video doesn't play or you get green/yellow overlay then your video player is missing H264/HEVC video codec. Either install the video codecs or use mpv.
         </p>
-        <p>
-            If the video is glitched with checkerboard pattern and you are using and Intel integrated GPU on wayland then this is a known issue and right now the only solution is to record on X11 instead.
-        </p>
         <p>AMD has a driver/hardware fault that causes black bars/distorted colors on the right side/bottom of the video for certain video resolutions. This happens for both av1 and hevc, so if you have this issue then switch to h264 video codec option in advanced settings.
         </p>
         <p>
-            If H264/HEVC video encoding option is not available on your AMD/Intel system but you know that your supports those codecs then you may need to install mesa-extra freedesktop runtime by running this command: "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra".
+            If H264/HEVC video encoding option is not available on your AMD/Intel system but you know that your GPU supports those codecs for encoding then you may need to install mesa-extra freedesktop runtime by running this command: "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra".
         </p>
         <p>
             On NVIDIA systems the flatpak NVIDIA driver needs to match the systems NVIDIA driver version or the NVIDIA driver will fail to properly load in flatpaks.
