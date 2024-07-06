@@ -1787,6 +1787,18 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
 
+    if(strcmp(video_codec_input_str, "vp8") == 0 || strcmp(video_codec_input_str, "vp9") == 0) {
+        if(strcmp(container_str, "webm") != 0 && strcmp(container_str, "matroska") != 0) {
+            fprintf(stderr, "Warning: container '%s' is not compatible with video codec '%s', using webm container instead\n", container_str, video_codec_input_str);
+            container_str = "webm";
+        }
+    } else {
+        if(strcmp(container_str, "webm") == 0) {
+            fprintf(stderr, "Warning: container webm is not compatible with video codec '%s', using mp4 container instead\n",  video_codec_input_str);
+            container_str = "mp4";
+        }
+    }
+
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
@@ -1929,16 +1941,6 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     int record_width = wayland ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
     int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
-    char dir_tmp[PATH_MAX];
-    strcpy(dir_tmp, dir);
-    if(create_directory_recursive(dir_tmp) != 0) {
-        std::string notification_body = std::string("Failed to start recording. Failed to create ") + dir_tmp;
-        show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
-        return true;
-    }
-
-    record_file_current_filename = std::string(dir_tmp) + "/Video_" + get_date_str() + "." + gtk_combo_box_text_get_active_text(record_container);
-
     bool follow_focused = false;
     std::string window_str = record_area_selection_menu_get_active_id();
     if(window_str == "window") {
@@ -1954,12 +1956,37 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     std::string fps_str = std::to_string(fps);
 
     const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_container));
+    const gchar* container_name = gtk_combo_box_text_get_active_text(record_container);
     const gchar* color_range_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
+
+    if(strcmp(video_codec_input_str, "vp8") == 0 || strcmp(video_codec_input_str, "vp9") == 0) {
+        if(strcmp(container_str, "webm") != 0 && strcmp(container_str, "matroska") != 0) {
+            fprintf(stderr, "Warning: container '%s' is not compatible with video codec '%s', using webm container instead\n", container_str, video_codec_input_str);
+            container_str = "webm";
+            container_name = "webm";
+        }
+    } else {
+        if(strcmp(container_str, "webm") == 0) {
+            fprintf(stderr, "Warning: container webm is not compatible with video codec '%s', using mp4 container instead\n",  video_codec_input_str);
+            container_str = "mp4";
+            container_name = "mp4";
+        }
+    }
+
+    char dir_tmp[PATH_MAX];
+    strcpy(dir_tmp, dir);
+    if(create_directory_recursive(dir_tmp) != 0) {
+        std::string notification_body = std::string("Failed to start recording. Failed to create ") + dir_tmp;
+        show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_URGENT);
+        return true;
+    }
+
+    record_file_current_filename = std::string(dir_tmp) + "/Video_" + get_date_str() + "." + container_name;
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
@@ -2111,6 +2138,18 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
+
+    if(strcmp(video_codec_input_str, "vp8") == 0 || strcmp(video_codec_input_str, "vp9") == 0) {
+        if(strcmp(container_str, "webm") != 0 && strcmp(container_str, "matroska") != 0) {
+            fprintf(stderr, "Warning: container '%s' is not compatible with video codec '%s', using webm container instead\n", container_str, video_codec_input_str);
+            container_str = "webm";
+        }
+    } else {
+        if(strcmp(container_str, "webm") == 0) {
+            fprintf(stderr, "Warning: container webm is not compatible with video codec '%s', using mp4 container instead\n",  video_codec_input_str);
+            container_str = "mp4";
+        }
+    }
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
