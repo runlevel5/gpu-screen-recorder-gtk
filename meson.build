@@ -8,8 +8,6 @@ elif get_option('buildtype') == 'release'
 endif
 
 src = [
-    'src/egl.c',
-    'src/library_loader.c',
     'src/main.cpp',
 ]
 
@@ -17,7 +15,6 @@ dep = [
     dependency('gtk+-3.0'),
     dependency('x11'),
     dependency('libpulse'),
-    dependency('libdrm'),
     dependency('ayatana-appindicator3-0.1'),
 ]
 
