@@ -33,6 +33,4 @@ Have separate options for each record option (stream, record and replay) or have
 
 Add refresh button for audio devices. Put it beside the "add" button. In the new ui this should update automatically without a button.
 
-Add support for desktop portal capture. Test first ScreenCast "version" property to see if the desktop portal is running at all with support for ScreenCast. Make it grayed out if not.
-
 Gray out monitor capture on intel if plane is compressed. Show the user to desktop portal capture instead.

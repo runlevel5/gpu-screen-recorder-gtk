@@ -2533,17 +2533,17 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_set(store, &iter, 1, "focused", -1);
     } else {
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, "Window", -1, "window", -1);
+        gtk_list_store_set(store, &iter, 0, "Window", -1);
         gtk_list_store_set(store, &iter, 1, "window", -1);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, "Follow focused window", -1, "focused", -1);
+        gtk_list_store_set(store, &iter, 0, "Follow focused window", -1);
         gtk_list_store_set(store, &iter, 1, "focused", -1);
     }
 
     const bool allow_screen_capture = is_monitor_capture_drm() || nvfbc_installed;
     if(allow_screen_capture) {
-        if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA) {
+        if(gsr_info.supported_capture_options.screen) {
             gtk_list_store_append(store, &iter);
             gtk_list_store_set(store, &iter, 0, "All monitors", -1);
             gtk_list_store_set(store, &iter, 1, "screen", -1);
@@ -2582,7 +2582,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     }
 
     gtk_list_store_append(store, &iter);
-    gtk_list_store_set(store, &iter, 0, "Desktop portal", -1);
+    gtk_list_store_set(store, &iter, 0, gsr_info.supported_capture_options.portal ? "Desktop portal (experimental)" : "Desktop portal (not supported on your system)", -1);
     gtk_list_store_set(store, &iter, 1, "portal", -1);
 
     record_area_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(record_area_selection_model));
