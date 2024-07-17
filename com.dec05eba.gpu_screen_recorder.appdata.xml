@@ -18,7 +18,7 @@
 
     <description>
         <p>
-            This is a screen recorder that has minimal impact on system performance by recording a monitor using the GPU only, similar to shadowplay on windows. This is the fastest screen recording tool for Linux. This screen recorder works with both X11 and Wayland.
+            This is a screen recorder that has minimal impact on system performance by recording a monitor using the GPU only, similar to shadowplay on windows. This is the fastest screen recording tool for Linux. This screen recorder works on X11 and Wayland.
         </p>
         <p>
             This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few minutes are saved.
@@ -39,10 +39,11 @@
         <p>
             Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: "flatpak install flathub --system com.dec05eba.gpu_screen_recorder"
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
+            Note that this only applies to when recording a monitor on AMD/Intel or when recording on Wayland without using the desktop portal option.
         </p>
         <p>Recording a single window is only possible on X11. Hotkeys are not supported on wayland either (wayland doesn't really support this). Use X11 if you want a proper desktop experience in general.</p>
         <p>AV1 is currently not supported in the flatpak for Nvidia since GPU Screen Recorder uses an older ffmpeg version to support older Nvidia cards. Install GPU Screen Recorder from source or from AUR if you want to use AV1 on Nvidia.</p>
-        <p>On some Intel integrated GPUs the video can appear glitched or be a black screen when recording on Wayland. The only known workaround at the moment is to record on X11. This will be fixed in a future version.</p>
+        <p>On some Intel integrated GPUs the video can appear glitched or be a black screen when recording on Wayland. Right now the only way to fix this is to either record on X11 (maybe only with the window capture option) or to record with the desktop portal option (usually only available on Wayland).</p>
         <p>
             Videos are in variable framerate format. Very out of date video players might have an issue playing such videos. It's recommend to use MPV to play such videos, otherwise you might experience stuttering in the video.
             You can select constant frame rate mode in advanced view if you need it.
@@ -81,10 +82,12 @@
     </screenshots>
 
     <releases>
-        <release version="3.8.3" date="2024-07-06">
+        <release version="4.0.0" date="2024-07-15">
             <description>
                 <ul>
-                    <li>Add VP8 and VP9 if supported by the hardware</li>
+                    <li>Added desktop portal (pipewire) capture option. This fixes issue with glitched capture on certain Intel iGPUS (on Wayland)</li>
+                    <li>Added VP8 and VP9 video codecs if supported by the hardware</li>
+                    <li>Added software encoding option</li>
                 </ul>
             </description>
         </release>

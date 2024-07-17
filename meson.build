@@ -1,4 +1,4 @@
-project('gpu-screen-recorder-gtk', ['c', 'cpp'], version : '3.8.0', default_options : ['warning_level=2'])
+project('gpu-screen-recorder-gtk', ['c', 'cpp'], version : '4.0.0', default_options : ['warning_level=2'])
 
 add_project_arguments('-Wshadow', language : ['c', 'cpp'])
 if get_option('buildtype') == 'debug'
@@ -16,11 +16,8 @@ src = [
 dep = [
     dependency('gtk+-3.0'),
     dependency('x11'),
-    dependency('xrandr'),
     dependency('libpulse'),
     dependency('libdrm'),
-    dependency('wayland-egl'),
-    dependency('wayland-client'),
     dependency('ayatana-appindicator3-0.1'),
 ]
 

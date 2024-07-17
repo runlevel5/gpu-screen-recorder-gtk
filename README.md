@@ -11,7 +11,7 @@ where only the last few minutes are saved.
 More info at [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
 
 ## Note
-This software works with x11 and wayland, but when using wayland only monitors can be recorded. Hotkeys are also not supported on wayland (wayland doesn't really support this properly yet). Use X11 if you want a proper desktop experience in general.
+This software works on x11 and wayland. Hotkeys are also not supported on wayland (wayland doesn't really support this properly yet). Use X11 if you want a proper desktop experience in general.
 ### TEMPORARY ISSUES
 1) Videos are in variable framerate format. Use MPV to play such videos, otherwise you might experience stuttering in the video if you are using a buggy video player. You can try saving the video into a .mkv file instead as some software may have better support for .mkv files (such as kdenlive). You can use the "-fm cfr" option to to use constant framerate mode.
 ### AMD/Intel/Wayland root permission
@@ -32,7 +32,7 @@ Bind a key to `killall -SIGINT gpu-screen-recorder` to stop recording (also save
 ## Installation
 This program depends on [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
 Run `sudo ./install.sh` or if you are running Arch Linux, then you can find gpu screen recorder gtk on aur under the name gpu-screen-recorder-gtk-git (`yay -S gpu-screen-recorder-gtk-git`).\
-Dependencies needed when building using `install.sh`: `meson gtk3 libx11 libxrandr libpulse libdrm wayland-client ayatana-appindicator3-0.1`.\
+Dependencies needed when building using `install.sh`: `meson gtk3 libx11 libpulse libdrm ayatana-appindicator3-0.1`.\
 You can also install gpu screen recorder (the gtk gui version) from [flathub](https://flathub.org/apps/details/com.dec05eba.gpu_screen_recorder). This flatpak includes gpu-screen-recorder so no need to install that first.
 
 ## Screenshots

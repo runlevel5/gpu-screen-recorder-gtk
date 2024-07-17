@@ -4,7 +4,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
-#include <X11/extensions/Xrandr.h>
 #include <assert.h>
 #include <string>
 #include <pulse/pulseaudio.h>
@@ -16,11 +15,6 @@
 #include <dlfcn.h>
 #include <functional>
 #include <vector>
-extern "C" {
-#include "egl.h"
-}
-#include <xf86drmMode.h>
-#include <xf86drm.h>
 #include <libayatana-appindicator/app-indicator.h>
 
 typedef struct {
@@ -131,9 +125,7 @@ static std::string record_file_current_filename;
 static bool nvfbc_installed = false;
 
 static Display *dpy = NULL;
-static bool wayland = false;
 static bool flatpak = false;
-static gsr_egl egl;
 
 static bool showing_notification = false;
 static double notification_timeout_seconds = 0.0;
@@ -179,15 +171,68 @@ static Hotkey replay_start_stop_hotkey;
 static Hotkey replay_save_hotkey;
 
 struct SupportedVideoCodecs {
-    bool h264;
-    bool hevc;
-    bool av1;
-    bool vp8;
-    bool vp9;
+    bool h264 = false;
+    bool hevc = false;
+    bool av1 = false;
+    bool vp8 = false;
+    bool vp9 = false;
 };
 
-static SupportedVideoCodecs supported_video_codecs;
-static int supported_video_codecs_exit_status = 0;
+struct vec2i {
+    int x = 0;
+    int y = 0;
+};
+
+struct GsrMonitor {
+    std::string name;
+    vec2i size;
+};
+
+struct SupportedCaptureOptions {
+    bool window = false;
+    bool focused = false;
+    bool screen = false;
+    bool portal = false;
+    std::vector<GsrMonitor> monitors;
+};
+
+enum class DisplayServer {
+    UNKNOWN,
+    X11,
+    WAYLAND
+};
+
+struct SystemInfo {
+    DisplayServer display_server = DisplayServer::UNKNOWN;
+};
+
+enum class GpuVendor {
+    AMD,
+    INTEL,
+    NVIDIA
+};
+
+struct GpuInfo {
+    GpuVendor vendor;
+};
+
+struct GsrInfo {
+    SystemInfo system_info;
+    GpuInfo gpu_info;
+    SupportedVideoCodecs supported_video_codecs;
+    SupportedCaptureOptions supported_capture_options;
+};
+
+static GsrInfo gsr_info;
+
+enum class GsrInfoExitStatus {
+    OK,
+    FAILED_TO_RUN_COMMAND,
+    OPENGL_FAILED,
+    NO_DRM_CARD
+};
+
+static GsrInfoExitStatus gsr_info_exit_status;
 
 struct Container {
     const char *container_name;
@@ -207,19 +252,6 @@ struct AudioRow {
     GtkWidget *row;
     GtkComboBoxText *input_list;
 };
-
-typedef enum {
-    GPU_VENDOR_AMD,
-    GPU_VENDOR_INTEL,
-    GPU_VENDOR_NVIDIA
-} gpu_vendor;
-
-typedef struct {
-    gpu_vendor vendor;
-    int gpu_version; /* 0 if unknown */
-} gpu_info;
-
-static gpu_info gpu_inf;
 
 // Dumb hacks below!! why dont these fking paths work outside flatpak.. except in kde. TODO: fix this!
 static const char* get_tray_idle_icon_name() {
@@ -637,7 +669,7 @@ static void record_area_selection_menu_set_active_id(const gchar *id) {
 }
 
 static void enable_stream_record_button_if_info_filled() {
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         const std::string selected_window_area = record_area_selection_menu_get_active_id();
         if(strcmp(selected_window_area.c_str(), "window") == 0 && select_window_userdata.selected_window == None) {
             gtk_widget_set_sensitive(GTK_WIDGET(replay_button), false);
@@ -767,7 +799,7 @@ static std::string get_date_str() {
 
 static void save_configs() {
     config.main_config.record_area_option = record_area_selection_menu_get_active_id();
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         config.main_config.record_area_width = gtk_spin_button_get_value_as_int(area_width_entry);
         config.main_config.record_area_height = gtk_spin_button_get_value_as_int(area_height_entry);
     }
@@ -794,14 +826,14 @@ static void save_configs() {
     config.streaming_config.twitch.stream_key = gtk_entry_get_text(twitch_stream_id_entry);
     config.streaming_config.custom.url = gtk_entry_get_text(custom_stream_url_entry);
     config.streaming_config.custom.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(custom_stream_container));
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         config.streaming_config.start_recording_hotkey.keysym = streaming_hotkey.keysym;
         config.streaming_config.start_recording_hotkey.modifiers = streaming_hotkey.modkey_mask;
     }
 
     config.record_config.save_directory = gtk_button_get_label(record_file_chooser_button);
     config.record_config.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_container));
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         config.record_config.start_recording_hotkey.keysym = record_hotkey.keysym;
         config.record_config.start_recording_hotkey.modifiers = record_hotkey.modkey_mask;
 
@@ -812,7 +844,7 @@ static void save_configs() {
     config.replay_config.save_directory = gtk_button_get_label(replay_file_chooser_button);
     config.replay_config.container = gtk_combo_box_get_active_id(GTK_COMBO_BOX(replay_container));
     config.replay_config.replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         config.replay_config.start_recording_hotkey.keysym = replay_start_stop_hotkey.keysym;
         config.replay_config.start_recording_hotkey.modifiers = replay_start_stop_hotkey.modkey_mask;
 
@@ -821,259 +853,6 @@ static void save_configs() {
     }
 
     save_config(config);
-}
-
-typedef struct {
-    const char *name;
-    int name_len;
-    vec2i pos;
-    vec2i size;
-    XRRCrtcInfo *crt_info; /* Only on x11 */
-    uint32_t connector_id; /* Only on drm */
-} gsr_monitor;
-
-typedef enum {
-    GSR_CONNECTION_X11,
-    GSR_CONNECTION_WAYLAND,
-    GSR_CONNECTION_DRM
-} gsr_connection_type;
-
-using active_monitor_callback = std::function<void(const gsr_monitor *monitor, void *userdata)>;
-
-static const XRRModeInfo* get_mode_info(const XRRScreenResources *sr, RRMode id) {
-    for(int i = 0; i < sr->nmode; ++i) {
-        if(sr->modes[i].id == id)
-            return &sr->modes[i];
-    }    
-    return NULL;
-}
-
-static void for_each_active_monitor_output_x11(Display *display, active_monitor_callback callback, void *userdata) {
-    XRRScreenResources *screen_res = XRRGetScreenResources(display, DefaultRootWindow(display));
-    if(!screen_res)
-        return;
-
-    char display_name[256];
-    for(int i = 0; i < screen_res->noutput; ++i) {
-        XRROutputInfo *out_info = XRRGetOutputInfo(display, screen_res, screen_res->outputs[i]);
-        if(out_info && out_info->crtc && out_info->connection == RR_Connected) {
-            XRRCrtcInfo *crt_info = XRRGetCrtcInfo(display, screen_res, out_info->crtc);
-            if(crt_info && crt_info->mode) {
-                const XRRModeInfo *mode_info = get_mode_info(screen_res, crt_info->mode);
-                if(mode_info && out_info->nameLen < (int)sizeof(display_name)) {
-                    memcpy(display_name, out_info->name, out_info->nameLen);
-                    display_name[out_info->nameLen] = '\0';
-
-                    gsr_monitor monitor;
-                    monitor.name = display_name;
-                    monitor.name_len = out_info->nameLen;
-                    monitor.pos = { (int)crt_info->x, (int)crt_info->y };
-                    monitor.size = { (int)crt_info->width, (int)crt_info->height };
-                    monitor.crt_info = crt_info;
-                    monitor.connector_id = 0; // TODO: Get connector id
-                    callback(&monitor, userdata);
-                }
-            }
-            if(crt_info)
-                XRRFreeCrtcInfo(crt_info);
-        }
-        if(out_info)
-            XRRFreeOutputInfo(out_info);
-    }    
-
-    XRRFreeScreenResources(screen_res);
-}
-
-typedef struct {
-    int type;
-    int count;
-} drm_connector_type_count;
-
-#define CONNECTOR_TYPE_COUNTS 32
-
-static drm_connector_type_count* drm_connector_types_get_index(drm_connector_type_count *type_counts, int *num_type_counts, int connector_type) {
-    for(int i = 0; i < *num_type_counts; ++i) {
-        if(type_counts[i].type == connector_type)
-            return &type_counts[i];
-    }
-
-    if(*num_type_counts == CONNECTOR_TYPE_COUNTS)
-        return NULL;
-
-    const int index = *num_type_counts;
-    type_counts[index].type = connector_type;
-    type_counts[index].count = 0;
-    ++*num_type_counts;
-    return &type_counts[index];
-}
-
-static bool connector_get_property_by_name(int drmfd, drmModeConnectorPtr props, const char *name, uint64_t *result) {
-    for(int i = 0; i < props->count_props; ++i) {
-        drmModePropertyPtr prop = drmModeGetProperty(drmfd, props->props[i]);
-        if(prop) {
-            if(strcmp(name, prop->name) == 0) {
-                *result = props->prop_values[i];
-                drmModeFreeProperty(prop);
-                return true;
-            }
-            drmModeFreeProperty(prop);
-        }
-    }
-    return false;
-}
-
-static void for_each_active_monitor_output_wayland(const gsr_egl *egl, active_monitor_callback callback, void *userdata) {
-    for(int i = 0; i < egl->wayland.num_outputs; ++i) {
-        if(!egl->wayland.outputs[i].name)
-            continue;
-
-        gsr_monitor monitor;
-        monitor.name = egl->wayland.outputs[i].name;
-        monitor.name_len = strlen(egl->wayland.outputs[i].name);
-        monitor.pos = { egl->wayland.outputs[i].pos.x, egl->wayland.outputs[i].pos.y };
-        monitor.size = { egl->wayland.outputs[i].size.x, egl->wayland.outputs[i].size.y };
-        monitor.crt_info = NULL;
-        monitor.connector_id = 0;
-        callback(&monitor, userdata);
-    }
-}
-
-static void for_each_active_monitor_output_drm(const gsr_egl *egl, active_monitor_callback callback, void *userdata) {
-    int fd = open(egl->card_path, O_RDONLY);
-    if(fd == -1)
-        return;
-
-    drmSetClientCap(fd, DRM_CLIENT_CAP_ATOMIC, 1);
-
-    drm_connector_type_count type_counts[CONNECTOR_TYPE_COUNTS];
-    int num_type_counts = 0;
-
-    char display_name[256];
-    drmModeResPtr resources = drmModeGetResources(fd);
-    if(resources) {
-        for(int i = 0; i < resources->count_connectors; ++i) {
-            drmModeConnectorPtr connector = drmModeGetConnectorCurrent(fd, resources->connectors[i]);
-            if(!connector)
-                continue;
-
-            drm_connector_type_count *connector_type = drm_connector_types_get_index(type_counts, &num_type_counts, connector->connector_type);
-            const char *connection_name = drmModeGetConnectorTypeName(connector->connector_type);
-            const int connection_name_len = strlen(connection_name);
-            if(connector_type)
-                ++connector_type->count;
-
-            if(connector->connection != DRM_MODE_CONNECTED) {
-                drmModeFreeConnector(connector);
-                continue;
-            }
-
-            uint64_t crtc_id = 0;
-            connector_get_property_by_name(fd, connector, "CRTC_ID", &crtc_id);
-
-            drmModeCrtcPtr crtc = drmModeGetCrtc(fd, crtc_id);
-            if(connector_type && crtc_id > 0 && crtc && connection_name_len + 5 < (int)sizeof(display_name)) {
-                const int display_name_len = snprintf(display_name, sizeof(display_name), "%s-%d", connection_name, connector_type->count);
-                gsr_monitor monitor;
-                monitor.name = display_name;
-                monitor.name_len = display_name_len;
-                monitor.pos = { (int)crtc->x, (int)crtc->y };
-                monitor.size = { (int)crtc->width, (int)crtc->height };
-                monitor.crt_info = NULL;
-                monitor.connector_id = connector->connector_id;
-                callback(&monitor, userdata);
-            }
-
-            if(crtc)
-                drmModeFreeCrtc(crtc);
-
-            drmModeFreeConnector(connector);
-        }
-        drmModeFreeResources(resources);
-    }
-
-    close(fd);
-}
-
-static void for_each_active_monitor_output(const gsr_egl *egl, gsr_connection_type connection_type, active_monitor_callback callback, void *userdata) {
-    switch(connection_type) {
-        case GSR_CONNECTION_X11:
-            for_each_active_monitor_output_x11(egl->x11.dpy, callback, userdata);
-            break;
-        case GSR_CONNECTION_WAYLAND:
-            for_each_active_monitor_output_wayland(egl, callback, userdata);
-            break;
-        case GSR_CONNECTION_DRM:
-            for_each_active_monitor_output_drm(egl, callback, userdata);
-            break;
-    }
-}
-
-static bool try_card_has_valid_plane(const char *card_path) {
-    drmVersion *ver = NULL;
-    drmModePlaneResPtr planes = NULL;
-    bool found_screen_card = false;
-
-    int fd = open(card_path, O_RDONLY);
-    if(fd == -1)
-        return false;
-
-    ver = drmGetVersion(fd);
-    if(!ver || strstr(ver->name, "nouveau"))
-        goto next;
-
-    drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
-
-    planes = drmModeGetPlaneResources(fd);
-    if(!planes)
-        goto next;
-
-    for(uint32_t j = 0; j < planes->count_planes; ++j) {
-        drmModePlanePtr plane = drmModeGetPlane(fd, planes->planes[j]);
-        if(!plane)
-            continue;
-
-        if(plane->fb_id)
-            found_screen_card = true;
-
-        drmModeFreePlane(plane);
-        if(found_screen_card)
-            break;
-    }
-
-    next:
-    if(planes)
-        drmModeFreePlaneResources(planes);
-    if(ver)
-        drmFreeVersion(ver);
-    close(fd);
-    if(found_screen_card)
-        return true;
-
-    return false;
-}
-
-static void string_copy(char *dst, const char *src, int len) {
-    int src_len = strlen(src);
-    int min_len = src_len;
-    if(len - 1 < min_len)
-        min_len = len - 1;
-    memcpy(dst, src, min_len);
-    dst[min_len] = '\0';
-}
-
-/* output should be >= 128 bytes */
-static bool gsr_get_valid_card_path(gsr_egl *egl, char *output) {
-    if(egl->dri_card_path) {
-        string_copy(output, egl->dri_card_path, 127);
-        return try_card_has_valid_plane(output);
-    }
-
-    for(int i = 0; i < 10; ++i) {
-        snprintf(output, 127, DRM_DEV_NAME, DRM_DIR_NAME, i);
-        if(try_card_has_valid_plane(output))
-            return true;
-    }
-    return false;
 }
 
 static void show_notification(GtkApplication *app, const char *title, const char *body, GNotificationPriority priority) {
@@ -1087,7 +866,7 @@ static void show_notification(GtkApplication *app, const char *title, const char
     if(priority < G_NOTIFICATION_PRIORITY_URGENT) {
         notification_timeout_seconds = 2.0;
     } else {
-        notification_timeout_seconds = 5.0;
+        notification_timeout_seconds = 10.0;
     }
     notification_start_seconds = clock_get_monotonic_seconds();
 }
@@ -1344,7 +1123,7 @@ static int xerror_grab_error(Display*, XErrorEvent*) {
 }
 
 static void ungrab_keyboard(Display *display) {
-    if(wayland)
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
         return;
 
     if(current_hotkey) {
@@ -1359,7 +1138,7 @@ static void ungrab_keyboard(Display *display) {
 }
 
 static bool grab_ungrab_hotkey_combo(Display *display, Hotkey hotkey, bool grab) {
-    if(wayland)
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
         return true;
 
     if(hotkey.keysym == None && hotkey.modkey_mask == 0)
@@ -1417,7 +1196,7 @@ static bool grab_ungrab_hotkey_combo(Display *display, Hotkey hotkey, bool grab)
 }
 
 static void ungrab_keys(Display *display) {
-    if(wayland)
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
         return;
 
     grab_ungrab_hotkey_combo(display, streaming_hotkey, false);
@@ -1501,27 +1280,31 @@ static HotkeyResult replace_grabbed_keys_depending_on_active_page() {
     return hotkey_result;
 }
 
+static bool is_monitor_capture_drm() {
+    return gsr_info.system_info.display_server == DisplayServer::WAYLAND || gsr_info.gpu_info.vendor != GpuVendor::NVIDIA;
+}
+
 static bool show_pkexec_flatpak_error_if_needed() {
     const std::string window_str = record_area_selection_menu_get_active_id();
-    if((wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA) && window_str != "window" && window_str != "focused") {
+    if(is_monitor_capture_drm() && window_str != "window" && window_str != "focused" && window_str != "portal") {
         if(!is_pkexec_installed()) {
             GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "pkexec needs to be installed to record a monitor with an AMD/Intel GPU. Please install and run polkit. Alternatively, record a single window which doesn't require root access.");
+                "pkexec needs to be installed to record a monitor with an AMD/Intel GPU. Please install and run polkit. Alternatively, record a single window or use portal option which doesn't require root access.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             return true;
         }
 
         if(flatpak && !flatpak_is_installed_as_system()) {
-            if(wayland) {
+            if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland. To install GPU Screen recorder system-wide, you can run this command:\n"
+                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland when not using the portal option. To install GPU Screen recorder system-wide, you can run this command:\n"
                     "flatpak install flathub --system com.dec05eba.gpu_screen_recorder\n");
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
             } else {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel. To install GPU Screen recorder system-wide, you can run this command:\n"
+                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel when not using the portal option. To install GPU Screen recorder system-wide, you can run this command:\n"
                     "flatpak install flathub --system com.dec05eba.gpu_screen_recorder\n"
                     "Alternatively, record a single window which doesn't have this restriction.");
                 gtk_dialog_run(GTK_DIALOG(dialog));
@@ -1541,7 +1324,7 @@ static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->replay_page);
     app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::REPLAY)));
 
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
         if(!hotkey_result.replay_start_stop_hotkey_success) {
             gtk_entry_set_text(GTK_ENTRY(replay_start_stop_hotkey.hotkey_entry), "");
@@ -1566,7 +1349,7 @@ static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
     app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::RECORDING)));
 
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
         if(!hotkey_result.record_hotkey_success) {
             gtk_entry_set_text(GTK_ENTRY(record_hotkey.hotkey_entry), "");
@@ -1610,7 +1393,7 @@ static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
     gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->streaming_page);
     app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::STREAMING)));
 
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         HotkeyResult hotkey_result = replace_grabbed_keys_depending_on_active_page();
         if(!hotkey_result.streaming_hotkey_success) {
             gtk_entry_set_text(GTK_ENTRY(streaming_hotkey.hotkey_entry), "");
@@ -1664,9 +1447,11 @@ static gboolean on_replay_file_chooser_button_click(GtkButton *button, gpointer)
     return res;
 }
 
-static bool kill_gpu_screen_recorder_get_result() {
+static bool kill_gpu_screen_recorder_get_result(bool *already_dead) {
+    *already_dead = true;
     bool exit_success = true;
     if(gpu_screen_recorder_process != -1) {
+        *already_dead = false;
         int status;
         int wait_result = waitpid(gpu_screen_recorder_process, &status, WNOHANG);
         if(wait_result == -1) {
@@ -1725,7 +1510,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     int exit_status = prev_exit_status;
     prev_exit_status = -1;
     if(replaying) {
-        bool exit_success = kill_gpu_screen_recorder_get_result();
+        bool already_dead = true;
+        bool exit_success = kill_gpu_screen_recorder_get_result(&already_dead);
 
         gtk_button_set_label(button, "Start replay");
         replaying = false;
@@ -1742,7 +1528,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
-        } else if(!exit_success) {
+        } else if(!exit_success || (already_dead && exit_status != 0)) {
             show_notification(app, "GPU Screen Recorder",
                 "Failed to start replay. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
         }
@@ -1754,8 +1540,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
     int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
-    int record_width = wayland ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
+    int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, dir);
@@ -1902,7 +1688,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     int exit_status = prev_exit_status;
     prev_exit_status = -1;
     if(recording) {
-        bool exit_success = kill_gpu_screen_recorder_get_result();
+        bool already_dead = true;
+        bool exit_success = kill_gpu_screen_recorder_get_result(&already_dead);
 
         gtk_button_set_label(button, "Start recording");
         recording = false;
@@ -1924,13 +1711,13 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(!exit_success || (already_dead && exit_status != 0)) {
+            show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video. Run GPU Screen Recorder from the terminal to see more information when this failure happens", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_success) {
             if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button))) {
                 const std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
                 show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
             }
-        } else {
-            show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
         }
         return true;
     }
@@ -1938,8 +1725,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     save_configs();
 
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    int record_width = wayland ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
+    int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     bool follow_focused = false;
     std::string window_str = record_area_selection_menu_get_active_id();
@@ -2057,7 +1844,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     int exit_status = prev_exit_status;
     prev_exit_status = -1;
     if(streaming) {
-        bool exit_success = kill_gpu_screen_recorder_get_result();
+        bool already_dead = true;
+        bool exit_success = kill_gpu_screen_recorder_get_result(&already_dead);
 
         gtk_button_set_label(button, "Start streaming");
         streaming = false;
@@ -2072,10 +1860,10 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(!exit_success || (already_dead && exit_status != 0)) {
+            show_notification(app, "GPU Screen Recorder", "Failed to stream video. There is either an error in your streaming config or your graphics card doesn't support GPU Screen Recorder with the settings you used", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_success) {
             show_notification(app, "GPU Screen Recorder", "Stopped streaming", G_NOTIFICATION_PRIORITY_NORMAL);
-        } else {
-            show_notification(app, "GPU Screen Recorder", "Failed to stream video. There is either an error in your streaming config or your graphics card doesn't support GPU Screen Recorder with the settings you used", G_NOTIFICATION_PRIORITY_URGENT);
         }
 
         return true;
@@ -2084,8 +1872,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     save_configs();
 
     int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    int record_width = wayland ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = wayland ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
+    int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     bool follow_focused = false;
     std::string window_str = record_area_selection_menu_get_active_id();
@@ -2257,7 +2045,7 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     gtk_widget_set_visible(GTK_WIDGET(video_codec_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(framerate_mode_grid), advanced_view);
-    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), advanced_view && gpu_inf.vendor == GPU_VENDOR_NVIDIA && !wayland);
+    gtk_widget_set_visible(GTK_WIDGET(overclock_grid), advanced_view && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA && gsr_info.system_info.display_server != DisplayServer::WAYLAND);
     gtk_widget_set_visible(GTK_WIDGET(show_notification_button), advanced_view);
 }
 
@@ -2323,7 +2111,7 @@ static void keypress_toggle_recording(bool recording_state, GtkButton *record_bu
 }
 
 static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpointer userdata) {
-    if(wayland)
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
         return GDK_FILTER_CONTINUE;
 
     if(hotkey_mode == HotkeyMode::NoAction)
@@ -2472,7 +2260,7 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
 }
 
 static gboolean on_hotkey_entry_click(GtkWidget *button, gpointer) {
-    if(wayland)
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
         return true;
 
     hotkey_mode = HotkeyMode::NewHotkey;
@@ -2518,69 +2306,185 @@ static bool audio_inputs_contains(const std::vector<AudioInput> &audio_inputs, c
     return false;
 }
 
-static gsr_connection_type get_connection_type() {
-    if(wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA) {
-        return GSR_CONNECTION_DRM;
-    } else {
-        return GSR_CONNECTION_X11;
+static void parse_system_info_line(GsrInfo *gsr_info, const std::string &line) {
+    const size_t space_index = line.find(' ');
+    if(space_index == std::string::npos)
+        return;
+
+    const StringView attribute_name = {line.c_str(), space_index};
+    const StringView attribute_value = {line.c_str() + space_index + 1, line.size() - (space_index + 1)};
+    if(attribute_name == "display_server") {
+        if(attribute_value == "x11")
+            gsr_info->system_info.display_server = DisplayServer::X11;
+        else if(attribute_value == "wayland")
+            gsr_info->system_info.display_server = DisplayServer::WAYLAND;
     }
 }
 
-// Returns the exit status
-static int get_supported_video_codecs(SupportedVideoCodecs *supported_video_codecs) {
-    supported_video_codecs->h264 = false;
-    supported_video_codecs->hevc = false;
-    supported_video_codecs->av1 = false;
-    supported_video_codecs->vp8 = false;
-    supported_video_codecs->vp9 = false;
+static void parse_gpu_info_line(GsrInfo *gsr_info, const std::string &line) {
+    const size_t space_index = line.find(' ');
+    if(space_index == std::string::npos)
+        return;
 
-    FILE *f = popen("gpu-screen-recorder --list-supported-video-codecs", "r");
+    const StringView attribute_name = {line.c_str(), space_index};
+    const StringView attribute_value = {line.c_str() + space_index + 1, line.size() - (space_index + 1)};
+    if(attribute_name == "gpu") {
+        if(attribute_value == "amd")
+            gsr_info->gpu_info.vendor = GpuVendor::AMD;
+        else if(attribute_value == "intel")
+            gsr_info->gpu_info.vendor = GpuVendor::INTEL;
+        else if(attribute_value == "nvidia")
+            gsr_info->gpu_info.vendor = GpuVendor::NVIDIA;
+    }
+}
+
+static void parse_video_codecs_line(GsrInfo *gsr_info, const std::string &line) {
+    if(line == "h264")
+        gsr_info->supported_video_codecs.h264 = true;
+    else if(line == "hevc")
+        gsr_info->supported_video_codecs.hevc = true;
+    else if(line == "av1")
+        gsr_info->supported_video_codecs.av1 = true;
+    else if(line == "vp8")
+        gsr_info->supported_video_codecs.vp8 = true;
+    else if(line == "vp9")
+        gsr_info->supported_video_codecs.vp9 = true;
+}
+
+static GsrMonitor capture_option_line_to_monitor(const std::string &line) {
+    size_t space_index = line.find(' ');
+    if(space_index == std::string::npos)
+        return { line, {0, 0} };
+    
+    vec2i size = {0, 0};
+    if(sscanf(line.c_str() + space_index + 1, "%dx%d", &size.x, &size.y) != 2)
+        size = {0, 0};
+
+    return { line.substr(0, space_index), size };
+}
+
+static void parse_capture_options_line(GsrInfo *gsr_info, const std::string &line) {
+    if(line == "window")
+        gsr_info->supported_capture_options.window = true;
+    else if(line == "focused")
+        gsr_info->supported_capture_options.focused = true;
+    else if(line == "screen")
+        gsr_info->supported_capture_options.screen = true;
+    else if(line == "portal")
+        gsr_info->supported_capture_options.portal = true;
+    else
+        gsr_info->supported_capture_options.monitors.push_back(capture_option_line_to_monitor(line));
+}
+
+enum class GsrInfoSection {
+    UNKNOWN,
+    SYSTEM_INFO,
+    GPU_INFO,
+    VIDEO_CODECS,
+    CAPTURE_OPTIONS
+};
+
+static bool starts_with(const std::string &str, const char *substr) {
+    size_t len = strlen(substr);
+    return str.size() >= len && memcmp(str.data(), substr, len) == 0;
+}
+
+static GsrInfoExitStatus get_gpu_screen_recorder_info(GsrInfo *gsr_info) {
+    *gsr_info = GsrInfo{};
+
+    FILE *f = popen("gpu-screen-recorder --info", "r");
     if(!f) {
-        fprintf(stderr, "error: 'gpu-screen-recorder --list-supported-video-codecs' failed\n");
-        return -1;
+        fprintf(stderr, "error: 'gpu-screen-recorder --info' failed\n");
+        return GsrInfoExitStatus::FAILED_TO_RUN_COMMAND;
     }
 
-    char output[1024];
+    char output[8192];
     ssize_t bytes_read = fread(output, 1, sizeof(output) - 1, f);
     if(bytes_read < 0 || ferror(f)) {
-        fprintf(stderr, "error: failed to read 'gpu-screen-recorder --list-supported-video-codecs' output\n");
+        fprintf(stderr, "error: failed to read 'gpu-screen-recorder --info' output\n");
         pclose(f);
-        return -1;
+        return GsrInfoExitStatus::FAILED_TO_RUN_COMMAND;
     }
     output[bytes_read] = '\0';
 
-    if(strstr(output, "h264"))
-        supported_video_codecs->h264 = true;
-    if(strstr(output, "hevc"))
-        supported_video_codecs->hevc = true;
-    if(strstr(output, "av1"))
-        supported_video_codecs->av1 = true;
-    if(strstr(output, "vp8"))
-        supported_video_codecs->vp8 = true;
-    if(strstr(output, "vp9"))
-        supported_video_codecs->vp9 = true;
+    GsrInfoSection section = GsrInfoSection::UNKNOWN;
+    string_split_char(output, '\n', [&](StringView line) {
+        const std::string line_str(line.str, line.size);
+
+        if(starts_with(line_str, "section=")) {
+            const char *section_name = line_str.c_str() + 8;
+            if(strcmp(section_name, "system_info") == 0)
+                section = GsrInfoSection::SYSTEM_INFO;
+            else if(strcmp(section_name, "gpu_info") == 0)
+                section = GsrInfoSection::GPU_INFO;
+            else if(strcmp(section_name, "video_codecs") == 0)
+                section = GsrInfoSection::VIDEO_CODECS;
+            else if(strcmp(section_name, "capture_options") == 0)
+                section = GsrInfoSection::CAPTURE_OPTIONS;
+            else
+                section = GsrInfoSection::UNKNOWN;
+            return true;
+        }
+
+        switch(section) {
+            case GsrInfoSection::UNKNOWN: {
+                break;
+            }
+            case GsrInfoSection::SYSTEM_INFO: {
+                parse_system_info_line(gsr_info, line_str);
+                break;
+            }
+            case GsrInfoSection::GPU_INFO: {
+                parse_gpu_info_line(gsr_info, line_str);
+                break;
+            }
+            case GsrInfoSection::VIDEO_CODECS: {
+                parse_video_codecs_line(gsr_info, line_str);
+                break;
+            }
+            case GsrInfoSection::CAPTURE_OPTIONS: {
+                parse_capture_options_line(gsr_info, line_str);
+                break;
+            }
+        }
+
+        return true;
+    });
 
     int status = pclose(f);
-    if(WIFEXITED(status))
-        return WEXITSTATUS(status);
-    return 0;
+    if(WIFEXITED(status)) {
+        switch(WEXITSTATUS(status)) {
+            case 0:  return GsrInfoExitStatus::OK;
+            case 22: return GsrInfoExitStatus::OPENGL_FAILED;
+            case 23: return GsrInfoExitStatus::NO_DRM_CARD;
+            default: return GsrInfoExitStatus::FAILED_TO_RUN_COMMAND;
+        }
+    }
+
+    return GsrInfoExitStatus::FAILED_TO_RUN_COMMAND;
 }
 
 static void record_area_set_sensitive(GtkCellLayout *cell_layout, GtkCellRenderer *cell, GtkTreeModel *tree_model, GtkTreeIter *iter, gpointer data) {
     (void)cell_layout;
     (void)data;
-    if(wayland) {
-        gchar *id;
-        gtk_tree_model_get(tree_model, iter, 1, &id, -1);
-        gboolean sensitive = g_strcmp0("window", id) != 0 && g_strcmp0("focused", id) != 0;
-        g_free(id);
-        g_object_set(cell, "sensitive", sensitive, NULL);
-    } else {
-        g_object_set(cell, "sensitive", true, NULL);
-    }
+
+    gchar *id;
+    gtk_tree_model_get(tree_model, iter, 1, &id, -1);
+
+    gboolean sensitive = true;
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
+        sensitive = g_strcmp0("window", id) != 0 && g_strcmp0("focused", id) != 0;
+
+    gboolean is_portal = g_strcmp0("portal", id) == 0;
+    if(is_portal && !gsr_info.supported_capture_options.portal)
+        sensitive = false;
+
+    g_object_set(cell, "sensitive", sensitive, NULL);
+
+    g_free(id);
 }
 
-static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app, const gpu_info &gpu_inf) {
+static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app) {
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "common-settings");
     gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
@@ -2619,7 +2523,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     GtkTreeIter iter;
     record_area_selection_model = GTK_TREE_MODEL(store);
 
-    if(wayland) {
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter, 0, "Window (Unavailable on Wayland)", -1);
         gtk_list_store_set(store, &iter, 1, "window", -1);
@@ -2637,41 +2541,37 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_set(store, &iter, 1, "focused", -1);
     }
 
-    const bool allow_screen_capture = wayland || nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
+    const bool allow_screen_capture = is_monitor_capture_drm() || nvfbc_installed;
     if(allow_screen_capture) {
-        if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA) {
+        if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA) {
             gtk_list_store_append(store, &iter);
             gtk_list_store_set(store, &iter, 0, "All monitors", -1);
             gtk_list_store_set(store, &iter, 1, "screen", -1);
         }
 
-        const gsr_connection_type connection_type = get_connection_type();
-        int num_monitors = 0;
-        for_each_active_monitor_output(&egl, connection_type, [&](const gsr_monitor *monitor, void*) {
+        for(const auto &monitor : gsr_info.supported_capture_options.monitors) {
             std::string label = "Monitor ";
-            label.append(monitor->name, monitor->name_len);
+            label += monitor.name;
             label += " (";
-            label += std::to_string(monitor->size.x);
+            label += std::to_string(monitor.size.x);
             label += "x";
-            label += std::to_string(monitor->size.y);
-            if(flatpak && (wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA)) {
+            label += std::to_string(monitor.size.y);
+            if(flatpak && is_monitor_capture_drm()) {
                 label += ", requires root access";
             }
             label += ")";
 
             // Leak on purpose, what are you gonna do? stab me?
-            char *id = (char*)malloc(monitor->name_len + 1);
-            memcpy(id, monitor->name, monitor->name_len);
-            id[monitor->name_len] = '\0';
+            char *id = (char*)malloc(monitor.name.size() + 1);
+            memcpy(id, monitor.name.c_str(), monitor.name.size());
+            id[monitor.name.size()] = '\0';
 
             gtk_list_store_append(store, &iter);
             gtk_list_store_set(store, &iter, 0, label.c_str(), -1);
             gtk_list_store_set(store, &iter, 1, id, -1);
+        }
 
-            ++num_monitors;
-        }, NULL);
-
-        if(num_monitors == 0 && (wayland || gpu_inf.vendor != GPU_VENDOR_NVIDIA)) {
+        if(gsr_info.supported_capture_options.monitors.empty() && gsr_info.system_info.display_server == DisplayServer::WAYLAND && !gsr_info.supported_capture_options.portal) {
             GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "No monitors to record found. Make sure GPU Screen Recorder is running on the same GPU device that is displaying graphics on the screen.");
             gtk_dialog_run(GTK_DIALOG(dialog));
@@ -2680,6 +2580,10 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             return GTK_WIDGET(grid);
         }
     }
+
+    gtk_list_store_append(store, &iter);
+    gtk_list_store_set(store, &iter, 0, "Desktop portal", -1);
+    gtk_list_store_set(store, &iter, 1, "portal", -1);
 
     record_area_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(record_area_selection_model));
 
@@ -2693,7 +2597,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 3, 1);
 
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
         gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
         g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
@@ -2810,27 +2714,23 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
     video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
-    if(supported_video_codecs_exit_status == 0) {
-        if(supported_video_codecs.h264) 
-            gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
-        if(supported_video_codecs.hevc)
-            gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
-        if(supported_video_codecs.av1)
-            gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
-        if(supported_video_codecs.vp8)
-            gtk_combo_box_text_append(video_codec_input_menu, "vp8", "VP8");
-        if(supported_video_codecs.vp9)
-            gtk_combo_box_text_append(video_codec_input_menu, "vp9", "VP9");
-
-        if(wayland) {
-            if(supported_video_codecs.hevc)
-                gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
-            if(supported_video_codecs.av1)
-                gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
-        }
-    } else {
+    gtk_combo_box_text_append(video_codec_input_menu, "h264_software", "H264 Software Encoder (Slow, not recommeded)");
+    if(gsr_info.supported_video_codecs.h264) 
         gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
+    if(gsr_info.supported_video_codecs.hevc)
         gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
+    if(gsr_info.supported_video_codecs.av1)
+        gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
+    if(gsr_info.supported_video_codecs.vp8)
+        gtk_combo_box_text_append(video_codec_input_menu, "vp8", "VP8");
+    if(gsr_info.supported_video_codecs.vp9)
+        gtk_combo_box_text_append(video_codec_input_menu, "vp9", "VP9");
+
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+        if(gsr_info.supported_video_codecs.hevc)
+            gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
+        if(gsr_info.supported_video_codecs.av1)
+            gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(video_codec_input_menu), true);
     gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_input_menu), 1, 0, 1, 1);
@@ -2974,7 +2874,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
     GtkWidget *hotkey_active_label = NULL;
-    if(wayland) {
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         add_wayland_global_hotkeys_ui(grid, row, 5);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
@@ -3039,7 +2939,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(replay_container, supported_container.container_name, supported_container.file_extension);
     }
-    if(supported_video_codecs.vp8 || supported_video_codecs.vp9) {
+    if(gsr_info.supported_video_codecs.vp8 || gsr_info.supported_video_codecs.vp9) {
         gtk_combo_box_text_append(replay_container, "webm", "webm");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(replay_container), true);
@@ -3110,7 +3010,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
     GtkWidget *hotkey_active_label = NULL;
-    if(wayland) {
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         add_wayland_global_hotkeys_ui(grid, row, 5);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
@@ -3175,7 +3075,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(record_container, supported_container.container_name, supported_container.file_extension);
     }
-    if(supported_video_codecs.vp8 || supported_video_codecs.vp9) {
+    if(gsr_info.supported_video_codecs.vp8 || gsr_info.supported_video_codecs.vp9) {
         gtk_combo_box_text_append(record_container, "webm", "webm");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(record_container), true);
@@ -3236,7 +3136,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
     GtkWidget *hotkey_active_label = NULL;
-    if(wayland) {
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         add_wayland_global_hotkeys_ui(grid, row, 3);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
@@ -3300,7 +3200,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(custom_stream_container, supported_container.container_name, supported_container.file_extension);
     }
-    if(supported_video_codecs.vp8 || supported_video_codecs.vp9) {
+    if(gsr_info.supported_video_codecs.vp8 || gsr_info.supported_video_codecs.vp9) {
         gtk_combo_box_text_append(custom_stream_container, "webm", "webm");
     }
     gtk_widget_set_hexpand(GTK_WIDGET(custom_stream_container), true);
@@ -3442,38 +3342,33 @@ static void add_audio_input_track(const char *name) {
     gtk_list_box_insert (GTK_LIST_BOX(audio_input_used_list), row, -1);
 }
 
-static void load_config(const gpu_info &gpu_inf) {
+static void load_config() {
     bool config_empty = false;
     config = read_config(config_empty);
 
     std::string first_monitor;
-    if(!wayland && strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
         //
-    } else if(!wayland && strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
+    } else if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
         //
-    } else if(!wayland && gpu_inf.vendor == GPU_VENDOR_NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "screen") == 0) {
+    } else if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "screen") == 0) {
         //
     } else {
-        gsr_connection_type connection_type = get_connection_type();
-
         bool found_monitor = false;
-        int monitor_name_size = strlen(config.main_config.record_area_option.c_str());
-        for_each_active_monitor_output(&egl, connection_type, [&](const gsr_monitor *monitor, void*) {
-            if(first_monitor.empty()) {
-                first_monitor.assign(monitor->name, monitor->name_len);
-            }
+        for(const auto &monitor : gsr_info.supported_capture_options.monitors) {
+            if(first_monitor.empty())
+                first_monitor = monitor.name;
 
-            if(monitor_name_size == monitor->name_len && strncmp(config.main_config.record_area_option.c_str(), monitor->name, monitor->name_len) == 0) {
+            if(config.main_config.record_area_option == monitor.name)
                 found_monitor = true;
-            }
-        }, NULL);
+        }
 
         if(!found_monitor)
             config.main_config.record_area_option.clear();
     }
 
     if(config.main_config.record_area_option.empty()) {
-        const bool allow_screen_capture = wayland || nvfbc_installed || gpu_inf.vendor != GPU_VENDOR_NVIDIA;
+        const bool allow_screen_capture = is_monitor_capture_drm() || nvfbc_installed;
         if(allow_screen_capture) {
             config.main_config.record_area_option = first_monitor;
         } else {
@@ -3481,7 +3376,7 @@ static void load_config(const gpu_info &gpu_inf) {
         }
     }
 
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
         gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
         gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
@@ -3514,7 +3409,7 @@ static void load_config(const gpu_info &gpu_inf) {
         config.main_config.codec = "auto";
     }
 
-    if(!wayland && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
         config.main_config.codec = "auto";
 
     if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac")
@@ -3538,7 +3433,7 @@ static void load_config(const gpu_info &gpu_inf) {
         config.replay_config.replay_time = 1200;
 
     record_area_selection_menu_set_active_id(config.main_config.record_area_option.c_str());
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         gtk_spin_button_set_value(area_width_entry, config.main_config.record_area_width);
         gtk_spin_button_set_value(area_height_entry, config.main_config.record_area_height);
     }
@@ -3567,7 +3462,7 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_entry_set_text(twitch_stream_id_entry, config.streaming_config.twitch.stream_key.c_str());
     gtk_entry_set_text(custom_stream_url_entry, config.streaming_config.custom.url.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(custom_stream_container), config.streaming_config.custom.container.c_str());
-    if(!wayland && streaming_hotkey_button && !config_empty) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && streaming_hotkey_button && !config_empty) {
         streaming_hotkey.keysym = config.streaming_config.start_recording_hotkey.keysym;
         streaming_hotkey.modkey_mask = config.streaming_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(streaming_hotkey_button), streaming_hotkey);
@@ -3575,12 +3470,12 @@ static void load_config(const gpu_info &gpu_inf) {
 
     gtk_button_set_label(record_file_chooser_button, config.record_config.save_directory.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(record_container), config.record_config.container.c_str());
-    if(!wayland && record_hotkey_button && !config_empty) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && record_hotkey_button && !config_empty) {
         record_hotkey.keysym = config.record_config.start_recording_hotkey.keysym;
         record_hotkey.modkey_mask = config.record_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(record_hotkey_button), record_hotkey);
     }
-    if(!wayland && pause_unpause_hotkey_button && !config_empty) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && pause_unpause_hotkey_button && !config_empty) {
         pause_unpause_hotkey.keysym = config.record_config.pause_recording_hotkey.keysym;
         pause_unpause_hotkey.modkey_mask = config.record_config.pause_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(pause_unpause_hotkey_button), pause_unpause_hotkey);
@@ -3589,12 +3484,12 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_button_set_label(replay_file_chooser_button, config.replay_config.save_directory.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(replay_container), config.replay_config.container.c_str());
     gtk_spin_button_set_value(replay_time_entry, config.replay_config.replay_time);
-    if(!wayland && replay_start_stop_hotkey_button && !config_empty) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && replay_start_stop_hotkey_button && !config_empty) {
         replay_start_stop_hotkey.keysym = config.replay_config.start_recording_hotkey.keysym;
         replay_start_stop_hotkey.modkey_mask = config.replay_config.start_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(replay_start_stop_hotkey_button), replay_start_stop_hotkey);
     }
-    if(!wayland && replay_save_hotkey_button && !config_empty) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && replay_save_hotkey_button && !config_empty) {
         replay_save_hotkey.keysym = config.replay_config.save_recording_hotkey.keysym;
         replay_save_hotkey.modkey_mask = config.replay_config.save_recording_hotkey.modifiers;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(replay_save_hotkey_button), replay_save_hotkey);
@@ -3603,7 +3498,7 @@ static void load_config(const gpu_info &gpu_inf) {
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
 
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         gtk_widget_set_visible(record_hotkey.hotkey_active_label, false);
         gtk_widget_set_visible(pause_unpause_hotkey.hotkey_active_label, false);
         gtk_widget_set_visible(streaming_hotkey.hotkey_active_label, false);
@@ -3613,20 +3508,8 @@ static void load_config(const gpu_info &gpu_inf) {
     enable_stream_record_button_if_info_filled();
     stream_service_item_change_callback(GTK_COMBO_BOX(stream_service_input_menu), nullptr);
 
-    if(supported_video_codecs_exit_status != 0) {
-        const char *cmd = flatpak ? "flatpak run --command=gpu-screen-recorder com.dec05eba.gpu_screen_recorder -w screen -f 60 -o video.mp4" : "gpu-screen-recorder -w screen -f 60 -o video.mp4";
-        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Failed to run 'gpu-screen-recorder' command. If you are using gpu-screen-recorder flatpak then this is a bug. Otherwise you need to make sure gpu-screen-recorder is installed on your system and working properly (install necessary depedencies depending on your GPU, such as libva-mesa-driver, libva-intel-driver, intel-media-driver and linux-firmware). Run:\n"
-                "%s\n"
-                "in a terminal to see more information about the issue.", cmd);
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(select_window_userdata.app));
-            return;
-    }
-
-    if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor != GPU_VENDOR_NVIDIA && config.main_config.codec != "av1") {
-        if(supported_video_codecs.av1) {
+    if(!gsr_info.supported_video_codecs.h264 && !gsr_info.supported_video_codecs.hevc && gsr_info.gpu_info.vendor != GpuVendor::NVIDIA && config.main_config.codec != "av1") {
+        if(gsr_info.supported_video_codecs.av1) {
             GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
                 "Switched video codec to AV1 since H264/HEVC video encoding is either missing or disabled on your system. If you know that your system supports H264/HEVC video encoding and "
                 "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
@@ -3651,7 +3534,7 @@ static void load_config(const gpu_info &gpu_inf) {
         }
     }
 
-    if(!supported_video_codecs.h264 && !supported_video_codecs.hevc && gpu_inf.vendor == GPU_VENDOR_NVIDIA) {
+    if(!gsr_info.supported_video_codecs.h264 && !gsr_info.supported_video_codecs.hevc && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA) {
         GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to find H264/HEVC video codecs. Your NVIDIA GPU may be missing support for H264/HEVC video codecs for video encoding.");
         gtk_dialog_run(GTK_DIALOG(dialog));
@@ -3661,79 +3544,32 @@ static void load_config(const gpu_info &gpu_inf) {
     }
 }
 
-static bool gl_get_gpu_info(gsr_egl *egl, gpu_info *info) {
-    const char *software_renderers[] = { "llvmpipe", "SWR", "softpipe", NULL };
-    bool supported = true;
-    const unsigned char *gl_vendor = egl->glGetString(GL_VENDOR);
-    const unsigned char *gl_renderer = egl->glGetString(GL_RENDERER);
-
-    info->gpu_version = 0;
-
-    if(!gl_vendor) {
-        fprintf(stderr, "Error: failed to get gpu vendor\n");
-        supported = false;
-        goto end;
-    }
-
-    if(gl_renderer) {
-        for(int i = 0; software_renderers[i]; ++i) {
-            if(strstr((const char*)gl_renderer, software_renderers[i])) {
-                fprintf(stderr, "gsr error: your opengl environment is not properly setup. It's using %s (software rendering) for opengl instead of your graphics card. Please make sure your graphics driver is properly installed\n", software_renderers[i]);
-                supported = false;
-                goto end;
-            }
-        }
-    }
-
-    if(strstr((const char*)gl_vendor, "AMD"))
-        info->vendor = GPU_VENDOR_AMD;
-    else if(strstr((const char*)gl_vendor, "Intel"))
-        info->vendor = GPU_VENDOR_INTEL;
-    else if(strstr((const char*)gl_vendor, "NVIDIA"))
-        info->vendor = GPU_VENDOR_NVIDIA;
-    else {
-        fprintf(stderr, "Error: unknown gpu vendor: %s\n", gl_vendor);
-        supported = false;
-        goto end;
-    }
-
-    if(gl_renderer) {
-        if(info->vendor == GPU_VENDOR_NVIDIA)
-            sscanf((const char*)gl_renderer, "%*s %*s %*s %d", &info->gpu_version);
-    }
-
-    end:
-    return supported;
-}
-
-static bool is_xwayland(Display *dpy) {
-    int opcode, event, error;
-    if(XQueryExtension(dpy, "XWAYLAND", &opcode, &event, &error))
-        return true;
-
-    bool xwayland_found = false;
-    for_each_active_monitor_output_x11(dpy, [&xwayland_found](const gsr_monitor *monitor, void*) {
-        if(monitor->name_len >= 8 && strncmp(monitor->name, "XWAYLAND", 8) == 0)
-            xwayland_found = true;
-        else if(memmem(monitor->name, monitor->name_len, "X11", 3))
-            xwayland_found = true;
-    }, NULL);
-    return xwayland_found;
-}
-
-static const char* gpu_vendor_to_name(gpu_vendor vendor) {
+static const char* gpu_vendor_to_name(GpuVendor vendor) {
     switch(vendor) {
-        case GPU_VENDOR_AMD:        return "AMD";
-        case GPU_VENDOR_INTEL:      return "Intel";
-        case GPU_VENDOR_NVIDIA:     return "NVIDIA";
+        case GpuVendor::AMD:    return "AMD";
+        case GpuVendor::INTEL:  return "Intel";
+        case GpuVendor::NVIDIA: return "NVIDIA";
     }
     return "";
 }
 
 static void activate(GtkApplication *app, gpointer) {
     flatpak = is_inside_flatpak();
+    nvfbc_installed = gsr_info.system_info.display_server != DisplayServer::WAYLAND && is_nv_fbc_installed();
 
-    if(!wayland && !dpy) {
+    if(gsr_info_exit_status == GsrInfoExitStatus::FAILED_TO_RUN_COMMAND) {
+        const char *cmd = flatpak ? "flatpak run --command=gpu-screen-recorder com.dec05eba.gpu_screen_recorder -w screen -f 60 -o video.mp4" : "gpu-screen-recorder -w screen -f 60 -o video.mp4";
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Failed to run 'gpu-screen-recorder' command. If you are using gpu-screen-recorder flatpak then this is a bug. Otherwise you need to make sure gpu-screen-recorder is installed on your system and working properly (install necessary depedencies depending on your GPU, such as libva-mesa-driver, libva-intel-driver, intel-media-driver and linux-firmware). Run:\n"
+            "%s\n"
+            "in a terminal to see more information about the issue.", cmd);
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(select_window_userdata.app));
+        return;
+    }
+
+    if(gsr_info.system_info.display_server == DisplayServer::UNKNOWN) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Neither X11 nor Wayland is running.");
         gtk_dialog_run(GTK_DIALOG(dialog));
@@ -3742,18 +3578,16 @@ static void activate(GtkApplication *app, gpointer) {
         return;
     }
 
-    nvfbc_installed = !wayland && is_nv_fbc_installed();
-
-    if(!gsr_egl_load(&egl, dpy, wayland)) {
+    if(gsr_info.system_info.display_server == DisplayServer::X11 && !dpy) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to load OpenGL. Make sure your GPU drivers are properly installed.");
+            "Failed to connect to X11 server");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
         return;
     }
 
-    if(!gl_get_gpu_info(&egl, &gpu_inf)) {
+    if(gsr_info_exit_status == GsrInfoExitStatus::OPENGL_FAILED) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to get OpenGL information. Make sure your GPU drivers are properly installed. "
             "If you are using nvidia then make sure to run \"flatpak update\" to make sure that your flatpak nvidia driver version matches your distros nvidia driver version. If this doesn't work then you might need to manually install a flatpak nvidia driver version that matches your distros nvidia driver version.");
@@ -3763,20 +3597,16 @@ static void activate(GtkApplication *app, gpointer) {
         return;
     }
 
-    if((gpu_inf.vendor != GPU_VENDOR_NVIDIA) || wayland) {
-        if(!gsr_get_valid_card_path(&egl, egl.card_path)) {
-            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Failed to find a valid DRM card. If you are running GPU Screen Recorder with prime-run then try running without it.");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(app));
-            return;
-        }
-    } else {
-        egl.card_path[0] = '\0';
+    if(gsr_info_exit_status == GsrInfoExitStatus::NO_DRM_CARD) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Failed to find a valid DRM card. If you are running GPU Screen Recorder with prime-run then try running without it.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(app));
+        return;
     }
 
-    if(gpu_inf.vendor == GPU_VENDOR_NVIDIA) {
+    if(gsr_info.gpu_info.vendor == GpuVendor::NVIDIA) {
         if(!is_cuda_installed()) {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                 "CUDA is not installed on your system. GPU Screen Recorder requires CUDA to be installed to work with a NVIDIA GPU.");
@@ -3796,10 +3626,8 @@ static void activate(GtkApplication *app, gpointer) {
         }
     }
 
-    supported_video_codecs_exit_status = get_supported_video_codecs(&supported_video_codecs);
-
     std::string window_title = "GPU Screen Recorder | Running on ";
-    window_title += gpu_vendor_to_name(gpu_inf.vendor);
+    window_title += gpu_vendor_to_name(gsr_info.gpu_info.vendor);
 
     window = gtk_application_window_new(app);
     g_signal_connect(window, "destroy", G_CALLBACK(on_destroy_window), nullptr);
@@ -3816,7 +3644,7 @@ static void activate(GtkApplication *app, gpointer) {
     if(!pa_default_sources.default_sink_name.empty() && audio_inputs_contains(audio_inputs, pa_default_sources.default_sink_name))
         audio_inputs.insert(audio_inputs.begin(), { pa_default_sources.default_sink_name.c_str(), "Default output" });
 
-    if(!wayland)
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND)
         crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);
 
     GtkStack *stack = GTK_STACK(gtk_stack_new());
@@ -3824,7 +3652,7 @@ static void activate(GtkApplication *app, gpointer) {
     gtk_stack_set_transition_type(stack, GTK_STACK_TRANSITION_TYPE_NONE);
     gtk_stack_set_transition_duration(stack, 0);
     gtk_stack_set_homogeneous(stack, false);
-    GtkWidget *common_settings_page = create_common_settings_page(stack, app, gpu_inf);
+    GtkWidget *common_settings_page = create_common_settings_page(stack, app);
     GtkWidget *replay_page = create_replay_page(app, stack);
     GtkWidget *recording_page = create_recording_page(app, stack);
     GtkWidget *streaming_page = create_streaming_page(app, stack);
@@ -3846,7 +3674,7 @@ static void activate(GtkApplication *app, gpointer) {
     g_signal_connect(stream_button, "clicked", G_CALLBACK(on_start_streaming_click), &page_navigation_userdata);
     g_signal_connect(stream_back_button, "clicked", G_CALLBACK(on_streaming_recording_replay_page_back_click), &page_navigation_userdata);
 
-    if(!wayland) {
+    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         xim = XOpenIM(gdk_x11_get_default_xdisplay(), NULL, NULL, NULL);
         xic = XCreateIC(xim, XNInputStyle, XIMPreeditNothing | XIMStatusNothing, NULL);
 
@@ -3859,7 +3687,7 @@ static void activate(GtkApplication *app, gpointer) {
     g_timeout_add(500, timer_timeout_handler, app);
 
     gtk_widget_show_all(window);
-    load_config(gpu_inf);
+    load_config();
 }
 
 int main(int argc, char **argv) {
@@ -3880,12 +3708,14 @@ int main(int argc, char **argv) {
     unsetenv("vblank_mode");
 
     dpy = XOpenDisplay(NULL);
-    wayland = !dpy || is_xwayland(dpy);
+    gsr_info_exit_status = get_gpu_screen_recorder_info(&gsr_info);
 
-    if(wayland) {
-        setenv("GDK_BACKEND", "wayland", true);
-    } else {
-        setenv("GDK_BACKEND", "x11", true);
+    if(gsr_info_exit_status == GsrInfoExitStatus::OK) {
+        if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+            setenv("GDK_BACKEND", "wayland", true);
+        } else {
+            setenv("GDK_BACKEND", "x11", true);
+        }
     }
 
     GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
