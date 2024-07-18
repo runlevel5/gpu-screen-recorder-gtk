@@ -2823,10 +2823,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_set(store, &iter, 1, "auto", -1);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, "H264 Software Encoder (Slow, not recommeded)", -1);
-        gtk_list_store_set(store, &iter, 1, "h264_software", -1);
-
-        gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264 ? "H264" : "H264 (Not supported on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "h264", -1);
 
@@ -2864,12 +2860,18 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_list_store_set(store, &iter, 1, "av1_hdr", -1);
         }
 
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, "H264 Software Encoder (Slow, not recommeded)", -1);
+        gtk_list_store_set(store, &iter, 1, "h264_software", -1);
+
         video_codec_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(video_codec_selection_model));
 
         GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
         gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, TRUE);
         gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, "text", 0, NULL);
         gtk_cell_layout_set_cell_data_func(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, video_codec_set_sensitive, NULL, NULL);
+
+        gtk_combo_box_set_active(video_codec_selection_menu, 0);
 
         gtk_widget_set_hexpand(GTK_WIDGET(video_codec_selection_menu), true);
         gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_selection_menu), 1, 0, 1, 1);
@@ -3578,6 +3580,7 @@ static void load_config() {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(color_range_input_menu), config.main_config.color_range.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(quality_input_menu), config.main_config.quality.c_str());
+    video_codec_selection_menu_set_active_id("auto");
     video_codec_selection_menu_set_active_id(config.main_config.codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_codec_input_menu), config.main_config.audio_codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(framerate_mode_input_menu), config.main_config.framerate_mode.c_str());
