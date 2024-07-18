@@ -46,7 +46,6 @@ static GtkSpinButton *area_height_entry;
 static GtkComboBox *record_area_selection_menu;
 static GtkTreeModel *record_area_selection_model;
 static GtkComboBoxText *quality_input_menu;
-static GtkComboBoxText *video_codec_input_menu;
 static GtkComboBoxText *audio_codec_input_menu;
 static GtkComboBoxText *color_range_input_menu;
 static GtkComboBoxText *framerate_mode_input_menu;
@@ -54,6 +53,8 @@ static GtkComboBoxText *stream_service_input_menu;
 static GtkComboBoxText *record_container;
 static GtkComboBoxText *replay_container;
 static GtkComboBoxText *custom_stream_container;
+static GtkComboBox *video_codec_selection_menu;
+static GtkTreeModel *video_codec_selection_model;
 static GtkLabel *stream_key_label;
 static GtkButton *record_file_chooser_button;
 static GtkButton *replay_file_chooser_button;
@@ -83,6 +84,7 @@ static GtkWidget *streaming_hotkey_button;
 static GtkWidget *merge_audio_tracks_button;
 static GtkWidget *show_notification_button;
 static GtkWidget *record_cursor_button;
+static GtkWidget *restore_portal_session_button;
 static GtkGrid *video_codec_grid;
 static GtkGrid *audio_codec_grid;
 static GtkGrid *color_range_grid;
@@ -637,6 +639,46 @@ static void drag_data_received(GtkWidget *widget, GdkDragContext*,
     g_object_unref(source);
 }
 
+static bool is_video_capture_option_enabled(const char *str) {
+    bool enabled = true;
+
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
+        enabled = strcmp(str, "window") != 0 && strcmp(str, "focused") != 0;
+
+    const bool is_portal = strcmp(str, "portal") == 0;
+    if(is_portal && !gsr_info.supported_capture_options.portal)
+        enabled = false;
+
+    return enabled;
+}
+
+static bool is_video_codec_enabled(const char *str) {
+    bool enabled = true;
+
+    if(strcmp(str, "h264") == 0 && !gsr_info.supported_video_codecs.h264)
+        enabled = false;
+
+    if(strcmp(str, "hevc") == 0 && !gsr_info.supported_video_codecs.hevc)
+        enabled = false;
+
+    if(strcmp(str, "av1") == 0 && !gsr_info.supported_video_codecs.av1)
+        enabled = false;
+
+    if(strcmp(str, "vp8") == 0 && !gsr_info.supported_video_codecs.vp8)
+        enabled = false;
+
+    if(strcmp(str, "vp9") == 0 && !gsr_info.supported_video_codecs.vp9)
+        enabled = false;
+
+    if(strcmp(str, "hevc_hdr") == 0 && (!gsr_info.supported_video_codecs.hevc || gsr_info.system_info.display_server != DisplayServer::WAYLAND))
+        enabled = false;
+
+    if(strcmp(str, "av1_hdr") == 0 && (!gsr_info.supported_video_codecs.av1 || gsr_info.system_info.display_server != DisplayServer::WAYLAND))
+        enabled = false;
+
+    return enabled;
+}
+
 static std::string record_area_selection_menu_get_active_id() {
     std::string id_str;
     GtkTreeIter iter;
@@ -651,6 +693,9 @@ static std::string record_area_selection_menu_get_active_id() {
 }
 
 static void record_area_selection_menu_set_active_id(const gchar *id) {
+    if(!is_video_capture_option_enabled(id))
+        return;
+
     GtkTreeIter iter;
     if(!gtk_tree_model_get_iter_first(record_area_selection_model, &iter))
         return;
@@ -666,6 +711,40 @@ static void record_area_selection_menu_set_active_id(const gchar *id) {
             break;
         }
     } while(gtk_tree_model_iter_next(record_area_selection_model, &iter));
+}
+
+static std::string video_codec_selection_menu_get_active_id() {
+    std::string id_str;
+    GtkTreeIter iter;
+    if(!gtk_combo_box_get_active_iter(video_codec_selection_menu, &iter))
+        return id_str;
+
+    gchar *id;
+    gtk_tree_model_get(video_codec_selection_model, &iter, 1, &id, -1);
+    id_str = id;
+    g_free(id);
+    return id_str;
+}
+
+static void video_codec_selection_menu_set_active_id(const gchar *id) {
+    if(!is_video_codec_enabled(id))
+        return;
+
+    GtkTreeIter iter;
+    if(!gtk_tree_model_get_iter_first(video_codec_selection_model, &iter))
+        return;
+
+    do {
+        gchar *row_id = nullptr;
+        gtk_tree_model_get(video_codec_selection_model, &iter, 1, &row_id, -1);
+
+        const bool found_row = strcmp(row_id, id) == 0;
+        g_free(row_id);
+        if(found_row) {
+            gtk_combo_box_set_active_iter(video_codec_selection_menu, &iter);
+            break;
+        }
+    } while(gtk_tree_model_iter_next(video_codec_selection_model, &iter));
 }
 
 static void enable_stream_record_button_if_info_filled() {
@@ -812,7 +891,7 @@ static void save_configs() {
     });
     config.main_config.color_range = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
     config.main_config.quality = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
-    config.main_config.codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
+    config.main_config.codec = video_codec_selection_menu_get_active_id();
     config.main_config.audio_codec = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     config.main_config.framerate_mode = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
@@ -820,6 +899,7 @@ static void save_configs() {
     config.main_config.show_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button));
     config.main_config.record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
     config.main_config.hide_window_when_recording = gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item));
+    config.main_config.restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
 
     config.streaming_config.streaming_service = gtk_combo_box_get_active_id(GTK_COMBO_BOX(stream_service_input_menu));
     config.streaming_config.youtube.stream_key = gtk_entry_get_text(youtube_stream_id_entry);
@@ -1503,6 +1583,38 @@ static void add_audio_command_line_args(std::vector<const char*> &args, std::str
     }
 }
 
+static void change_container_if_codec_not_supported(const std::string &video_codec, const gchar **container_str) {
+    if(strcmp(video_codec.c_str(), "vp8") == 0 || strcmp(video_codec.c_str(), "vp9") == 0) {
+        if(strcmp(*container_str, "webm") != 0 && strcmp(*container_str, "matroska") != 0) {
+            fprintf(stderr, "Warning: container '%s' is not compatible with video codec '%s', using webm container instead\n", *container_str, video_codec.c_str());
+            *container_str = "webm";
+        }
+    } else if(strcmp(*container_str, "webm") == 0) {
+        fprintf(stderr, "Warning: container webm is not compatible with video codec '%s', using mp4 container instead\n",  video_codec.c_str());
+        *container_str = "mp4";
+    }
+}
+
+static bool switch_video_codec_to_usable_hardware_encoder(std::string &video_codec) {
+    if(gsr_info.supported_video_codecs.h264) {
+        video_codec = "h264";
+        return true;
+    } else if(gsr_info.supported_video_codecs.hevc) {
+        video_codec = "hevc";
+        return true;
+    } else if(gsr_info.supported_video_codecs.av1) {
+        video_codec = "av1";
+        return true;
+    } else if(gsr_info.supported_video_codecs.vp8) {
+        video_codec = "vp8";
+        return true;
+    } else if(gsr_info.supported_video_codecs.vp9) {
+        video_codec = "vp9";
+        return true;
+    }
+    return false;
+}
+
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
     const gchar *dir = gtk_button_get_label(replay_file_chooser_button);
@@ -1568,28 +1680,30 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(replay_container));
     const gchar* color_range_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
-    const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
+    const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
 
-    if(strcmp(video_codec_input_str, "vp8") == 0 || strcmp(video_codec_input_str, "vp9") == 0) {
-        if(strcmp(container_str, "webm") != 0 && strcmp(container_str, "matroska") != 0) {
-            fprintf(stderr, "Warning: container '%s' is not compatible with video codec '%s', using webm container instead\n", container_str, video_codec_input_str);
-            container_str = "webm";
-        }
-    } else {
-        if(strcmp(container_str, "webm") == 0) {
-            fprintf(stderr, "Warning: container webm is not compatible with video codec '%s', using mp4 container instead\n",  video_codec_input_str);
-            container_str = "mp4";
+    const char *encoder = "gpu";
+    std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
+    if(video_codec_input_str == "h264_software") {
+        video_codec_input_str = "h264";
+        encoder = "cpu";
+    } else if(video_codec_input_str == "auto") {
+        if(!switch_video_codec_to_usable_hardware_encoder(video_codec_input_str)) {
+            video_codec_input_str = "h264";
+            encoder = "cpu";
         }
     }
+
+    change_container_if_codec_not_supported(video_codec_input_str, &container_str);
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-cr", color_range_input_str, "-r", replay_time_str.c_str(), "-o", dir
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-r", replay_time_str.c_str(), "-encoder", encoder, "-o", dir
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -1746,24 +1860,24 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     const gchar* container_name = gtk_combo_box_text_get_active_text(record_container);
     const gchar* color_range_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
-    const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
+    const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
 
-    if(strcmp(video_codec_input_str, "vp8") == 0 || strcmp(video_codec_input_str, "vp9") == 0) {
-        if(strcmp(container_str, "webm") != 0 && strcmp(container_str, "matroska") != 0) {
-            fprintf(stderr, "Warning: container '%s' is not compatible with video codec '%s', using webm container instead\n", container_str, video_codec_input_str);
-            container_str = "webm";
-            container_name = "webm";
-        }
-    } else {
-        if(strcmp(container_str, "webm") == 0) {
-            fprintf(stderr, "Warning: container webm is not compatible with video codec '%s', using mp4 container instead\n",  video_codec_input_str);
-            container_str = "mp4";
-            container_name = "mp4";
+    const char *encoder = "gpu";
+    std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
+    if(video_codec_input_str == "h264_software") {
+        video_codec_input_str = "h264";
+        encoder = "cpu";
+    } else if(video_codec_input_str == "auto") {
+        if(!switch_video_codec_to_usable_hardware_encoder(video_codec_input_str)) {
+            video_codec_input_str = "h264";
+            encoder = "cpu";
         }
     }
+
+    change_container_if_codec_not_supported(video_codec_input_str, &container_str);
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, dir);
@@ -1779,7 +1893,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-cr", color_range_input_str, "-o", record_file_current_filename.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-encoder", encoder, "-o", record_file_current_filename.c_str()
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -1922,28 +2036,30 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
     const gchar* quality_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(quality_input_menu));
     const gchar* color_range_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
-    const gchar* video_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(video_codec_input_menu));
     const gchar* audio_codec_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_codec_input_menu));
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
+    const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
 
-    if(strcmp(video_codec_input_str, "vp8") == 0 || strcmp(video_codec_input_str, "vp9") == 0) {
-        if(strcmp(container_str, "webm") != 0 && strcmp(container_str, "matroska") != 0) {
-            fprintf(stderr, "Warning: container '%s' is not compatible with video codec '%s', using webm container instead\n", container_str, video_codec_input_str);
-            container_str = "webm";
-        }
-    } else {
-        if(strcmp(container_str, "webm") == 0) {
-            fprintf(stderr, "Warning: container webm is not compatible with video codec '%s', using mp4 container instead\n",  video_codec_input_str);
-            container_str = "mp4";
+    const char *encoder = "gpu";
+    std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
+    if(video_codec_input_str == "h264_software") {
+        video_codec_input_str = "h264";
+        encoder = "cpu";
+    } else if(video_codec_input_str == "auto") {
+        if(!switch_video_codec_to_usable_hardware_encoder(video_codec_input_str)) {
+            video_codec_input_str = "h264";
+            encoder = "cpu";
         }
     }
+
+    change_container_if_codec_not_supported(video_codec_input_str, &container_str);
 
     char area[64];
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str, "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-cr", color_range_input_str, "-o", stream_url.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-encoder", encoder, "-o", stream_url.c_str()
     };
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
@@ -2029,11 +2145,12 @@ static void gtk_widget_set_margin(GtkWidget *widget, int top, int bottom, int le
 
 static void record_area_item_change_callback(GtkComboBox *widget, gpointer userdata) {
     (void)widget;
-    GtkWidget *select_window_button = (GtkWidget*)userdata;
+    (void)userdata;
     const std::string selected_window_area = record_area_selection_menu_get_active_id();
-    gtk_widget_set_visible(select_window_button, strcmp(selected_window_area.c_str(), "window") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(selected_window_area.c_str(), "window") == 0);
     gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(selected_window_area.c_str(), "focused") == 0);
     gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(selected_window_area.c_str(), "focused") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(restore_portal_session_button), strcmp(selected_window_area.c_str(), "portal") == 0);
     enable_stream_record_button_if_info_filled();
 }
 
@@ -2470,17 +2587,17 @@ static void record_area_set_sensitive(GtkCellLayout *cell_layout, GtkCellRendere
 
     gchar *id;
     gtk_tree_model_get(tree_model, iter, 1, &id, -1);
+    g_object_set(cell, "sensitive", is_video_capture_option_enabled(id), NULL);
+    g_free(id);
+}
 
-    gboolean sensitive = true;
-    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
-        sensitive = g_strcmp0("window", id) != 0 && g_strcmp0("focused", id) != 0;
+static void video_codec_set_sensitive(GtkCellLayout *cell_layout, GtkCellRenderer *cell, GtkTreeModel *tree_model, GtkTreeIter *iter, gpointer data) {
+    (void)cell_layout;
+    (void)data;
 
-    gboolean is_portal = g_strcmp0("portal", id) == 0;
-    if(is_portal && !gsr_info.supported_capture_options.portal)
-        sensitive = false;
-
-    g_object_set(cell, "sensitive", sensitive, NULL);
-
+    gchar *id;
+    gtk_tree_model_get(tree_model, iter, 1, &id, -1);
+    g_object_set(cell, "sensitive", is_video_codec_enabled(id), NULL);
     g_free(id);
 }
 
@@ -2582,7 +2699,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     }
 
     gtk_list_store_append(store, &iter);
-    gtk_list_store_set(store, &iter, 0, gsr_info.supported_capture_options.portal ? "Desktop portal (experimental)" : "Desktop portal (not supported on your system)", -1);
+    gtk_list_store_set(store, &iter, 0, gsr_info.supported_capture_options.portal ? "Desktop portal (Experimental)" : "Desktop portal (Not supported on your system)", -1);
     gtk_list_store_set(store, &iter, 1, "portal", -1);
 
     record_area_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(record_area_selection_model));
@@ -2592,38 +2709,41 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, "text", 0, NULL);
     gtk_cell_layout_set_cell_data_func(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, record_area_set_sensitive, NULL, NULL);
 
-    gtk_combo_box_set_active(record_area_selection_menu, allow_screen_capture ? 2 : 0);
+    gtk_combo_box_set_active(record_area_selection_menu, (allow_screen_capture || gsr_info.supported_capture_options.portal) ? 2 : 0);
 
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 3, 1);
 
-    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
-        select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
-        gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
-        g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
-        gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 3, 1);
+    g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), NULL);
 
-        g_signal_connect(record_area_selection_menu, "changed", G_CALLBACK(record_area_item_change_callback), select_window_button);
+    select_window_button = GTK_BUTTON(gtk_button_new_with_label("Select window..."));
+    gtk_widget_set_hexpand(GTK_WIDGET(select_window_button), true);
+    g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 3, 1);
 
-        area_size_label = GTK_LABEL(gtk_label_new("Area size: "));
-        gtk_label_set_xalign(area_size_label, 0.0f);
-        gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_label), 0, record_area_row++, 2, 1);
+    area_size_label = GTK_LABEL(gtk_label_new("Area size: "));
+    gtk_label_set_xalign(area_size_label, 0.0f);
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_label), 0, record_area_row++, 2, 1);
 
-        area_size_grid = GTK_GRID(gtk_grid_new());
-        gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
+    area_size_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
 
-        area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
-        gtk_spin_button_set_value(area_width_entry, 1920.0);
-        gtk_widget_set_hexpand(GTK_WIDGET(area_width_entry), true);
-        gtk_grid_attach(area_size_grid, GTK_WIDGET(area_width_entry), 0, 0, 1, 1);
+    area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+    gtk_spin_button_set_value(area_width_entry, 1920.0);
+    gtk_widget_set_hexpand(GTK_WIDGET(area_width_entry), true);
+    gtk_grid_attach(area_size_grid, GTK_WIDGET(area_width_entry), 0, 0, 1, 1);
 
-        gtk_grid_attach(area_size_grid, gtk_label_new("x"), 1, 0, 1, 1);
+    gtk_grid_attach(area_size_grid, gtk_label_new("x"), 1, 0, 1, 1);
 
-        area_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
-        gtk_spin_button_set_value(area_height_entry, 1080.0);
-        gtk_widget_set_hexpand(GTK_WIDGET(area_height_entry), true);
-        gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 0, 1, 1);
-    }
+    area_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+    gtk_spin_button_set_value(area_height_entry, 1080.0);
+    gtk_widget_set_hexpand(GTK_WIDGET(area_height_entry), true);
+    gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 0, 1, 1);
+
+    restore_portal_session_button = gtk_check_button_new_with_label("Restore portal session");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(restore_portal_session_button), true);
+    gtk_widget_set_halign(restore_portal_session_button, GTK_ALIGN_START);
+    gtk_grid_attach(record_area_grid, restore_portal_session_button, 0, record_area_row++, 3, 1);
 
     GtkFrame *audio_input_frame = GTK_FRAME(gtk_frame_new("Audio"));
     gtk_grid_attach(grid, GTK_WIDGET(audio_input_frame), 0, grid_row++, 2, 1);
@@ -2640,25 +2760,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_set_row_spacing(add_audio_grid, 10);
     gtk_grid_set_column_spacing(add_audio_grid, 10);
     gtk_grid_attach(audio_grid, GTK_WIDGET(add_audio_grid), 0, audio_input_area_row++, 1, 1);
-
-    // TODO:
-    //const PulseAudioServerInfo pa_server_info = get_pulseaudio_default_inputs();
-
-    // if(!pa_server_info.default_sink_name.empty() && audio_inputs_contains(audio_inputs, pa_server_info.default_sink_name)) {
-    //     gtk_combo_box_text_append(audio_input_menu_todo, pa_server_info.default_sink_name.c_str(), "Default output");
-    //     ++num_audio_inputs_addable;
-    // }
-
-    // if(!pa_server_info.default_source_name.empty() && audio_inputs_contains(audio_inputs, pa_server_info.default_source_name)) {
-    //     gtk_combo_box_text_append(audio_input_menu_todo, pa_server_info.default_source_name.c_str(), "Default input");
-    //     ++num_audio_inputs_addable;
-    // }
-
-    // for(const AudioInput &audio_input : audio_inputs) {
-    //     std::string text = audio_input.description;
-    //     gtk_combo_box_text_append(audio_input_menu_todo, audio_input.name.c_str(), audio_input.description.c_str());
-    //     ++num_audio_inputs_addable;
-    // }
 
     add_audio_input_button = gtk_button_new_with_label("Add audio track");
     gtk_grid_attach(add_audio_grid, add_audio_input_button, 0, 0, 1, 1);
@@ -2712,29 +2813,67 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     video_codec_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(video_codec_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
-    video_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(video_codec_input_menu, "auto", "Auto (Recommended)");
-    gtk_combo_box_text_append(video_codec_input_menu, "h264_software", "H264 Software Encoder (Slow, not recommeded)");
-    if(gsr_info.supported_video_codecs.h264) 
-        gtk_combo_box_text_append(video_codec_input_menu, "h264", "H264");
-    if(gsr_info.supported_video_codecs.hevc)
-        gtk_combo_box_text_append(video_codec_input_menu, "hevc", "HEVC");
-    if(gsr_info.supported_video_codecs.av1)
-        gtk_combo_box_text_append(video_codec_input_menu, "av1", "AV1");
-    if(gsr_info.supported_video_codecs.vp8)
-        gtk_combo_box_text_append(video_codec_input_menu, "vp8", "VP8");
-    if(gsr_info.supported_video_codecs.vp9)
-        gtk_combo_box_text_append(video_codec_input_menu, "vp9", "VP9");
+    {
+        GtkListStore *store = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
+        GtkTreeIter iter;
+        video_codec_selection_model = GTK_TREE_MODEL(store);
 
-    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
-        if(gsr_info.supported_video_codecs.hevc)
-            gtk_combo_box_text_append(video_codec_input_menu, "hevc_hdr", "HEVC (HDR)");
-        if(gsr_info.supported_video_codecs.av1)
-            gtk_combo_box_text_append(video_codec_input_menu, "av1_hdr", "AV1 (HDR)");
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, "Auto (Recommended)", -1);
+        gtk_list_store_set(store, &iter, 1, "auto", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, "H264 Software Encoder (Slow, not recommeded)", -1);
+        gtk_list_store_set(store, &iter, 1, "h264_software", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264 ? "H264" : "H264 (Not supported on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "h264", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC" : "HEVC (Not supported on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "hevc", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1" : "AV1 (Not supported on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "av1", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.vp8 ? "VP8" : "VP8 (Not supported on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "vp8", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.vp9 ? "VP9" : "VP9 (Not supported on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "vp9", -1);
+
+        if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC (HDR)" : "HEVC (HDR, not supported on your system)", -1);
+            gtk_list_store_set(store, &iter, 1, "hevc_hdr", -1);
+
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (HDR)" : "AV1 (HDR, not supported on your system)", -1);
+            gtk_list_store_set(store, &iter, 1, "av1_hdr", -1);
+        } else {
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, "HEVC (HDR, not supported on X11)", -1);
+            gtk_list_store_set(store, &iter, 1, "hevc_hdr", -1);
+
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, "AV1 (HDR, not supported on X11)", -1);
+            gtk_list_store_set(store, &iter, 1, "av1_hdr", -1);
+        }
+
+        video_codec_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(video_codec_selection_model));
+
+        GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
+        gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, TRUE);
+        gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, "text", 0, NULL);
+        gtk_cell_layout_set_cell_data_func(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, video_codec_set_sensitive, NULL, NULL);
+
+        gtk_widget_set_hexpand(GTK_WIDGET(video_codec_selection_menu), true);
+        gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_selection_menu), 1, 0, 1, 1);
     }
-    gtk_widget_set_hexpand(GTK_WIDGET(video_codec_input_menu), true);
-    gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_input_menu), 1, 0, 1, 1);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(video_codec_input_menu), 0);
 
     audio_codec_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(audio_codec_grid), 0, grid_row++, 2, 1);
@@ -3353,6 +3492,8 @@ static void load_config() {
         //
     } else if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "screen") == 0) {
         //
+    } else if(config.main_config.record_area_option == "portal" && gsr_info.supported_capture_options.portal) {
+        //
     } else {
         bool found_monitor = false;
         for(const auto &monitor : gsr_info.supported_capture_options.monitors) {
@@ -3376,11 +3517,10 @@ static void load_config() {
         }
     }
 
-    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
-        gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
-        gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
-        gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
-    }
+    gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(restore_portal_session_button), strcmp(config.main_config.record_area_option.c_str(), "portal") == 0);
 
     if(config.main_config.record_area_width == 0)
         config.main_config.record_area_width = 1920;
@@ -3400,17 +3540,6 @@ static void load_config() {
 
     if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
         config.main_config.quality = "very_high";
-
-    if(config.main_config.codec != "auto" && config.main_config.codec != "h264" && config.main_config.codec != "h265"
-        && config.main_config.codec != "hevc" && config.main_config.codec != "av1"
-        && config.main_config.codec != "hevc_hdr" && config.main_config.codec != "av1_hdr"
-        && config.main_config.codec != "vp8" && config.main_config.codec != "vp9")
-    {
-        config.main_config.codec = "auto";
-    }
-
-    if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && (config.main_config.codec == "hevc_hdr" || config.main_config.codec == "av1_hdr"))
-        config.main_config.codec = "auto";
 
     if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac")
         config.main_config.audio_codec = "opus";
@@ -3449,13 +3578,14 @@ static void load_config() {
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(color_range_input_menu), config.main_config.color_range.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(quality_input_menu), config.main_config.quality.c_str());
-    gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
+    video_codec_selection_menu_set_active_id(config.main_config.codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_codec_input_menu), config.main_config.audio_codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(framerate_mode_input_menu), config.main_config.framerate_mode.c_str());
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), config.main_config.overclock);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_notification_button), config.main_config.show_notifications);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_cursor_button), config.main_config.record_cursor);
     gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item), config.main_config.hide_window_when_recording);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(restore_portal_session_button), config.main_config.restore_portal_session);
 
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(stream_service_input_menu), config.streaming_config.streaming_service.c_str());
     gtk_entry_set_text(youtube_stream_id_entry, config.streaming_config.youtube.stream_key.c_str());
@@ -3508,39 +3638,17 @@ static void load_config() {
     enable_stream_record_button_if_info_filled();
     stream_service_item_change_callback(GTK_COMBO_BOX(stream_service_input_menu), nullptr);
 
-    if(!gsr_info.supported_video_codecs.h264 && !gsr_info.supported_video_codecs.hevc && gsr_info.gpu_info.vendor != GpuVendor::NVIDIA && config.main_config.codec != "av1") {
-        if(gsr_info.supported_video_codecs.av1) {
-            GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
-                "Switched video codec to AV1 since H264/HEVC video encoding is either missing or disabled on your system. If you know that your system supports H264/HEVC video encoding and "
-                "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
-                "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
-                "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
-                "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            config.main_config.codec = "av1";
-            gtk_combo_box_set_active_id(GTK_COMBO_BOX(video_codec_input_menu), config.main_config.codec.c_str());
-        } else {
-            GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "H264/HEVC video encoding is either missing or disabled on your system. If you know that your system supports H264/HEVC video encoding and "
-                "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
-                "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
-                "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
-                "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(select_window_userdata.app));
-            return;
-        }
-    }
-
-    if(!gsr_info.supported_video_codecs.h264 && !gsr_info.supported_video_codecs.hevc && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA) {
-        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to find H264/HEVC video codecs. Your NVIDIA GPU may be missing support for H264/HEVC video codecs for video encoding.");
+    std::string dummy;
+    if(!config.main_config.software_encoding_warning_shown && !switch_video_codec_to_usable_hardware_encoder(dummy)) {
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
+            "Unable to find a hardware video encoder on your system, using software video encoder instead (slow!). If you know that your system supports H264/HEVC hardware video encoding and "
+            "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
+            "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
+            "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
+            "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(select_window_userdata.app));
-        return;
+        config.main_config.software_encoding_warning_shown = true;
     }
 }
 

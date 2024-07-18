@@ -24,11 +24,6 @@ Use https://hosted.weblate.org/ for translation.
 
 Detect game name by using x11 window class or title. Fallback to finding pressure vessel, find the binary is runs and get the directory name directly under the proton game list directory. Fallback to pure wine.
 
-Add option to use software encoder (-encoder cpu) by adding "h264 (software)" video encoder option. Make video encoder option available in simple view as well.
-    If no hardware accelerated video encoder option is available then show a warning window (only the first time) and switch to the software video encoder.
-    Do not show error if only vp8/vp9 is available and automatically choose vp8 in that case.
-    The video encoder option should always show all possible options but make them unselectable (with text why), just like the record area option (capture method).
-
 Have separate options for each record option (stream, record and replay) or have option to use profiles. Remake the gui and have a proper overlay! on wlroots and kde use https://wayland.app/protocols/wlr-layer-shell-unstable-v1.
 
 Add refresh button for audio devices. Put it beside the "add" button. In the new ui this should update automatically without a button.
