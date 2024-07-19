@@ -59,13 +59,16 @@ struct StreamingConfig {
     TwitchStreamConfig twitch;
     CustomStreamConfig custom;
     ConfigHotkey start_recording_hotkey;
+    ConfigHotkey stop_recording_hotkey;
 };
 
 struct RecordConfig {
     std::string save_directory;
     std::string container;
     ConfigHotkey start_recording_hotkey;
+    ConfigHotkey stop_recording_hotkey;
     ConfigHotkey pause_recording_hotkey;
+    ConfigHotkey unpause_recording_hotkey;
 };
 
 struct ReplayConfig {
@@ -73,6 +76,7 @@ struct ReplayConfig {
     std::string container;
     int32_t replay_time = 30;
     ConfigHotkey start_recording_hotkey;
+    ConfigHotkey stop_recording_hotkey;
     ConfigHotkey save_recording_hotkey;
 };
 
@@ -321,16 +325,20 @@ static std::map<std::string, ConfigValue> get_config_options(Config &config) {
         {"streaming.custom.url", {CONFIG_TYPE_STRING, &config.streaming_config.custom.url}},
         {"streaming.custom.container", {CONFIG_TYPE_STRING, &config.streaming_config.custom.container}},
         {"streaming.start_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.streaming_config.start_recording_hotkey}},
+        {"streaming.stop_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.streaming_config.stop_recording_hotkey}},
 
         {"record.save_directory", {CONFIG_TYPE_STRING, &config.record_config.save_directory}},
         {"record.container", {CONFIG_TYPE_STRING, &config.record_config.container}},
         {"record.start_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.record_config.start_recording_hotkey}},
+        {"record.stop_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.record_config.stop_recording_hotkey}},
         {"record.pause_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.record_config.pause_recording_hotkey}},
+        {"record.unpause_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.record_config.unpause_recording_hotkey}},
 
         {"replay.save_directory", {CONFIG_TYPE_STRING, &config.replay_config.save_directory}},
         {"replay.container", {CONFIG_TYPE_STRING, &config.replay_config.container}},
         {"replay.time", {CONFIG_TYPE_I32, &config.replay_config.replay_time}},
         {"replay.start_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.replay_config.start_recording_hotkey}},
+        {"replay.stop_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.replay_config.stop_recording_hotkey}},
         {"replay.save_recording_hotkey", {CONFIG_TYPE_HOTKEY, &config.replay_config.save_recording_hotkey}}
     };
 }
