@@ -4064,7 +4064,7 @@ static void activate(GtkApplication *app, gpointer) {
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         if(!gsr_global_shortcuts_init(&global_shortcuts, init_shortcuts_callback, NULL)) {
             fprintf(stderr, "gsr error: failed to initialize global shortcuts\n");
-            global_shortcuts_initialized = false;
+            init_shortcuts_callback(false, nullptr);
         }
     }
 }
