@@ -968,8 +968,12 @@ static void save_configs() {
 
     if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         for(int i = 0; i < num_hotkeys; ++i) {
-            hotkeys[i]->config->keysym = hotkeys[i]->keysym;
-            hotkeys[i]->config->modifiers = hotkeys[i]->modkey_mask;
+            // This can also happen if we run multiple instances of gpu screen recorder, in which case it will fail to grab keys for the other windows.
+            // We dont want to overwrite hotkeys in that case.
+            if(hotkeys[i]->grab_success) {
+                hotkeys[i]->config->keysym = hotkeys[i]->keysym;
+                hotkeys[i]->config->modifiers = hotkeys[i]->modkey_mask;
+            }
         }
     }
 
@@ -2297,6 +2301,7 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
             ungrab_keyboard(display);
             grab_ungrab_hotkey_combo(gdk_x11_get_default_xdisplay(), *current_hotkey, false);
             gtk_entry_set_text(GTK_ENTRY(current_hotkey->hotkey_entry), "");
+            current_hotkey->grab_success = true;
             current_hotkey->keysym = None;
             current_hotkey->modkey_mask = 0;
             current_hotkey = nullptr;
@@ -2354,13 +2359,13 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
             current_hotkey->keysym = latest_hotkey.keysym;
             current_hotkey->modkey_mask = latest_hotkey.modkey_mask;
 
+            const std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(current_hotkey->hotkey_entry));
             if(replace_grabbed_keys_depending_on_active_page()) {
                 save_configs();
                 current_hotkey = nullptr;
                 hotkey_mode = HotkeyMode::Record;
                 return GDK_FILTER_CONTINUE;
             } else {
-                const std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(current_hotkey->hotkey_entry));
                 const std::string error_text = "Hotkey " + hotkey_text + " can't be used because it's used by another program. Please choose another hotkey.";
 
                 current_hotkey->keysym = prev_current_hotkey.keysym;
@@ -3082,6 +3087,7 @@ static void add_wayland_global_hotkeys_ui(GtkGrid *grid, int &row, int width) {
 
 static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_columns) {
     replay_hotkeys_grid = GTK_GRID(gtk_grid_new());
+    gtk_widget_set_halign(GTK_WIDGET(replay_hotkeys_grid), GTK_ALIGN_START);
     gtk_grid_set_row_spacing(replay_hotkeys_grid, 10);
     gtk_grid_set_column_spacing(replay_hotkeys_grid, 10);
     gtk_grid_attach(parent_grid, GTK_WIDGET(replay_hotkeys_grid), 0, row, num_columns, 1);
@@ -3098,21 +3104,35 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
         g_signal_connect(replay_start_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_start_hotkey_button);
         gtk_grid_attach(replay_hotkeys_grid, replay_start_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("to start the replay and"), 2, hotkeys_row, 1, 1);
+        GtkWidget *start_replay_label = gtk_label_new("to start the replay");
+        gtk_widget_set_halign(start_replay_label, GTK_ALIGN_START);
+        gtk_grid_attach(replay_hotkeys_grid, start_replay_label, 2, hotkeys_row, 1, 1);
+
+        ++hotkeys_row;
+
+        gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         replay_stop_hotkey_button = gtk_entry_new();
         gtk_entry_set_text(GTK_ENTRY(replay_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F2");
         g_signal_connect(replay_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_stop_hotkey_button);
-        gtk_grid_attach(replay_hotkeys_grid, replay_stop_hotkey_button, 3, hotkeys_row, 1, 1);
+        gtk_grid_attach(replay_hotkeys_grid, replay_stop_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("to stop the replay and"), 4, hotkeys_row, 1, 1);
+        GtkWidget *stop_replay_label = gtk_label_new("to stop the replay");
+        gtk_widget_set_halign(stop_replay_label, GTK_ALIGN_START);
+        gtk_grid_attach(replay_hotkeys_grid, stop_replay_label, 2, hotkeys_row, 1, 1);
+
+        ++hotkeys_row;
+
+        gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         replay_save_hotkey_button = gtk_entry_new();
         gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F3");
         g_signal_connect(replay_save_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_save_hotkey_button);
-        gtk_grid_attach(replay_hotkeys_grid, replay_save_hotkey_button, 5, hotkeys_row, 1, 1);
+        gtk_grid_attach(replay_hotkeys_grid, replay_save_hotkey_button,1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("to save the replay"), 6, hotkeys_row, 1, 1);
+        GtkWidget *save_replay_label = gtk_label_new("to save the replay");
+        gtk_widget_set_halign(save_replay_label, GTK_ALIGN_START);
+        gtk_grid_attach(replay_hotkeys_grid, save_replay_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
     }
@@ -3120,7 +3140,7 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
 
 static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     int row = 0;
-    const int num_columns = 7;
+    const int num_columns = 3;
 
     std::string video_filepath = get_videos_dir();
 
@@ -3268,6 +3288,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
 
 static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num_columns) {
     recording_hotkeys_grid = GTK_GRID(gtk_grid_new());
+    gtk_widget_set_halign(GTK_WIDGET(recording_hotkeys_grid), GTK_ALIGN_START);
     gtk_grid_set_row_spacing(recording_hotkeys_grid, 10);
     gtk_grid_set_column_spacing(recording_hotkeys_grid, 10);
     gtk_grid_attach(parent_grid, GTK_WIDGET(recording_hotkeys_grid), 0, row, num_columns, 1);
@@ -3284,14 +3305,22 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
         g_signal_connect(record_start_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), record_start_hotkey_button);
         gtk_grid_attach(recording_hotkeys_grid, record_start_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("to start recording and"), 2, hotkeys_row, 1, 1);
+        GtkWidget *start_recording_label = gtk_label_new("to start recording");
+        gtk_widget_set_halign(start_recording_label, GTK_ALIGN_START);
+        gtk_grid_attach(recording_hotkeys_grid, start_recording_label, 2, hotkeys_row, 1, 1);
+
+        ++hotkeys_row;
+
+        gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         record_stop_hotkey_button = gtk_entry_new();
         gtk_entry_set_text(GTK_ENTRY(record_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F2");
         g_signal_connect(record_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), record_stop_hotkey_button);
-        gtk_grid_attach(recording_hotkeys_grid, record_stop_hotkey_button, 3, hotkeys_row, 1, 1);
+        gtk_grid_attach(recording_hotkeys_grid, record_stop_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("to stop recording"), 4, hotkeys_row, 1, 1);
+        GtkWidget *stop_recording_label = gtk_label_new("to stop recording");
+        gtk_widget_set_halign(stop_recording_label, GTK_ALIGN_START);
+        gtk_grid_attach(recording_hotkeys_grid, stop_recording_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
     }
@@ -3304,14 +3333,22 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
         g_signal_connect(pause_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), pause_hotkey_button);
         gtk_grid_attach(recording_hotkeys_grid, pause_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("to pause recording and"), 2, hotkeys_row, 1, 1);
+        GtkWidget *pause_recording_label = gtk_label_new("to pause recording");
+        gtk_widget_set_halign(pause_recording_label, GTK_ALIGN_START);
+        gtk_grid_attach(recording_hotkeys_grid, pause_recording_label, 2, hotkeys_row, 1, 1);
+
+        ++hotkeys_row;
+
+        gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         unpause_hotkey_button = gtk_entry_new();
         gtk_entry_set_text(GTK_ENTRY(unpause_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F6");
         g_signal_connect(unpause_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), unpause_hotkey_button);
-        gtk_grid_attach(recording_hotkeys_grid, unpause_hotkey_button, 3, hotkeys_row, 1, 1);
+        gtk_grid_attach(recording_hotkeys_grid, unpause_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("to unpause recording"), 4, hotkeys_row, 1, 1);
+        GtkWidget *unpause_recording_label = gtk_label_new("to unpause recording");
+        gtk_widget_set_halign(unpause_recording_label, GTK_ALIGN_START);
+        gtk_grid_attach(recording_hotkeys_grid, unpause_recording_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
     }
@@ -3319,7 +3356,7 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
 
 static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     int row = 0;
-    const int num_columns = 5;
+    const int num_columns = 3;
 
     std::string video_filepath = get_videos_dir();
 
@@ -3471,6 +3508,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
 
 static void create_streaming_hotkey_items(GtkGrid *parent_grid, int row, int num_columns) {
     streaming_hotkeys_grid = GTK_GRID(gtk_grid_new());
+    gtk_widget_set_halign(GTK_WIDGET(streaming_hotkeys_grid), GTK_ALIGN_START);
     gtk_grid_set_row_spacing(streaming_hotkeys_grid, 10);
     gtk_grid_set_column_spacing(streaming_hotkeys_grid, 10);
     gtk_grid_attach(parent_grid, GTK_WIDGET(streaming_hotkeys_grid), 0, row, num_columns, 1);
@@ -3487,14 +3525,22 @@ static void create_streaming_hotkey_items(GtkGrid *parent_grid, int row, int num
         g_signal_connect(streaming_start_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), streaming_start_hotkey_button);
         gtk_grid_attach(streaming_hotkeys_grid, streaming_start_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(streaming_hotkeys_grid, gtk_label_new("to start streaming and"), 2, hotkeys_row, 1, 1);
+        GtkWidget *start_streaming_label = gtk_label_new("to start streaming");
+        gtk_widget_set_halign(start_streaming_label, GTK_ALIGN_START);
+        gtk_grid_attach(streaming_hotkeys_grid, start_streaming_label, 2, hotkeys_row, 1, 1);
+
+        ++hotkeys_row;
+
+        gtk_grid_attach(streaming_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         streaming_stop_hotkey_button = gtk_entry_new();
         gtk_entry_set_text(GTK_ENTRY(streaming_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F2");
         g_signal_connect(streaming_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), streaming_stop_hotkey_button);
-        gtk_grid_attach(streaming_hotkeys_grid, streaming_stop_hotkey_button, 3, hotkeys_row, 1, 1);
+        gtk_grid_attach(streaming_hotkeys_grid, streaming_stop_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(streaming_hotkeys_grid, gtk_label_new("to stop streaming"), 4, hotkeys_row, 1, 1);
+        GtkWidget *stop_streaming_label = gtk_label_new("to stop streaming");
+        gtk_widget_set_halign(stop_streaming_label, GTK_ALIGN_START);
+        gtk_grid_attach(streaming_hotkeys_grid, stop_streaming_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
     }
@@ -3502,7 +3548,7 @@ static void create_streaming_hotkey_items(GtkGrid *parent_grid, int row, int num
 
 static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     int row = 0;
-    const int num_columns = 5;
+    const int num_columns = 3;
 
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(grid), "streaming");
