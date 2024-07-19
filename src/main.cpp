@@ -3134,7 +3134,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
 
     GtkWidget *hotkey_active_label = nullptr;
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
-        replay_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma Wayland.");
+        replay_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma on Wayland if you want to use hotkeys.");
         gtk_grid_attach(grid, replay_hotkeys_not_supported_label, 0, row++, num_columns, 1);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel.");
@@ -3333,7 +3333,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
 
     GtkWidget *hotkey_active_label = nullptr;
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
-        recording_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma Wayland.");
+        recording_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma on Wayland if you want to use hotkeys.");
         gtk_grid_attach(grid, recording_hotkeys_not_supported_label, 0, row++, num_columns, 1);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel.");
@@ -3514,7 +3514,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
 
     GtkWidget *hotkey_active_label = nullptr;
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
-        streaming_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma Wayland.");
+        streaming_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma on Wayland if you want to use hotkeys.");
         gtk_grid_attach(grid, streaming_hotkeys_not_supported_label, 0, row++, num_columns, 1);
     } else {
         hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel.");
