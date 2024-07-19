@@ -1646,6 +1646,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(exit_status == 50) {
+            show_notification(app, "GPU Screen Recorder", "Desktop portal capture failed. Either you canceled the desktop portal or your Wayland compositor doesn't support desktop portal capture or it's incorrectly setup on your system", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(!exit_success || (already_dead && exit_status != 0)) {
             show_notification(app, "GPU Screen Recorder",
                 "Failed to start replay. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
@@ -1840,6 +1842,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(exit_status == 50) {
+            show_notification(app, "GPU Screen Recorder", "Desktop portal capture failed. Either you canceled the desktop portal or your Wayland compositor doesn't support desktop portal capture or it's incorrectly setup on your system", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(!exit_success || (already_dead && exit_status != 0)) {
             show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video. Run GPU Screen Recorder from the terminal to see more information when this failure happens", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_success) {
@@ -1992,6 +1996,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         if(exit_status == 10) {
             show_notification(app, "GPU Screen Recorder",
                 "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(exit_status == 50) {
+            show_notification(app, "GPU Screen Recorder", "Desktop portal capture failed. Either you canceled the desktop portal or your Wayland compositor doesn't support desktop portal capture or it's incorrectly setup on your system", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(!exit_success || (already_dead && exit_status != 0)) {
             show_notification(app, "GPU Screen Recorder", "Failed to stream video. There is either an error in your streaming config or your graphics card doesn't support GPU Screen Recorder with the settings you used", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_success) {
