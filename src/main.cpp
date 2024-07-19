@@ -2986,7 +2986,6 @@ static void shortcut_changed_callback(gsr_shortcut shortcut, void *userdata) {
     (void)userdata;
     std::string trigger = shortcut.trigger_description;
     replace_meta_with_super(trigger);
-    fprintf(stderr, "shortcut: %s, %s\n", shortcut.id, trigger.c_str());
     for(int i = 0; i < num_hotkeys; ++i) {
         if(strcmp(shortcut.id, hotkeys[i]->shortcut_id) == 0) {
             gtk_entry_set_text(GTK_ENTRY(hotkeys[i]->hotkey_entry), trigger.c_str());
@@ -2996,7 +2995,6 @@ static void shortcut_changed_callback(gsr_shortcut shortcut, void *userdata) {
 
 static void deactivated_callback(const char *description, void *userdata) {
     (void)userdata;
-    fprintf(stderr, "deactivated callback: %s, recording: %s\n", description, recording ? "yes" : "no");
     const GtkWidget *visible_page = gtk_stack_get_visible_child(page_navigation_userdata.stack);
     for(int i = 0; i < num_hotkeys; ++i) {
         if(visible_page != hotkeys[i]->page)
