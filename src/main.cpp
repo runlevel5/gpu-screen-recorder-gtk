@@ -3087,13 +3087,8 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
     gtk_grid_attach(parent_grid, GTK_WIDGET(replay_hotkeys_grid), 0, row, num_columns, 1);
     int hotkeys_row = 0;
 
-    GtkWidget *hotkey_active_label = NULL;
-    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
         add_wayland_global_hotkeys_ui(replay_hotkeys_grid, hotkeys_row, num_columns);
-    } else {
-        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
-        gtk_grid_attach(replay_hotkeys_grid, hotkey_active_label, 0, hotkeys_row++, num_columns, 1);
-    }
 
     {
         gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
@@ -3137,9 +3132,6 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
-    create_replay_hotkey_items(grid, row, num_columns);
-    ++row;
-
     GtkWidget *hotkey_active_label = nullptr;
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         replay_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma Wayland.");
@@ -3149,10 +3141,15 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, num_columns, 1);
     }
 
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, num_columns, 1);
+    create_replay_hotkey_items(grid, row, num_columns);
+    ++row;
 
-    gtk_widget_set_visible(GTK_WIDGET(replay_hotkeys_grid), false);
-    gtk_widget_set_visible(GTK_WIDGET(replay_hotkeys_not_supported_label), false);
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+        gtk_widget_set_visible(GTK_WIDGET(replay_hotkeys_grid), false);
+        gtk_widget_set_visible(GTK_WIDGET(replay_hotkeys_not_supported_label), false);
+    }
+
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, num_columns, 1);
 
     GtkWidget *save_icon = gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_BUTTON);
 
@@ -3276,13 +3273,8 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
     gtk_grid_attach(parent_grid, GTK_WIDGET(recording_hotkeys_grid), 0, row, num_columns, 1);
     int hotkeys_row = 0;
 
-    GtkWidget *hotkey_active_label = NULL;
-    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
         add_wayland_global_hotkeys_ui(recording_hotkeys_grid, hotkeys_row, num_columns);
-    } else {
-        hotkey_active_label = gtk_label_new("Press a key combination to set a new hotkey, backspace to remove the hotkey or esc to cancel");
-        gtk_grid_attach(recording_hotkeys_grid, hotkey_active_label, 0, hotkeys_row++, num_columns, 1);
-    }
 
     {
         gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
@@ -3339,9 +3331,6 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
-    create_recording_hotkey_items(grid, row, num_columns);
-    ++row;
-
     GtkWidget *hotkey_active_label = nullptr;
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         recording_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma Wayland.");
@@ -3351,10 +3340,15 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, num_columns, 1);
     }
 
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, num_columns, 1);
+    create_recording_hotkey_items(grid, row, num_columns);
+    ++row;
 
-    gtk_widget_set_visible(GTK_WIDGET(recording_hotkeys_grid), false);
-    gtk_widget_set_visible(GTK_WIDGET(recording_hotkeys_not_supported_label), false);
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+        gtk_widget_set_visible(GTK_WIDGET(recording_hotkeys_grid), false);
+        gtk_widget_set_visible(GTK_WIDGET(recording_hotkeys_not_supported_label), false);
+    }
+
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, num_columns, 1);
 
     GtkWidget *save_icon = gtk_image_new_from_icon_name("document-save", GTK_ICON_SIZE_BUTTON);
 
@@ -3518,9 +3512,6 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
-    create_streaming_hotkey_items(grid, row, num_columns);
-    ++row;
-
     GtkWidget *hotkey_active_label = nullptr;
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         streaming_hotkeys_not_supported_label = gtk_label_new("Your Wayland compositor doesn't support global hotkeys. Use X11 or KDE Plasma Wayland.");
@@ -3530,10 +3521,15 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
         gtk_grid_attach(grid, hotkey_active_label, 0, row++, num_columns, 1);
     }
 
-    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, num_columns, 1);
+    create_streaming_hotkey_items(grid, row, num_columns);
+    ++row;
 
-    gtk_widget_set_visible(GTK_WIDGET(streaming_hotkeys_grid), false);
-    gtk_widget_set_visible(GTK_WIDGET(streaming_hotkeys_not_supported_label), false);
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+        gtk_widget_set_visible(GTK_WIDGET(streaming_hotkeys_grid), false);
+        gtk_widget_set_visible(GTK_WIDGET(streaming_hotkeys_not_supported_label), false);
+    }
+
+    gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row++, num_columns, 1);
 
     GtkGrid *stream_service_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(stream_service_grid), 0, row++, num_columns, 1);
