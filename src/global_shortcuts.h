@@ -18,7 +18,7 @@ typedef struct {
     gsr_shortcut shortcut;
 } gsr_bind_shortcut;
 
-typedef void (*gsr_init_callback)(void *userdata);
+typedef void (*gsr_init_callback)(bool success, void *userdata);
 typedef void (*gsr_shortcut_callback)(gsr_shortcut shortcut, void *userdata);
 typedef void (*gsr_deactivated_callback)(const char *id, void *userdata);
 

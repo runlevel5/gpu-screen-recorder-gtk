@@ -139,14 +139,16 @@ static void dbus_signal_create_session(GDBusProxy *proxy, gchar *sender_name, gc
     GVariant *results = NULL;
     g_variant_get(parameters, "(u@a{sv})", &response, &results);
 
-    if(response != 0 || !results)
+    if(response != 0 || !results) {
+        cu->callback(false, cu->userdata);
         goto done;
+    }
 
     gchar *session_handle = NULL;
     if(g_variant_lookup(results, "session_handle", "s", &session_handle) && session_handle) {
         cu->self->session_handle = strdup(session_handle);
         cu->self->session_created = true;
-        cu->callback(cu->userdata);
+        cu->callback(true, cu->userdata);
     }
 
     done:
