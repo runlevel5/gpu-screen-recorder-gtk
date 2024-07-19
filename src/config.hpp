@@ -33,7 +33,9 @@ struct MainConfig {
     std::string framerate_mode;
     bool advanced_view = false;
     bool overclock = false;
-    bool show_notifications = true;
+    bool show_recording_started_notifications = false;
+    bool show_recording_stopped_notifications = false;
+    bool show_recording_saved_notifications = true;
     bool record_cursor = true;
     bool hide_window_when_recording = false;
     bool software_encoding_warning_shown = false;
@@ -313,7 +315,9 @@ static std::map<std::string, ConfigValue> get_config_options(Config &config) {
         {"main.framerate_mode", {CONFIG_TYPE_STRING, &config.main_config.framerate_mode}},
         {"main.advanced_view", {CONFIG_TYPE_BOOL, &config.main_config.advanced_view}},
         {"main.overclock", {CONFIG_TYPE_BOOL, &config.main_config.overclock}},
-        {"main.show_notifications", {CONFIG_TYPE_BOOL, &config.main_config.show_notifications}},
+        {"main.show_recording_started_notifications", {CONFIG_TYPE_BOOL, &config.main_config.show_recording_started_notifications}},
+        {"main.show_recording_stopped_notifications", {CONFIG_TYPE_BOOL, &config.main_config.show_recording_stopped_notifications}},
+        {"main.show_recording_saved_notifications", {CONFIG_TYPE_BOOL, &config.main_config.show_recording_saved_notifications}},
         {"main.record_cursor", {CONFIG_TYPE_BOOL, &config.main_config.record_cursor}},
         {"main.hide_window_when_recording", {CONFIG_TYPE_BOOL, &config.main_config.hide_window_when_recording}},
         {"main.software_encoding_warning_shown", {CONFIG_TYPE_BOOL, &config.main_config.software_encoding_warning_shown}},

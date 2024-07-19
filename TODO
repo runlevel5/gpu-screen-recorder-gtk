@@ -31,4 +31,3 @@ Gray out monitor capture on intel if plane is compressed. Show the user to deskt
 Dont show error if closing the desktop portal popup.
 
 Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do global hotkeys without x11/wayland.
-Separate notifications enable to start, stop and save recording.

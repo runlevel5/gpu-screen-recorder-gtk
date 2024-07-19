@@ -96,7 +96,9 @@ static GtkWidget *replay_save_hotkey_button;
 static GtkWidget *streaming_start_hotkey_button;
 static GtkWidget *streaming_stop_hotkey_button;
 static GtkWidget *merge_audio_tracks_button;
-static GtkWidget *show_notification_button;
+static GtkWidget *show_recording_started_notification_button;
+static GtkWidget *show_recording_stopped_notification_button;
+static GtkWidget *show_recording_saved_notification_button;
 static GtkWidget *record_cursor_button;
 static GtkWidget *restore_portal_session_button;
 static GtkGrid *video_codec_grid;
@@ -938,7 +940,9 @@ static void save_configs() {
     config.main_config.framerate_mode = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     config.main_config.advanced_view = strcmp(gtk_combo_box_get_active_id(GTK_COMBO_BOX(view_combo_box)), "advanced") == 0;
     config.main_config.overclock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button));
-    config.main_config.show_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button));
+    config.main_config.show_recording_started_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_started_notification_button));
+    config.main_config.show_recording_stopped_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_stopped_notification_button));
+    config.main_config.show_recording_saved_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_saved_notification_button));
     config.main_config.record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
     config.main_config.hide_window_when_recording = gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item));
     config.main_config.restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
@@ -1252,10 +1256,8 @@ static bool grab_ungrab_hotkey_combo(Display *display, Hotkey hotkey, bool grab)
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND)
         return true;
 
-    if(hotkey.keysym == None && hotkey.modkey_mask == 0) {
-        fprintf(stderr, "hotkey is empty\n");
+    if(hotkey.keysym == None && hotkey.modkey_mask == 0)
         return true;
-    }
 
     unsigned int numlockmask = 0;
     KeyCode numlock_keycode = XKeysymToKeycode(display, XK_Num_Lock);
@@ -1641,6 +1643,9 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         } else if(!exit_success || (already_dead && exit_status != 0)) {
             show_notification(app, "GPU Screen Recorder",
                 "Failed to start replay. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video", G_NOTIFICATION_PRIORITY_URGENT);
+        } else if(exit_success) {
+            if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_stopped_notification_button)))
+                show_notification(app, "GPU Screen Recorder", "Stopped replay", G_NOTIFICATION_PRIORITY_NORMAL);
         }
 
         return true;
@@ -1756,6 +1761,9 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     gtk_widget_set_sensitive(save_replay_menu_item, true);
     app_indicator_set_icon_full(app_indicator, get_tray_recording_icon_name(), "Recording");
 
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_started_notification_button)))
+        show_notification(app, "GPU Screen Recorder", "Started replay", G_NOTIFICATION_PRIORITY_NORMAL);
+
     record_start_time_sec = clock_get_monotonic_seconds();
     return true;
 }
@@ -1766,7 +1774,7 @@ static gboolean on_replay_save_button_click(GtkButton*, gpointer userdata) {
 
     GtkApplication *app = (GtkApplication*)userdata;
     kill(gpu_screen_recorder_process, SIGUSR1);
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button)))
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_saved_notification_button)))
         show_notification(app, "GPU Screen Recorder", "Saved replay", G_NOTIFICATION_PRIORITY_NORMAL);
     return true;
 }
@@ -1829,7 +1837,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         } else if(!exit_success || (already_dead && exit_status != 0)) {
             show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video. Run GPU Screen Recorder from the terminal to see more information when this failure happens", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_success) {
-            if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_notification_button))) {
+            if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_saved_notification_button))) {
                 const std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
                 show_notification(app, "GPU Screen Recorder", notification_body.c_str(), G_NOTIFICATION_PRIORITY_NORMAL);
             }
@@ -1948,6 +1956,9 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     gtk_widget_set_sensitive(pause_recording_menu_item, true);
     app_indicator_set_icon_full(app_indicator, get_tray_recording_icon_name(), "Recording");
 
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_started_notification_button)))
+        show_notification(app, "GPU Screen Recorder", "Started recording", G_NOTIFICATION_PRIORITY_NORMAL);
+
     record_start_time_sec = clock_get_monotonic_seconds();
     paused_time_offset_sec = 0.0;
     return true;
@@ -1978,7 +1989,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         } else if(!exit_success || (already_dead && exit_status != 0)) {
             show_notification(app, "GPU Screen Recorder", "Failed to stream video. There is either an error in your streaming config or your graphics card doesn't support GPU Screen Recorder with the settings you used", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_success) {
-            show_notification(app, "GPU Screen Recorder", "Stopped streaming", G_NOTIFICATION_PRIORITY_NORMAL);
+            if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_stopped_notification_button)))
+                show_notification(app, "GPU Screen Recorder", "Stopped streaming", G_NOTIFICATION_PRIORITY_NORMAL);
         }
 
         return true;
@@ -2113,6 +2125,9 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     gtk_menu_item_set_label(GTK_MENU_ITEM(start_stop_streaming_menu_item), "Stop streaming");
     app_indicator_set_icon_full(app_indicator, get_tray_recording_icon_name(), "Recording");
 
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_started_notification_button)))
+        show_notification(app, "GPU Screen Recorder", "Started streaming", G_NOTIFICATION_PRIORITY_NORMAL);
+
     record_start_time_sec = clock_get_monotonic_seconds();
     return true;
 }
@@ -2164,7 +2179,9 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(framerate_mode_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(overclock_grid), advanced_view && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA && gsr_info.system_info.display_server != DisplayServer::WAYLAND);
-    gtk_widget_set_visible(GTK_WIDGET(show_notification_button), advanced_view);
+    gtk_widget_set_visible(GTK_WIDGET(show_recording_started_notification_button), advanced_view);
+    gtk_widget_set_visible(GTK_WIDGET(show_recording_stopped_notification_button), advanced_view);
+    gtk_widget_set_visible(GTK_WIDGET(show_recording_saved_notification_button), advanced_view);
 }
 
 static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -2900,15 +2917,25 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         return true;
     }), nullptr);
 
-    show_notification_button = gtk_check_button_new_with_label("Show video saved notification");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_notification_button), true);
-    gtk_widget_set_halign(show_notification_button, GTK_ALIGN_START);
-    gtk_grid_attach(grid, show_notification_button, 0, grid_row++, 2, 1);
-
     record_cursor_button = gtk_check_button_new_with_label("Record cursor");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_cursor_button), true);
     gtk_widget_set_halign(record_cursor_button, GTK_ALIGN_START);
     gtk_grid_attach(grid, record_cursor_button, 0, grid_row++, 2, 1);
+
+    show_recording_started_notification_button = gtk_check_button_new_with_label("Show recording/streaming/replay started notification");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_started_notification_button), false);
+    gtk_widget_set_halign(show_recording_started_notification_button, GTK_ALIGN_START);
+    gtk_grid_attach(grid, show_recording_started_notification_button, 0, grid_row++, 2, 1);
+
+    show_recording_stopped_notification_button = gtk_check_button_new_with_label("Show streaming/replay stopped notification");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_stopped_notification_button), false);
+    gtk_widget_set_halign(show_recording_stopped_notification_button, GTK_ALIGN_START);
+    gtk_grid_attach(grid, show_recording_stopped_notification_button, 0, grid_row++, 2, 1);
+
+    show_recording_saved_notification_button = gtk_check_button_new_with_label("Show video saved notification");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_saved_notification_button), true);
+    gtk_widget_set_halign(show_recording_saved_notification_button, GTK_ALIGN_START);
+    gtk_grid_attach(grid, show_recording_saved_notification_button, 0, grid_row++, 2, 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, grid_row++, 2, 1);
@@ -3739,7 +3766,9 @@ static void load_config() {
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(audio_codec_input_menu), config.main_config.audio_codec.c_str());
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(framerate_mode_input_menu), config.main_config.framerate_mode.c_str());
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), config.main_config.overclock);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_notification_button), config.main_config.show_notifications);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_started_notification_button), config.main_config.show_recording_started_notifications);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_stopped_notification_button), config.main_config.show_recording_stopped_notifications);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_saved_notification_button), config.main_config.show_recording_saved_notifications);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_cursor_button), config.main_config.record_cursor);
     gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item), config.main_config.hide_window_when_recording);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(restore_portal_session_button), config.main_config.restore_portal_session);
