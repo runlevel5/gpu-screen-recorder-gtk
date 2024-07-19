@@ -3106,6 +3106,7 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
 
         GtkWidget *start_replay_label = gtk_label_new("to start the replay");
         gtk_widget_set_halign(start_replay_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(start_replay_label, true);
         gtk_grid_attach(replay_hotkeys_grid, start_replay_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
@@ -3119,6 +3120,7 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
 
         GtkWidget *stop_replay_label = gtk_label_new("to stop the replay");
         gtk_widget_set_halign(stop_replay_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(stop_replay_label, true);
         gtk_grid_attach(replay_hotkeys_grid, stop_replay_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
@@ -3132,6 +3134,7 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
 
         GtkWidget *save_replay_label = gtk_label_new("to save the replay");
         gtk_widget_set_halign(save_replay_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(save_replay_label, true);
         gtk_grid_attach(replay_hotkeys_grid, save_replay_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
@@ -3307,6 +3310,7 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
 
         GtkWidget *start_recording_label = gtk_label_new("to start recording");
         gtk_widget_set_halign(start_recording_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(start_recording_label, true);
         gtk_grid_attach(recording_hotkeys_grid, start_recording_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
@@ -3320,6 +3324,7 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
 
         GtkWidget *stop_recording_label = gtk_label_new("to stop recording");
         gtk_widget_set_halign(stop_recording_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(stop_recording_label, true);
         gtk_grid_attach(recording_hotkeys_grid, stop_recording_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
@@ -3335,6 +3340,7 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
 
         GtkWidget *pause_recording_label = gtk_label_new("to pause recording");
         gtk_widget_set_halign(pause_recording_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(pause_recording_label, true);
         gtk_grid_attach(recording_hotkeys_grid, pause_recording_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
@@ -3348,6 +3354,7 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
 
         GtkWidget *unpause_recording_label = gtk_label_new("to unpause recording");
         gtk_widget_set_halign(unpause_recording_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(unpause_recording_label, true);
         gtk_grid_attach(recording_hotkeys_grid, unpause_recording_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
@@ -3527,6 +3534,7 @@ static void create_streaming_hotkey_items(GtkGrid *parent_grid, int row, int num
 
         GtkWidget *start_streaming_label = gtk_label_new("to start streaming");
         gtk_widget_set_halign(start_streaming_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(start_streaming_label, true);
         gtk_grid_attach(streaming_hotkeys_grid, start_streaming_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
@@ -3540,6 +3548,7 @@ static void create_streaming_hotkey_items(GtkGrid *parent_grid, int row, int num
 
         GtkWidget *stop_streaming_label = gtk_label_new("to stop streaming");
         gtk_widget_set_halign(stop_streaming_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(stop_streaming_label, true);
         gtk_grid_attach(streaming_hotkeys_grid, stop_streaming_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
