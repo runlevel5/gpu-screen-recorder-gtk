@@ -30,4 +30,6 @@ Gray out monitor capture on intel if plane is compressed. Show the user to deskt
 
 Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do global hotkeys without x11/wayland.
 
-Detect when using hyprland to show a popup when pressing "register hotkeys" to explain to the user to run `hyprctl globalshortcuts` and how to bind that to keys with for example `bind = SUPERSHIFT, R, global, :gpu_screen_recorder_start_recording`
+A single flatpak can only be installed either system-wide or user, so there can be a check if it's installed system-wide or user and it will only match one. With this information we can guaranteed know the flatpak directory of the running gpu screen recorder instance. The command `flatpak info -l com.dec05eba.gpu_screen_recorder` can also be used and is available for all flatpak users.
+
+Re-renable hotkeys on hyprland after it's fixed in the hyprland desktop portal.

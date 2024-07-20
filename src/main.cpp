@@ -4,6 +4,7 @@ extern "C" {
 }
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
+#include <gdk/gdkwayland.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
@@ -3078,9 +3079,9 @@ static void add_wayland_global_hotkeys_ui(GtkGrid *grid, int &row, int width) {
     gtk_grid_attach(grid, GTK_WIDGET(aa_grid), 0, row++, width, 1);
     gtk_grid_set_column_spacing(aa_grid, 10);
 
-    gtk_grid_attach(aa_grid, gtk_label_new("On Wayland hotkeys are managed externally by the Wayland compositor, click here to register hotkeys:"), 0, 0, 1, 1);
+    gtk_grid_attach(aa_grid, gtk_label_new("On Wayland hotkeys are managed externally by the Wayland compositor, click here to change hotkeys:"), 0, 0, 1, 1);
 
-    GtkButton *register_hotkeys_button = GTK_BUTTON(gtk_button_new_with_label("Register hotkeys"));
+    GtkButton *register_hotkeys_button = GTK_BUTTON(gtk_button_new_with_label("Change hotkeys"));
     gtk_widget_set_hexpand(GTK_WIDGET(register_hotkeys_button), true);
     //gtk_widget_set_halign(GTK_WIDGET(register_hotkeys_button), GTK_ALIGN_START);
     g_signal_connect(register_hotkeys_button, "clicked", G_CALLBACK(on_register_hotkeys_button_clicked), nullptr);
@@ -4123,9 +4124,22 @@ static void activate(GtkApplication *app, gpointer) {
     load_config();
 
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
-        if(!gsr_global_shortcuts_init(&global_shortcuts, init_shortcuts_callback, NULL)) {
-            fprintf(stderr, "gsr error: failed to initialize global shortcuts\n");
-            init_shortcuts_callback(false, nullptr);
+        init_shortcuts_callback(false, nullptr);
+        // TODO:
+        // Disable global hotkeys on Hyprland for now. It crashes the hyprland desktop portal.
+        // When it's re-enabled on Hyprland it will need special handing where it does BindShortcuts immediately on startup
+        // instead of having a "register hotkeys" button. This needed because Hyprland doesn't remember registered hotkeys after
+        // the desktop portal is restarted (when the computer is restarted for example).
+        const bool is_hyprland = gdk_wayland_display_query_registry(gdk_display_get_default(), "hyprland_global_shortcuts_manager_v1");
+        if(is_hyprland) {
+            const char *hotkeys_not_supported_text = "Global hotkeys have been disabled on your system because of a Hyprland bug.\nUse X11 or KDE Plasma on Wayland if you want to use hotkeys.";
+            gtk_label_set_text(GTK_LABEL(recording_hotkeys_not_supported_label), hotkeys_not_supported_text);
+            gtk_label_set_text(GTK_LABEL(replay_hotkeys_not_supported_label), hotkeys_not_supported_text);
+            gtk_label_set_text(GTK_LABEL(streaming_hotkeys_not_supported_label), hotkeys_not_supported_text);
+        } else {
+            if(!gsr_global_shortcuts_init(&global_shortcuts, init_shortcuts_callback, NULL)) {
+                fprintf(stderr, "gsr error: failed to initialize global shortcuts\n");
+            }
         }
     }
 }
