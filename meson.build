@@ -17,7 +17,6 @@ dep = [
     dependency('x11'),
     dependency('libpulse'),
     dependency('ayatana-appindicator3-0.1'),
-    dependency('dbus-1'),
 ]
 
 executable('gpu-screen-recorder-gtk', src, dependencies : dep, install : true)

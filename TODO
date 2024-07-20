@@ -29,3 +29,5 @@ Add refresh button for audio devices. Put it beside the "add" button. In the new
 Gray out monitor capture on intel if plane is compressed. Show the user to desktop portal capture instead.
 
 Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do global hotkeys without x11/wayland.
+
+Detect when using hyprland to show a popup when pressing "register hotkeys" to explain to the user to run `hyprctl globalshortcuts` and how to bind that to keys with for example `bind = SUPERSHIFT, R, global, :gpu_screen_recorder_start_recording`
