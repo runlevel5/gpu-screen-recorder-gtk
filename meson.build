@@ -23,7 +23,7 @@ executable('gpu-screen-recorder-gtk', src, dependencies : dep, install : true)
 
 prefix = get_option('prefix')
 datadir = get_option('datadir')
-install_data(files('gpu-screen-recorder-gtk.desktop'), install_dir : join_paths(prefix, datadir, 'applications'))
+install_data(files('com.dec05eba.gpu_screen_recorder.desktop'), install_dir : join_paths(prefix, datadir, 'applications'))
 install_data(files('com.dec05eba.gpu_screen_recorder.appdata.xml'), install_dir : join_paths(prefix, datadir, 'metainfo'))
 install_subdir('icons/hicolor', install_dir : join_paths(prefix, datadir, 'icons'))
 

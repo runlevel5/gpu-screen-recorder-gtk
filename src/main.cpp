@@ -2456,7 +2456,7 @@ static void parse_gpu_info_line(GsrInfo *gsr_info, const std::string &line) {
 
     const StringView attribute_name = {line.c_str(), space_index};
     const StringView attribute_value = {line.c_str() + space_index + 1, line.size() - (space_index + 1)};
-    if(attribute_name == "gpu") {
+    if(attribute_name == "vendor") {
         if(attribute_value == "amd")
             gsr_info->gpu_info.vendor = GpuVendor::AMD;
         else if(attribute_value == "intel")
