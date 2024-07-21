@@ -88,6 +88,7 @@
                     <li>Added desktop portal (pipewire) capture option. This fixes issue with glitched capture on certain Intel iGPUS (on Wayland)</li>
                     <li>Added global hotkeys on Wayland. KDE Plasma is the only Wayland environment that supports this properly at the moment.</li>
                     <li>Add separate hotkeys for start and stop and option to show notification when starting/stopping recording.</li>
+                    <li>Fix HDR capture (HDR metadata is now correct). Note that HDR capture is only available on Wayland and when recording a monitor without the desktop portal option</li>
                     <li>Added VP8 and VP9 video codecs if supported by the hardware</li>
                     <li>Added software encoding option</li>
                 </ul>
