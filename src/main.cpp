@@ -3060,7 +3060,7 @@ static gboolean on_register_hotkeys_button_clicked(GtkButton *button, gpointer u
         },
         {
             "Save replay",
-            { SHORTCUT_ID_SAVE_REPLAY, "LOGO+f9" }
+            { SHORTCUT_ID_SAVE_REPLAY, "LOGO+s" }
         }
     };
 
@@ -3135,7 +3135,7 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
         gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         replay_save_hotkey_button = gtk_entry_new();
-        gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F3");
+        gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + s");
         g_signal_connect(replay_save_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_save_hotkey_button);
         gtk_grid_attach(replay_hotkeys_grid, replay_save_hotkey_button,1, hotkeys_row, 1, 1);
 
@@ -3282,7 +3282,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     replay_stop_hotkey.shortcut_id = SHORTCUT_ID_STOP_RECORDING;
 
     replay_save_hotkey.modkey_mask = modkey_to_mask(XK_Super_L);
-    replay_save_hotkey.keysym = XK_F3;
+    replay_save_hotkey.keysym = XK_S;
     replay_save_hotkey.hotkey_entry = replay_save_hotkey_button;
     replay_save_hotkey.hotkey_active_label = hotkey_active_label;
     replay_save_hotkey.config = &config.replay_config.save_recording_hotkey;

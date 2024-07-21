@@ -33,3 +33,14 @@ Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do 
 A single flatpak can only be installed either system-wide or user, so there can be a check if it's installed system-wide or user and it will only match one. With this information we can guaranteed know the flatpak directory of the running gpu screen recorder instance. The command `flatpak info -l com.dec05eba.gpu_screen_recorder` can also be used and is available for all flatpak users.
 
 Re-renable hotkeys on hyprland after it's fixed in the hyprland desktop portal.
+
+Replay on startup should be its own page with its own settings for everything and should not allow enabling the feature unless global hotkeys can be enable.
+    To make sure this works, create a separate program to handle global hotkeys with root access to make it work for every user and keys should be registered by requiring root access (every time its changed), with a confirm button.
+    Or have a predefined set of keys that can be changed. Also have a key to show the gui.
+    The replay on startup should be this gpu screen recorder gtk program but should launch a separate gui (in a different cpp file)
+    and should be a single page with start/stop button and whatever. It should also show a systray similar to the default one but with only
+    start/stop/save/exit button. The UI is needed for gnome users that dont have a systray!
+    Maybe create gnome extension so that gnome users can see recording status, or mention to the user that it's a gnome limitation.
+    The system startup program should work like the gpu screen recorder systemd daemon but start gpu screen recorder gtk with a special argument to launch it into this
+    replay mode. The replay mode program should loop and launch gpu screen recorder, restarting it if it crashes. If it crashes show an error dialog to the user
+    and if hotkeys cant be registered then also show an error.
