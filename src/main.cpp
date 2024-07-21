@@ -5,6 +5,7 @@ extern "C" {
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include <gdk/gdkwayland.h>
+#include <libnotify/notify.h>
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/cursorfont.h>
@@ -983,11 +984,18 @@ static void save_configs() {
 }
 
 static void show_notification(GtkApplication *app, const char *title, const char *body, GNotificationPriority priority) {
+    (void)app;
     fprintf(stderr, "Notification: title: %s, body: %s\n", title, body);
-    GNotification *notification = g_notification_new(title);
-    g_notification_set_body(notification, body);
-    g_notification_set_priority(notification, priority);
-    g_application_send_notification(&app->parent, "gpu-screen-recorder", notification);
+    NotifyNotification *notification = notify_notification_new(title, body, "com.dec05eba.gpu_screen_recorder");
+    if(notification) {
+        notify_notification_set_category(notification, "normal");
+        notify_notification_set_timeout(notification, 2000);
+        notify_notification_show(notification, NULL);
+    }
+    // GNotification *notification = g_notification_new(title);
+    // g_notification_set_body(notification, body);
+    // g_notification_set_priority(notification, priority);
+    // g_application_send_notification(&app->parent, "gpu-screen-recorder", notification);
 
     showing_notification = true;
     if(priority < G_NOTIFICATION_PRIORITY_URGENT) {
@@ -3766,12 +3774,13 @@ static void handle_record_timer() {
 }
 
 static void handle_notification_timer(GtkApplication *app) {
+    (void)app;
     if(!showing_notification)
         return;
 
     const double now = clock_get_monotonic_seconds();
     if(now - notification_start_seconds >= notification_timeout_seconds) {
-        g_application_withdraw_notification(&app->parent, "gpu-screen-recorder");
+        //g_application_withdraw_notification(&app->parent, "gpu-screen-recorder");
         showing_notification = false;
     }
 }
@@ -4174,9 +4183,11 @@ int main(int argc, char **argv) {
         }
     }
 
+    notify_init("com.dec05eba.gpu_screen_recorder");
     GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
     g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
     g_object_unref(app);
+    notify_uninit();
     return status;
 }
