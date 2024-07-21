@@ -261,13 +261,14 @@ struct SystemInfo {
 };
 
 enum class GpuVendor {
+    UNKNOWN,
     AMD,
     INTEL,
     NVIDIA
 };
 
 struct GpuInfo {
-    GpuVendor vendor;
+    GpuVendor vendor = GpuVendor::UNKNOWN;
 };
 
 struct GsrInfo {
@@ -3980,9 +3981,10 @@ static void init_shortcuts_callback(bool success, void *userdata) {
 
 static const char* gpu_vendor_to_name(GpuVendor vendor) {
     switch(vendor) {
-        case GpuVendor::AMD:    return "AMD";
-        case GpuVendor::INTEL:  return "Intel";
-        case GpuVendor::NVIDIA: return "NVIDIA";
+        case GpuVendor::UNKNOWN: return "Unknown";
+        case GpuVendor::AMD:     return "AMD";
+        case GpuVendor::INTEL:   return "Intel";
+        case GpuVendor::NVIDIA:  return "NVIDIA";
     }
     return "";
 }
