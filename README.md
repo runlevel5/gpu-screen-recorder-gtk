@@ -1,6 +1,6 @@
 ![](https://dec05eba.com/images/gpu_screen_recorder_logo_small.png)
 
-gtk frontend for [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
+GTK frontend for [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
 
 This is a screen recorder that has minimal impact on system performance by recording your monitor using the GPU only,
 similar to shadowplay on windows. This is the fastest screen recording tool for Linux.
