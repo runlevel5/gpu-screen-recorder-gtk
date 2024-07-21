@@ -32,7 +32,7 @@ Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do 
 
 A single flatpak can only be installed either system-wide or user, so there can be a check if it's installed system-wide or user and it will only match one. With this information we can guaranteed know the flatpak directory of the running gpu screen recorder instance. The command `flatpak info -l com.dec05eba.gpu_screen_recorder` can also be used and is available for all flatpak users.
 
-Re-renable hotkeys on hyprland after it's fixed in the hyprland desktop portal.
+Re-renable hotkeys on hyprland after it's fixed in the hyprland desktop portal. Or use hyprland specific protocol to do it ourselves, and it also works better.
 
 Replay on startup should be its own page with its own settings for everything and should not allow enabling the feature unless global hotkeys can be enable.
     To make sure this works, create a separate program to handle global hotkeys with root access to make it work for every user and keys should be registered by requiring root access (every time its changed), with a confirm button.
