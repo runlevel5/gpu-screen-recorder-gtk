@@ -2711,7 +2711,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_capture_options.portal ? "Desktop portal (Experimental)" : "Desktop portal (Not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_capture_options.portal ? "Desktop portal (Experimental, HDR not supported)" : "Desktop portal (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "portal", -1);
     } else {
         gtk_list_store_append(store, &iter);
