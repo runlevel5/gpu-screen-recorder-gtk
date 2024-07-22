@@ -28,7 +28,7 @@ Add refresh button for audio devices. Put it beside the "add" button. In the new
 
 Gray out monitor capture on intel if plane is compressed. Show the user to desktop portal capture instead.
 
-Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do global hotkeys without x11/wayland.
+Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do global hotkeys without x11/wayland. The password prompt for this can be removed by using polkit rules, this is how SwayOSD does it.
 
 A single flatpak can only be installed either system-wide or user, so there can be a check if it's installed system-wide or user and it will only match one. With this information we can guaranteed know the flatpak directory of the running gpu screen recorder instance. The command `flatpak info -l com.dec05eba.gpu_screen_recorder` can also be used and is available for all flatpak users.
 
@@ -44,3 +44,6 @@ Replay on startup should be its own page with its own settings for everything an
     The system startup program should work like the gpu screen recorder systemd daemon but start gpu screen recorder gtk with a special argument to launch it into this
     replay mode. The replay mode program should loop and launch gpu screen recorder, restarting it if it crashes. If it crashes show an error dialog to the user
     and if hotkeys cant be registered then also show an error.
+
+Notifications are not shown on kde plasma while using desktop portal capture (system-wide). This is a design choice by kde, see https://invent.kde.org/plasma/xdg-desktop-portal-kde/-/blob/master/src/screencast.cpp?ref_type=heads#L41 . The DoNotDisturb.WhenScreenSharing config controls this. This can be bypassed by making the notification critical. Maybe notifications should be set as critical? but only on kde.
+    Maybe we should create our own notification system with gtk layer shell (which is supported by every platform except gnome wayland).

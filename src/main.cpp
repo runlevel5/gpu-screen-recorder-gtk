@@ -289,6 +289,13 @@ enum class GsrInfoExitStatus {
 
 static GsrInfoExitStatus gsr_info_exit_status;
 
+enum class WaylandCompositor {
+    UNKNOWN,
+    HYPRLAND,
+    KDE // kwin
+};
+static WaylandCompositor wayland_compositor = WaylandCompositor::UNKNOWN;
+
 struct Container {
     const char *container_name;
     const char *file_extension;
@@ -983,19 +990,26 @@ static void save_configs() {
 }
 
 static void show_notification(GtkApplication *app, const char *title, const char *body, GNotificationPriority priority) {
+    if(priority < G_NOTIFICATION_PRIORITY_URGENT) {
+        notification_timeout_seconds = 3.0;
+    } else {
+        notification_timeout_seconds = 10.0;
+    }
+
+    // KDE doesn't show notifications when using desktop portal capture unless either DoNotDisturb.WhenScreenSharing kde config
+    // has been changed by the user or if the priority for the notification is set as urgent
+    const std::string recording_window = record_area_selection_menu_get_active_id();
+    if((recording || replaying || streaming) && wayland_compositor == WaylandCompositor::KDE && recording_window == "portal")
+        priority = G_NOTIFICATION_PRIORITY_URGENT;
+
     fprintf(stderr, "Notification: title: %s, body: %s\n", title, body);
     GNotification *notification = g_notification_new(title);
     g_notification_set_body(notification, body);
     g_notification_set_priority(notification, priority);
     g_application_send_notification(&app->parent, "gpu-screen-recorder", notification);
 
-    showing_notification = true;
-    if(priority < G_NOTIFICATION_PRIORITY_URGENT) {
-        notification_timeout_seconds = 2.0;
-    } else {
-        notification_timeout_seconds = 10.0;
-    }
     notification_start_seconds = clock_get_monotonic_seconds();
+    showing_notification = true;
 }
 
 static bool window_has_atom(Display *display, Window window, Atom atom) {
@@ -4126,14 +4140,20 @@ static void activate(GtkApplication *app, gpointer) {
     load_config();
 
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+        if(gdk_wayland_display_query_registry(gdk_display_get_default(), "hyprland_global_shortcuts_manager_v1")) {
+            wayland_compositor = WaylandCompositor::HYPRLAND;
+        } else if(gdk_wayland_display_query_registry(gdk_display_get_default(), "org_kde_plasma_shell")) {
+            wayland_compositor = WaylandCompositor::KDE;
+        }
+
         init_shortcuts_callback(false, nullptr);
         // TODO:
         // Disable global hotkeys on Hyprland for now. It crashes the hyprland desktop portal.
         // When it's re-enabled on Hyprland it will need special handing where it does BindShortcuts immediately on startup
         // instead of having a "register hotkeys" button. This needed because Hyprland doesn't remember registered hotkeys after
         // the desktop portal is restarted (when the computer is restarted for example).
-        const bool is_hyprland = gdk_wayland_display_query_registry(gdk_display_get_default(), "hyprland_global_shortcuts_manager_v1");
-        if(is_hyprland) {
+
+        if(wayland_compositor == WaylandCompositor::HYPRLAND) {
             const char *hotkeys_not_supported_text = "Global hotkeys have been disabled on your system because of a Hyprland bug.\nUse X11 or KDE Plasma on Wayland if you want to use hotkeys.";
             gtk_label_set_text(GTK_LABEL(recording_hotkeys_not_supported_label), hotkeys_not_supported_text);
             gtk_label_set_text(GTK_LABEL(replay_hotkeys_not_supported_label), hotkeys_not_supported_text);
