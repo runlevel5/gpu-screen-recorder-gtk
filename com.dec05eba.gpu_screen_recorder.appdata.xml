@@ -82,7 +82,7 @@
     </screenshots>
 
     <releases>
-        <release version="4.0.0" date="2024-07-15">
+        <release version="4.0.0" date="2024-07-22">
             <description>
                 <ul>
                     <li>Added desktop portal (pipewire) capture option. This fixes issue with glitched capture on certain Intel iGPUS (on Wayland)</li>
