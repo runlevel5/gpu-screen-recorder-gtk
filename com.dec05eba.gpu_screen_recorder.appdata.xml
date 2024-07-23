@@ -41,7 +41,6 @@
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
             Note that this only applies to when recording a monitor on AMD/Intel or when recording on Wayland without using the desktop portal option.
         </p>
-        <p>Recording a single window is only possible on X11. Hotkeys are not supported on wayland either (wayland doesn't really support this). Use X11 if you want a proper desktop experience in general.</p>
         <p>AV1 is currently not supported in the flatpak for Nvidia since GPU Screen Recorder uses an older ffmpeg version to support older Nvidia cards. Install GPU Screen Recorder from source or from AUR if you want to use AV1 on Nvidia.</p>
         <p>On some Intel integrated GPUs the video can appear glitched or be a black screen when recording on Wayland. Right now the only way to fix this is to either record on X11 (maybe only with the window capture option) or to record with the desktop portal option (usually only available on Wayland).</p>
         <p>

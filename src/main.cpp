@@ -3276,7 +3276,7 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
         g_signal_connect(pause_unpause_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), pause_unpause_hotkey_button);
         gtk_grid_attach(recording_hotkeys_grid, pause_unpause_hotkey_button, 3, hotkeys_row, 1, 1);
 
-        GtkWidget *pause_unpause_recording_label = gtk_label_new("to pause/unpause recording");
+        GtkWidget *pause_unpause_recording_label = gtk_label_new("to pause/unpause");
         gtk_widget_set_halign(pause_unpause_recording_label, GTK_ALIGN_START);
         gtk_widget_set_hexpand(pause_unpause_recording_label, true);
         gtk_grid_attach(recording_hotkeys_grid, pause_unpause_recording_label, 4, hotkeys_row, 1, 1);
