@@ -3109,7 +3109,10 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
         g_signal_connect(replay_save_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_save_hotkey_button);
         gtk_grid_attach(replay_hotkeys_grid, replay_save_hotkey_button, 3, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("to save the replay"), 4, hotkeys_row, 1, 1);
+        GtkWidget *save_replay_label = gtk_label_new("to save the replay");
+        gtk_widget_set_halign(save_replay_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(save_replay_label, true);
+        gtk_grid_attach(replay_hotkeys_grid, save_replay_label, 4, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
     }
@@ -3273,7 +3276,10 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
         g_signal_connect(pause_unpause_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), pause_unpause_hotkey_button);
         gtk_grid_attach(recording_hotkeys_grid, pause_unpause_hotkey_button, 3, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("to pause/unpause recording"), 4, hotkeys_row, 1, 1);
+        GtkWidget *pause_unpause_recording_label = gtk_label_new("to pause/unpause recording");
+        gtk_widget_set_halign(pause_unpause_recording_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(pause_unpause_recording_label, true);
+        gtk_grid_attach(recording_hotkeys_grid, pause_unpause_recording_label, 4, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
     }
@@ -3422,7 +3428,10 @@ static void create_streaming_hotkey_items(GtkGrid *parent_grid, int row, int num
         g_signal_connect(streaming_start_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), streaming_start_stop_hotkey_button);
         gtk_grid_attach(streaming_hotkeys_grid, streaming_start_stop_hotkey_button, 1, hotkeys_row, 1, 1);
 
-        gtk_grid_attach(streaming_hotkeys_grid, gtk_label_new("to start/stop streaming"), 2, hotkeys_row, 1, 1);
+        GtkWidget *start_stop_streaming_label = gtk_label_new("to start/stop streaming");
+        gtk_widget_set_halign(start_stop_streaming_label, GTK_ALIGN_START);
+        gtk_widget_set_hexpand(start_stop_streaming_label, true);
+        gtk_grid_attach(streaming_hotkeys_grid, start_stop_streaming_label, 2, hotkeys_row, 1, 1);
 
         ++hotkeys_row;
     }
