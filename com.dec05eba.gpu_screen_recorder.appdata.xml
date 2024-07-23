@@ -81,6 +81,14 @@
     </screenshots>
 
     <releases>
+        <release version="4.0.1" date="2024-07-23">
+            <description>
+                <ul>
+                    <li>Fix capture broken on amd on wayland</li>
+                    <li>Fix hdr capture causing crash when in replay mode</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.0.0" date="2024-07-22">
             <description>
                 <ul>
