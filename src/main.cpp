@@ -3852,16 +3852,17 @@ static const char* gpu_vendor_to_name(GpuVendor vendor) {
 static void activate(GtkApplication *app, gpointer) {
     flatpak = is_inside_flatpak();
     nvfbc_installed = gsr_info.system_info.display_server != DisplayServer::WAYLAND && is_nv_fbc_installed();
+    page_navigation_userdata.app = app;
 
     if(gsr_info_exit_status == GsrInfoExitStatus::FAILED_TO_RUN_COMMAND) {
         const char *cmd = flatpak ? "flatpak run --command=gpu-screen-recorder com.dec05eba.gpu_screen_recorder -w screen -f 60 -o video.mp4" : "gpu-screen-recorder -w screen -f 60 -o video.mp4";
-        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to run 'gpu-screen-recorder' command. If you are using gpu-screen-recorder flatpak then this is a bug. Otherwise you need to make sure gpu-screen-recorder is installed on your system and working properly (install necessary depedencies depending on your GPU, such as libva-mesa-driver, libva-intel-driver, intel-media-driver and linux-firmware). Run:\n"
             "%s\n"
             "in a terminal to see more information about the issue.", cmd);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(select_window_userdata.app));
+        g_application_quit(G_APPLICATION(app));
         return;
     }
 
@@ -3954,7 +3955,6 @@ static void activate(GtkApplication *app, gpointer) {
     GtkWidget *streaming_page = create_streaming_page(app, stack);
     gtk_stack_set_visible_child(stack, common_settings_page);
 
-    page_navigation_userdata.app = app;
     page_navigation_userdata.stack = stack;
     page_navigation_userdata.common_settings_page = common_settings_page;
     page_navigation_userdata.replay_page = replay_page;
