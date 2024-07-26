@@ -4028,6 +4028,11 @@ int main(int argc, char **argv) {
     unsetenv("__GL_SYNC_TO_VBLANK");
     // Same as above, but for amd/intel
     unsetenv("vblank_mode");
+    // Disable prime-run and similar options as it doesn't work, the monitor to capture has to be run on the same device
+    unsetenv("__NV_PRIME_RENDER_OFFLOAD");
+    unsetenv("__NV_PRIME_RENDER_OFFLOAD_PROVIDER");
+    unsetenv("__GLX_VENDOR_LIBRARY_NAME");
+    unsetenv("__VK_LAYER_NV_optimus");
 
     dpy = XOpenDisplay(NULL);
     gsr_info_exit_status = get_gpu_screen_recorder_info(&gsr_info);
