@@ -292,7 +292,7 @@ static bool config_split_key_value(const StringView str, StringView &key, String
 
     value.str = str.str + index + 1;
     value.size = str.size - (index + 1);
-    
+
     return true;
 }
 
@@ -357,13 +357,13 @@ static Config read_config(bool &config_empty) {
     auto config_options = get_config_options(config);
 
     string_split_char(file_content, '\n', [&](StringView line) {
-        StringView key, value;
-        if(!config_split_key_value(line, key, value)) {
+        StringView key, sv_val;
+        if(!config_split_key_value(line, key, sv_val)) {
             fprintf(stderr, "Warning: Invalid config option format: %.*s\n", (int)line.size, line.str);
             return true;
         }
 
-        if(key.size == 0 || value.size == 0)
+        if(key.size == 0 || sv_val.size == 0)
             return true;
 
         auto it = config_options.find(std::string(key.str, key.size));
@@ -372,15 +372,15 @@ static Config read_config(bool &config_empty) {
 
         switch(it->second.type) {
             case CONFIG_TYPE_BOOL: {
-                *(bool*)it->second.data = value == "true";
+                *(bool*)it->second.data = sv_val == "true";
                 break;
             }
             case CONFIG_TYPE_STRING: {
-                ((std::string*)it->second.data)->assign(value.str, value.size);
+                ((std::string*)it->second.data)->assign(sv_val.str, sv_val.size);
                 break;
             }
             case CONFIG_TYPE_I32: {
-                std::string value_str(value.str, value.size);
+                std::string value_str(sv_val.str, sv_val.size);
                 int32_t *value = (int32_t*)it->second.data;
                 if(sscanf(value_str.c_str(), FORMAT_I32, value) != 1) {
                     fprintf(stderr, "Warning: Invalid config option value for %.*s\n", (int)key.size, key.str);
@@ -389,7 +389,7 @@ static Config read_config(bool &config_empty) {
                 break;
             }
             case CONFIG_TYPE_HOTKEY: {
-                std::string value_str(value.str, value.size);
+                std::string value_str(sv_val.str, sv_val.size);
                 ConfigHotkey *config_hotkey = (ConfigHotkey*)it->second.data;
                 if(sscanf(value_str.c_str(), FORMAT_I64 " " FORMAT_U32, &config_hotkey->keysym, &config_hotkey->modifiers) != 2) {
                     fprintf(stderr, "Warning: Invalid config option value for %.*s\n", (int)key.size, key.str);
@@ -399,7 +399,7 @@ static Config read_config(bool &config_empty) {
                 break;
             }
             case CONFIG_TYPE_STRING_ARRAY: {
-                std::string array_value(value.str, value.size);
+                std::string array_value(sv_val.str, sv_val.size);
                 ((std::vector<std::string>*)it->second.data)->push_back(std::move(array_value));
                 break;
             }

@@ -848,9 +848,9 @@ static GtkWidget* create_used_audio_input_row(void) {
     g_object_set_data(G_OBJECT(row), "audio-row", audio_row);
 
     g_signal_connect(remove_button, "clicked", G_CALLBACK(+[](GtkButton*, gpointer userdata){
-        AudioRow *audio_row = (AudioRow*)userdata;
-        gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(audio_row->row)), audio_row->row);
-        delete audio_row;
+        AudioRow *_audio_row = (AudioRow*)userdata;
+        gtk_container_remove(GTK_CONTAINER(gtk_widget_get_parent(_audio_row->row)), _audio_row->row);
+        delete _audio_row;
         return true;
     }), audio_row);
 
@@ -996,12 +996,12 @@ static void show_notification(GtkApplication *app, const char *title, const char
     showing_notification = true;
 }
 
-static bool window_has_atom(Display *display, Window window, Atom atom) {
+static bool window_has_atom(Display *display, Window _window, Atom atom) {
     Atom type;
     unsigned long len, bytes_left;
     int format;
     unsigned char *properties = nullptr;
-    if(XGetWindowProperty(display, window, atom, 0, 1024, False, AnyPropertyType, &type, &format, &len, &bytes_left, &properties) < Success)
+    if(XGetWindowProperty(display, _window, atom, 0, 1024, False, AnyPropertyType, &type, &format, &len, &bytes_left, &properties) < Success)
         return false;
 
     if(properties)
@@ -1010,22 +1010,22 @@ static bool window_has_atom(Display *display, Window window, Atom atom) {
     return type != None;
 }
 
-static Window window_get_target_window_child(Display *display, Window window) {
-    if(window == None)
+static Window window_get_target_window_child(Display *display, Window _window) {
+    if(_window == None)
         return None;
 
     Atom wm_state_atom = XInternAtom(display, "_NET_WM_STATE", False);
     if(!wm_state_atom)
         return None;
 
-    if(window_has_atom(display, window, wm_state_atom))
-        return window;
+    if(window_has_atom(display, _window, wm_state_atom))
+        return _window;
 
     Window root;
     Window parent;
     Window *children = nullptr;
     unsigned int num_children = 0;
-    if(!XQueryTree(display, window, &root, &parent, &children, &num_children) || !children)
+    if(!XQueryTree(display, _window, &root, &parent, &children, &num_children) || !children)
         return None;
 
     Window found_window = None;
@@ -1053,38 +1053,38 @@ static Window window_get_target_window_child(Display *display, Window window) {
 
 /* TODO: Look at xwininfo source to figure out how to make this work for different types of window managers */
 static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent*, gpointer userdata) {
-    SelectWindowUserdata *select_window_userdata = (SelectWindowUserdata*)userdata;
+    SelectWindowUserdata *_select_window_userdata = (SelectWindowUserdata*)userdata;
     XEvent *ev = (XEvent*)xevent;
     //assert(ev->type == ButtonPress);
     if(ev->type != ButtonPress)
         return GDK_FILTER_CONTINUE;
 
     Window target_win = ev->xbutton.subwindow;
-    Window new_window = window_get_target_window_child(select_window_userdata->display, target_win);
+    Window new_window = window_get_target_window_child(_select_window_userdata->display, target_win);
     if(new_window)
         target_win = new_window;
 
-    int status = XUngrabPointer(select_window_userdata->display, CurrentTime);
+    int status = XUngrabPointer(_select_window_userdata->display, CurrentTime);
     if(!status) {
         fprintf(stderr, "failed to ungrab pointer!\n");
-        show_notification(select_window_userdata->app, "GPU Screen Recorder", "Failed to ungrab pointer!", G_NOTIFICATION_PRIORITY_URGENT);
+        show_notification(_select_window_userdata->app, "GPU Screen Recorder", "Failed to ungrab pointer!", G_NOTIFICATION_PRIORITY_URGENT);
         exit(1);
     }
 
     if(target_win == None) {
-        show_notification(select_window_userdata->app, "GPU Screen Recorder", "No window selected!", G_NOTIFICATION_PRIORITY_URGENT);
+        show_notification(_select_window_userdata->app, "GPU Screen Recorder", "No window selected!", G_NOTIFICATION_PRIORITY_URGENT);
         GdkScreen *screen = gdk_screen_get_default();
         GdkWindow *root_window = gdk_screen_get_root_window(screen);
-        gdk_window_remove_filter(root_window, filter_callback, select_window_userdata);
+        gdk_window_remove_filter(root_window, filter_callback, _select_window_userdata);
         return GDK_FILTER_REMOVE;
     }
 
     std::string window_name;
     XTextProperty wm_name_prop;
-    if(XGetWMName(select_window_userdata->display, target_win, &wm_name_prop) && wm_name_prop.nitems > 0) {
+    if(XGetWMName(_select_window_userdata->display, target_win, &wm_name_prop) && wm_name_prop.nitems > 0) {
         char **list_return = NULL;
         int num_items = 0;
-        int ret = XmbTextPropertyToTextList(select_window_userdata->display, &wm_name_prop, &list_return, &num_items);
+        int ret = XmbTextPropertyToTextList(_select_window_userdata->display, &wm_name_prop, &list_return, &num_items);
         if((ret == Success || ret > 0) && list_return) {
             for(int i = 0; i < num_items; ++i) {
                 window_name += list_return[i];
@@ -1098,12 +1098,12 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent*, gpointer us
     }
 
     fprintf(stderr, "window name: %s, window id: %ld\n", window_name.c_str(), target_win);
-    gtk_button_set_label(select_window_userdata->select_window_button, window_name.c_str());
-    select_window_userdata->selected_window = target_win;
+    gtk_button_set_label(_select_window_userdata->select_window_button, window_name.c_str());
+    _select_window_userdata->selected_window = target_win;
 
     GdkScreen *screen = gdk_screen_get_default();
     GdkWindow *root_window = gdk_screen_get_root_window(screen);
-    gdk_window_remove_filter(root_window, filter_callback, select_window_userdata);
+    gdk_window_remove_filter(root_window, filter_callback, _select_window_userdata);
 
     enable_stream_record_button_if_info_filled();
 
@@ -1276,7 +1276,7 @@ static bool grab_ungrab_hotkey_combo(Display *display, Hotkey hotkey, bool grab)
         for(int i = 0; i < 8; ++i) {
             for(int j = 0; j < modmap->max_keypermod; ++j) {
                 if(modmap->modifiermap[i * modmap->max_keypermod + j] == numlock_keycode)
-                    numlockmask = (1 << i); 
+                    numlockmask = (1 << i);
             }
         }
         XFreeModifiermap(modmap);
@@ -1293,7 +1293,7 @@ static bool grab_ungrab_hotkey_combo(Display *display, Hotkey hotkey, bool grab)
     XSync(display, False);
     x_failed = false;
     XErrorHandler prev_error_handler = XSetErrorHandler(xerror_grab_error);
-    
+
 	Window root_window = DefaultRootWindow(display);
     unsigned int modifiers[] = { 0, LockMask, numlockmask, numlockmask|LockMask };
     if(key_sym != None) {
@@ -1379,7 +1379,7 @@ static bool replace_grabbed_keys_depending_on_active_page() {
 
     ungrab_keys(gdk_x11_get_default_xdisplay());
     const GtkWidget *visible_page = gtk_stack_get_visible_child(page_navigation_userdata.stack);
-    
+
     bool keys_successfully_grabbed = true;
     for(int i = 0; i < num_hotkeys; ++i) {
         if(visible_page == hotkeys[i]->page) {
@@ -1438,9 +1438,9 @@ static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
 
-    PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
-    gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->replay_page);
-    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::REPLAY)));
+    PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
+    gtk_stack_set_visible_child(_page_navigation_userdata->stack, _page_navigation_userdata->replay_page);
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(_page_navigation_userdata->app, SystrayPage::REPLAY)));
 
     if(gsr_info.system_info.display_server != DisplayServer::WAYLAND)
         replace_grabbed_keys_depending_on_active_page();
@@ -1452,9 +1452,9 @@ static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
 
-    PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
-    gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->recording_page);
-    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::RECORDING)));
+    PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
+    gtk_stack_set_visible_child(_page_navigation_userdata->stack, _page_navigation_userdata->recording_page);
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(_page_navigation_userdata->app, SystrayPage::RECORDING)));
 
     if(gsr_info.system_info.display_server != DisplayServer::WAYLAND)
         replace_grabbed_keys_depending_on_active_page();
@@ -1485,9 +1485,9 @@ static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
         return true;
     }
 
-    PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
-    gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->streaming_page);
-    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::STREAMING)));
+    PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
+    gtk_stack_set_visible_child(_page_navigation_userdata->stack, _page_navigation_userdata->streaming_page);
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(_page_navigation_userdata->app, SystrayPage::STREAMING)));
 
     if(gsr_info.system_info.display_server != DisplayServer::WAYLAND)
         replace_grabbed_keys_depending_on_active_page();
@@ -1496,11 +1496,11 @@ static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
 }
 
 static gboolean on_streaming_recording_replay_page_back_click(GtkButton*, gpointer userdata) {
-    PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
-    gtk_stack_set_visible_child(page_navigation_userdata->stack, page_navigation_userdata->common_settings_page);
+    PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
+    gtk_stack_set_visible_child(_page_navigation_userdata->stack, _page_navigation_userdata->common_settings_page);
     ungrab_keys(gdk_x11_get_default_xdisplay());
     hotkey_mode = HotkeyMode::NoAction;
-    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(page_navigation_userdata->app, SystrayPage::FRONT)));
+    app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(_page_navigation_userdata->app, SystrayPage::FRONT)));
     return true;
 }
 
@@ -1755,7 +1755,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
         if(getppid() != parent_pid)
             _exit(3);
-        
+
         execvp(args[0], (char* const*)args.data());
         perror("failed to launch gpu-screen-recorder");
         _exit(127);
@@ -1955,7 +1955,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
         if(getppid() != parent_pid)
             _exit(3);
-        
+
         execvp(args[0], (char* const*)args.data());
         perror("failed to launch gpu-screen-recorder");
         _exit(127);
@@ -2255,9 +2255,9 @@ static bool is_cuda_installed() {
     return lib != nullptr;
 }
 
-static bool is_hotkey_already_bound_to_another_action_on_same_page(const Hotkey *current_hotkey, const Hotkey new_hotkey, GtkWidget *page) {
+static bool is_hotkey_already_bound_to_another_action_on_same_page(const Hotkey *_current_hotkey, const Hotkey new_hotkey, GtkWidget *page) {
     for(int i = 0; i < num_hotkeys; ++i) {
-        if(hotkeys[i] != current_hotkey && hotkeys[i]->page == page && hotkeys[i]->keysym == new_hotkey.keysym && hotkeys[i]->modkey_mask == new_hotkey.modkey_mask)
+        if(hotkeys[i] != _current_hotkey && hotkeys[i]->page == page && hotkeys[i]->keysym == new_hotkey.keysym && hotkeys[i]->modkey_mask == new_hotkey.modkey_mask)
             return true;
     }
     return false;
@@ -2270,7 +2270,7 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
     if(hotkey_mode == HotkeyMode::NoAction)
         return GDK_FILTER_CONTINUE;
 
-    PageNavigationUserdata *page_navigation_userdata = (PageNavigationUserdata*)userdata;
+    PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
     XEvent *ev = (XEvent*)xevent;
     if(ev->type != KeyPress && ev->type != KeyRelease)
         return GDK_FILTER_CONTINUE;
@@ -2279,13 +2279,13 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
     KeySym key_sym = XLookupKeysym(&ev->xkey, 0);
 
     if(hotkey_mode == HotkeyMode::Record && ev->type == KeyRelease) {
-        const GtkWidget *visible_page = gtk_stack_get_visible_child(page_navigation_userdata->stack);
+        const GtkWidget *visible_page = gtk_stack_get_visible_child(_page_navigation_userdata->stack);
         for(int i = 0; i < num_hotkeys; ++i) {
             if(visible_page != hotkeys[i]->page)
                 continue;
-    
+
             if(key_sym == hotkeys[i]->keysym && key_state_without_locks(ev->xkey.state) == key_mod_mask_to_x11_mask(hotkeys[i]->modkey_mask))
-                hotkeys[i]->trigger_handler(hotkeys[i]->associated_button, page_navigation_userdata->app);
+                hotkeys[i]->trigger_handler(hotkeys[i]->associated_button, _page_navigation_userdata->app);
         }
         return GDK_FILTER_CONTINUE;
     }
@@ -2332,7 +2332,7 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
         latest_hotkey = pressed_hotkey;
         set_hotkey_text_from_hotkey_data(GTK_ENTRY(current_hotkey->hotkey_entry), latest_hotkey);
     }
-    
+
     if(ev->type == KeyRelease) {
         if(key_is_modifier(key_sym)) {
             pressed_hotkey.modkey_mask &= ~modkey_to_mask(key_sym);
@@ -2348,7 +2348,7 @@ static GdkFilterReturn hotkey_filter_callback(GdkXEvent *xevent, GdkEvent*, gpoi
         if(pressed_hotkey.modkey_mask == None && pressed_hotkey.keysym == None) {
             ungrab_keyboard(display);
 
-            if(is_hotkey_already_bound_to_another_action_on_same_page(current_hotkey, latest_hotkey, gtk_stack_get_visible_child(page_navigation_userdata->stack))) {
+            if(is_hotkey_already_bound_to_another_action_on_same_page(current_hotkey, latest_hotkey, gtk_stack_get_visible_child(_page_navigation_userdata->stack))) {
                 const std::string hotkey_text = gtk_entry_get_text(GTK_ENTRY(current_hotkey->hotkey_entry));
                 const std::string error_text = "Hotkey " + hotkey_text + " can't be used because it's used for something else. Please choose another hotkey.";
                 set_hotkey_text_from_hotkey_data(GTK_ENTRY(current_hotkey->hotkey_entry), *current_hotkey);
@@ -2424,15 +2424,15 @@ static gboolean on_hotkey_entry_click(GtkWidget *button, gpointer) {
     return true;
 }
 
-static bool audio_inputs_contains(const std::vector<AudioInput> &audio_inputs, const std::string &audio_input_name) {
-    for(auto &audio_input : audio_inputs) {
+static bool audio_inputs_contains(const std::vector<AudioInput> &_audio_inputs, const std::string &audio_input_name) {
+    for(auto &audio_input : _audio_inputs) {
         if(audio_input.name == audio_input_name)
             return true;
     }
     return false;
 }
 
-static void parse_system_info_line(GsrInfo *gsr_info, const std::string &line) {
+static void parse_system_info_line(GsrInfo *_gsr_info, const std::string &line) {
     const size_t space_index = line.find(' ');
     if(space_index == std::string::npos)
         return;
@@ -2441,13 +2441,13 @@ static void parse_system_info_line(GsrInfo *gsr_info, const std::string &line) {
     const StringView attribute_value = {line.c_str() + space_index + 1, line.size() - (space_index + 1)};
     if(attribute_name == "display_server") {
         if(attribute_value == "x11")
-            gsr_info->system_info.display_server = DisplayServer::X11;
+            _gsr_info->system_info.display_server = DisplayServer::X11;
         else if(attribute_value == "wayland")
-            gsr_info->system_info.display_server = DisplayServer::WAYLAND;
+            _gsr_info->system_info.display_server = DisplayServer::WAYLAND;
     }
 }
 
-static void parse_gpu_info_line(GsrInfo *gsr_info, const std::string &line) {
+static void parse_gpu_info_line(GsrInfo *_gsr_info, const std::string &line) {
     const size_t space_index = line.find(' ');
     if(space_index == std::string::npos)
         return;
@@ -2456,32 +2456,32 @@ static void parse_gpu_info_line(GsrInfo *gsr_info, const std::string &line) {
     const StringView attribute_value = {line.c_str() + space_index + 1, line.size() - (space_index + 1)};
     if(attribute_name == "vendor") {
         if(attribute_value == "amd")
-            gsr_info->gpu_info.vendor = GpuVendor::AMD;
+            _gsr_info->gpu_info.vendor = GpuVendor::AMD;
         else if(attribute_value == "intel")
-            gsr_info->gpu_info.vendor = GpuVendor::INTEL;
+            _gsr_info->gpu_info.vendor = GpuVendor::INTEL;
         else if(attribute_value == "nvidia")
-            gsr_info->gpu_info.vendor = GpuVendor::NVIDIA;
+            _gsr_info->gpu_info.vendor = GpuVendor::NVIDIA;
     }
 }
 
-static void parse_video_codecs_line(GsrInfo *gsr_info, const std::string &line) {
+static void parse_video_codecs_line(GsrInfo *_gsr_info, const std::string &line) {
     if(line == "h264")
-        gsr_info->supported_video_codecs.h264 = true;
+        _gsr_info->supported_video_codecs.h264 = true;
     else if(line == "hevc")
-        gsr_info->supported_video_codecs.hevc = true;
+        _gsr_info->supported_video_codecs.hevc = true;
     else if(line == "av1")
-        gsr_info->supported_video_codecs.av1 = true;
+        _gsr_info->supported_video_codecs.av1 = true;
     else if(line == "vp8")
-        gsr_info->supported_video_codecs.vp8 = true;
+        _gsr_info->supported_video_codecs.vp8 = true;
     else if(line == "vp9")
-        gsr_info->supported_video_codecs.vp9 = true;
+        _gsr_info->supported_video_codecs.vp9 = true;
 }
 
 static GsrMonitor capture_option_line_to_monitor(const std::string &line) {
     size_t space_index = line.find(' ');
     if(space_index == std::string::npos)
         return { line, {0, 0} };
-    
+
     vec2i size = {0, 0};
     if(sscanf(line.c_str() + space_index + 1, "%dx%d", &size.x, &size.y) != 2)
         size = {0, 0};
@@ -2489,17 +2489,17 @@ static GsrMonitor capture_option_line_to_monitor(const std::string &line) {
     return { line.substr(0, space_index), size };
 }
 
-static void parse_capture_options_line(GsrInfo *gsr_info, const std::string &line) {
+static void parse_capture_options_line(GsrInfo *_gsr_info, const std::string &line) {
     if(line == "window")
-        gsr_info->supported_capture_options.window = true;
+        _gsr_info->supported_capture_options.window = true;
     else if(line == "focused")
-        gsr_info->supported_capture_options.focused = true;
+        _gsr_info->supported_capture_options.focused = true;
     else if(line == "screen")
-        gsr_info->supported_capture_options.screen = true;
+        _gsr_info->supported_capture_options.screen = true;
     else if(line == "portal")
-        gsr_info->supported_capture_options.portal = true;
+        _gsr_info->supported_capture_options.portal = true;
     else
-        gsr_info->supported_capture_options.monitors.push_back(capture_option_line_to_monitor(line));
+        _gsr_info->supported_capture_options.monitors.push_back(capture_option_line_to_monitor(line));
 }
 
 enum class GsrInfoSection {
@@ -2515,8 +2515,8 @@ static bool starts_with(const std::string &str, const char *substr) {
     return str.size() >= len && memcmp(str.data(), substr, len) == 0;
 }
 
-static GsrInfoExitStatus get_gpu_screen_recorder_info(GsrInfo *gsr_info) {
-    *gsr_info = GsrInfo{};
+static GsrInfoExitStatus get_gpu_screen_recorder_info(GsrInfo *_gsr_info) {
+    *_gsr_info = GsrInfo{};
 
     FILE *f = popen("gpu-screen-recorder --info", "r");
     if(!f) {
@@ -2557,19 +2557,19 @@ static GsrInfoExitStatus get_gpu_screen_recorder_info(GsrInfo *gsr_info) {
                 break;
             }
             case GsrInfoSection::SYSTEM_INFO: {
-                parse_system_info_line(gsr_info, line_str);
+                parse_system_info_line(_gsr_info, line_str);
                 break;
             }
             case GsrInfoSection::GPU_INFO: {
-                parse_gpu_info_line(gsr_info, line_str);
+                parse_gpu_info_line(_gsr_info, line_str);
                 break;
             }
             case GsrInfoSection::VIDEO_CODECS: {
-                parse_video_codecs_line(gsr_info, line_str);
+                parse_video_codecs_line(_gsr_info, line_str);
                 break;
             }
             case GsrInfoSection::CAPTURE_OPTIONS: {
-                parse_capture_options_line(gsr_info, line_str);
+                parse_capture_options_line(_gsr_info, line_str);
                 break;
             }
         }
@@ -2828,9 +2828,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     video_codec_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(video_codec_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
+
     {
-        GtkListStore *store = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
-        GtkTreeIter iter;
+        store = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
         video_codec_selection_model = GTK_TREE_MODEL(store);
 
         gtk_list_store_append(store, &iter);
@@ -2881,7 +2881,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 
         video_codec_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(video_codec_selection_model));
 
-        GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
+        renderer = gtk_cell_renderer_text_new();
         gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, TRUE);
         gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, "text", 0, NULL);
         gtk_cell_layout_set_cell_data_func(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, video_codec_set_sensitive, NULL, NULL);
