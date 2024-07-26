@@ -3865,24 +3865,6 @@ static void activate(GtkApplication *app, gpointer) {
         return;
     }
 
-    if(gsr_info.system_info.display_server == DisplayServer::UNKNOWN) {
-        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Neither X11 nor Wayland is running.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
-    }
-
-    if(gsr_info.system_info.display_server == DisplayServer::X11 && !dpy) {
-        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to connect to X11 server");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
-    }
-
     if(gsr_info_exit_status == GsrInfoExitStatus::OPENGL_FAILED) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to get OpenGL information. Make sure your GPU drivers are properly installed. "
@@ -3896,6 +3878,24 @@ static void activate(GtkApplication *app, gpointer) {
     if(gsr_info_exit_status == GsrInfoExitStatus::NO_DRM_CARD) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to find a valid DRM card. If you are running GPU Screen Recorder with prime-run then try running without it.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
+
+    if(gsr_info.system_info.display_server == DisplayServer::UNKNOWN) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Neither X11 nor Wayland is running.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
+
+    if(gsr_info.system_info.display_server == DisplayServer::X11 && !dpy) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Failed to connect to X11 server");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));

@@ -47,3 +47,8 @@ Replay on startup should be its own page with its own settings for everything an
 
 Notifications are not shown on kde plasma while using desktop portal capture (system-wide). This is a design choice by kde, see https://invent.kde.org/plasma/xdg-desktop-portal-kde/-/blob/master/src/screencast.cpp?ref_type=heads#L41 . The DoNotDisturb.WhenScreenSharing config controls this. This can be bypassed by making the notification critical. Maybe notifications should be set as critical? but only on kde.
     Maybe we should create our own notification system with gtk layer shell (which is supported by every platform except gnome wayland).
+    On gnome wayland maybe we can fallback to x11? we need to add back --socket=x11 and remove --socket=fallback-x11 from flatpak manifest.
+    Maybe use this: https://gitlab.freedesktop.org/wayland/wayland-protocols/-/merge_requests/264 when that gets supported. But will gnome support that?
+
+For replay on system startup add functionality to only record if an application is fullscreen (on the focused monitor, or any monitor if not possible).
+    This is easy to do with x11. For hyprland/sway we can maybe use hyprctl/swaymsg. On kde maybe we can do something similar to this: https://github.com/jinliu/kdotool. For gnome maybe do something like this: https://github.com/ActivityWatch/aw-watcher-window/pull/46/files
