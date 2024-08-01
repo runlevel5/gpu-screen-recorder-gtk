@@ -10,7 +10,6 @@ extern "C" {
 #include <X11/cursorfont.h>
 #include <assert.h>
 #include <string>
-#include <pulse/pulseaudio.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
@@ -160,13 +159,7 @@ struct AudioInput {
     std::string description;
 };
 
-struct PulseAudioServerInfo {
-    std::string default_sink_name;
-    std::string default_source_name;
-};
-
 static std::vector<AudioInput> audio_inputs;
-static PulseAudioServerInfo pa_default_sources;
 
 enum class HotkeyMode {
     NoAction,
@@ -498,128 +491,44 @@ static void setup_systray(GtkApplication *app) {
     app_indicator_set_menu(app_indicator, GTK_MENU(create_systray_menu(app, SystrayPage::FRONT)));
 }
 
-static void pa_state_cb(pa_context *c, void *userdata) {
-    pa_context_state state = pa_context_get_state(c);
-    int *pa_ready = (int*)userdata;
-    switch(state) {
-        case PA_CONTEXT_UNCONNECTED:
-        case PA_CONTEXT_CONNECTING:
-        case PA_CONTEXT_AUTHORIZING:
-        case PA_CONTEXT_SETTING_NAME:
-        default:
-            break;
-        case PA_CONTEXT_FAILED:
-        case PA_CONTEXT_TERMINATED:
-            *pa_ready = 2;
-            break;
-        case PA_CONTEXT_READY:
-            *pa_ready = 1;
-            break;
-    }
-}
+static AudioInput parse_audio_device_line(const std::string &line) {
+    AudioInput audio_input;
+    const size_t space_index = line.find(' ');
+    if(space_index == std::string::npos)
+        return audio_input;
 
-static void pa_sourcelist_cb(pa_context*, const pa_source_info *source_info, int eol, void *userdata) {
-    if(eol > 0)
-        return;
-
-    std::vector<AudioInput> *inputs = (std::vector<AudioInput>*)userdata;
-    inputs->push_back({ source_info->name, source_info->description });
+    const StringView audio_input_name = {line.c_str(), space_index};
+    const StringView audio_input_description = {line.c_str() + space_index + 1, line.size() - (space_index + 1)};
+    audio_input.name.assign(audio_input_name.str, audio_input_name.size);
+    audio_input.description.assign(audio_input_description.str, audio_input_description.size);
+    return audio_input;
 }
 
 static std::vector<AudioInput> get_pulseaudio_inputs() {
     std::vector<AudioInput> inputs;
-    pa_mainloop *main_loop = pa_mainloop_new();
 
-    pa_context *ctx = pa_context_new(pa_mainloop_get_api(main_loop), "gpu-screen-recorder-gtk");
-    pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL);
-    int state = 0;
-    int pa_ready = 0;
-    pa_context_set_state_callback(ctx, pa_state_cb, &pa_ready);
-
-    pa_operation *pa_op = NULL;
-
-    for(;;) {
-        // Not ready
-        if(pa_ready == 0) {
-            pa_mainloop_iterate(main_loop, 1, NULL);
-            continue;
-        }
-
-        switch(state) {
-            case 0: {
-                pa_op = pa_context_get_source_info_list(ctx, pa_sourcelist_cb, &inputs);
-                ++state;
-                break;
-            }
-        }
-
-        // Couldn't get connection to the server
-        if(pa_ready == 2 || (state == 1 && pa_op && pa_operation_get_state(pa_op) == PA_OPERATION_DONE)) {
-            if(pa_op)
-                pa_operation_unref(pa_op);
-            pa_context_disconnect(ctx);
-            pa_context_unref(ctx);
-            pa_mainloop_free(main_loop);
-            return inputs;
-        }
-
-        pa_mainloop_iterate(main_loop, 1, NULL);
+    FILE *f = popen("gpu-screen-recorder --list-audio-devices", "r");
+    if(!f) {
+        fprintf(stderr, "error: 'gpu-screen-recorder --info' failed\n");
+        return inputs;
     }
 
-    pa_mainloop_free(main_loop);
-    return {};
-}
-
-static void server_info_callback(pa_context*, const pa_server_info *server_info, void *userdata) {
-    PulseAudioServerInfo *u = (PulseAudioServerInfo*)userdata;
-    if(server_info->default_sink_name)
-        u->default_sink_name = std::string(server_info->default_sink_name) + ".monitor";
-    if(server_info->default_source_name)
-        u->default_source_name = server_info->default_source_name;
-}
-
-static PulseAudioServerInfo get_pulseaudio_default_inputs() {
-    PulseAudioServerInfo server_info;
-    pa_mainloop *main_loop = pa_mainloop_new();
-
-    pa_context *ctx = pa_context_new(pa_mainloop_get_api(main_loop), "gpu-screen-recorder-gtk");
-    pa_context_connect(ctx, NULL, PA_CONTEXT_NOFLAGS, NULL);
-    int state = 0;
-    int pa_ready = 0;
-    pa_context_set_state_callback(ctx, pa_state_cb, &pa_ready);
-
-    pa_operation *pa_op = NULL;
-
-    for(;;) {
-        // Not ready
-        if(pa_ready == 0) {
-            pa_mainloop_iterate(main_loop, 1, NULL);
-            continue;
-        }
-
-        switch(state) {
-            case 0: {
-                pa_op = pa_context_get_server_info(ctx, server_info_callback, &server_info);
-                ++state;
-                break;
-            }
-        }
-
-        // Couldn't get connection to the server
-        if(pa_ready == 2 || (state == 1 && pa_op && pa_operation_get_state(pa_op) == PA_OPERATION_DONE)) {
-            if(pa_op)
-                pa_operation_unref(pa_op);
-            pa_context_disconnect(ctx);
-            pa_context_unref(ctx);
-            pa_mainloop_free(main_loop);
-            return server_info;
-        }
-
-        pa_mainloop_iterate(main_loop, 1, NULL);
+    char output[16384];
+    ssize_t bytes_read = fread(output, 1, sizeof(output) - 1, f);
+    if(bytes_read < 0 || ferror(f)) {
+        fprintf(stderr, "error: failed to read 'gpu-screen-recorder --info' output\n");
+        pclose(f);
+        return inputs;
     }
+    output[bytes_read] = '\0';
 
-    pa_mainloop_free(main_loop);
-    return server_info;
+    string_split_char(output, '\n', [&](StringView line) {
+        const std::string line_str(line.str, line.size);
+        inputs.push_back(parse_audio_device_line(line_str));
+        return true;
+    });
+
+    return inputs;
 }
 
 static void used_audio_input_loop_callback(GtkWidget *row, gpointer userdata) {
@@ -1564,31 +1473,19 @@ static bool kill_gpu_screen_recorder_get_result(bool *already_dead) {
     return exit_success;
 }
 
-static const gchar* audio_row_get_id(const AudioRow *audio_row) {
-    const char *text = gtk_combo_box_text_get_active_text(audio_row->input_list);
-    if(strcmp(text, "Default output") == 0 && !pa_default_sources.default_sink_name.empty())
-        return pa_default_sources.default_sink_name.c_str();
-    else if(strcmp(text, "Default input") == 0 && !pa_default_sources.default_source_name.empty())
-        return pa_default_sources.default_source_name.c_str();
-    else
-        return gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_row->input_list));
-}
-
 static void add_audio_command_line_args(std::vector<const char*> &args, std::string &merge_audio_tracks_arg_value) {
-    pa_default_sources = get_pulseaudio_default_inputs();
-
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
         for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&merge_audio_tracks_arg_value](const AudioRow *audio_row) {
             if(!merge_audio_tracks_arg_value.empty())
                 merge_audio_tracks_arg_value += '|';
-            merge_audio_tracks_arg_value += audio_row_get_id(audio_row);
+            merge_audio_tracks_arg_value += gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_row->input_list));
         });
 
         if(!merge_audio_tracks_arg_value.empty())
             args.insert(args.end(), { "-a", merge_audio_tracks_arg_value.c_str() });
     } else {
         for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&args](const AudioRow *audio_row) {
-            args.insert(args.end(), { "-a", audio_row_get_id(audio_row) });
+            args.insert(args.end(), { "-a", gtk_combo_box_get_active_id(GTK_COMBO_BOX(audio_row->input_list)) });
         });
     }
 }
@@ -2422,14 +2319,6 @@ static gboolean on_hotkey_entry_click(GtkWidget *button, gpointer) {
     XSync(display, False);
     XSetErrorHandler(prev_error_handler);
     return true;
-}
-
-static bool audio_inputs_contains(const std::vector<AudioInput> &_audio_inputs, const std::string &audio_input_name) {
-    for(auto &audio_input : _audio_inputs) {
-        if(audio_input.name == audio_input_name)
-            return true;
-    }
-    return false;
 }
 
 static void parse_system_info_line(GsrInfo *_gsr_info, const std::string &line) {
@@ -3933,13 +3822,6 @@ static void activate(GtkApplication *app, gpointer) {
 
     select_window_userdata.app = app;
     audio_inputs = get_pulseaudio_inputs();
-    pa_default_sources = get_pulseaudio_default_inputs();
-
-    if(!pa_default_sources.default_source_name.empty() && audio_inputs_contains(audio_inputs, pa_default_sources.default_source_name))
-        audio_inputs.insert(audio_inputs.begin(), { pa_default_sources.default_source_name.c_str(), "Default input" });
-
-    if(!pa_default_sources.default_sink_name.empty() && audio_inputs_contains(audio_inputs, pa_default_sources.default_sink_name))
-        audio_inputs.insert(audio_inputs.begin(), { pa_default_sources.default_sink_name.c_str(), "Default output" });
 
     if(gsr_info.system_info.display_server != DisplayServer::WAYLAND)
         crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);

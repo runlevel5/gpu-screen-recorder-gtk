@@ -15,7 +15,6 @@ src = [
 dep = [
     dependency('gtk+-3.0'),
     dependency('x11'),
-    dependency('libpulse'),
     dependency('ayatana-appindicator3-0.1'),
 ]
 
