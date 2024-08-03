@@ -203,6 +203,7 @@ static int num_hotkeys = 5;
 
 struct SupportedVideoCodecs {
     bool h264 = false;
+    bool h264_software = false;
     bool hevc = false;
     bool av1 = false;
     bool vp8 = false;
@@ -504,7 +505,7 @@ static AudioInput parse_audio_device_line(const std::string &line) {
     return audio_input;
 }
 
-static std::vector<AudioInput> get_pulseaudio_inputs() {
+static std::vector<AudioInput> get_audio_devices() {
     std::vector<AudioInput> inputs;
 
     FILE *f = popen("gpu-screen-recorder --list-audio-devices", "r");
@@ -608,6 +609,9 @@ static bool is_video_codec_enabled(const char *str) {
     bool enabled = true;
 
     if(strcmp(str, "h264") == 0 && !gsr_info.supported_video_codecs.h264)
+        enabled = false;
+
+    if(strcmp(str, "h264_software") == 0 && !gsr_info.supported_video_codecs.h264_software)
         enabled = false;
 
     if(strcmp(str, "hevc") == 0 && !gsr_info.supported_video_codecs.hevc)
@@ -2356,6 +2360,8 @@ static void parse_gpu_info_line(GsrInfo *_gsr_info, const std::string &line) {
 static void parse_video_codecs_line(GsrInfo *_gsr_info, const std::string &line) {
     if(line == "h264")
         _gsr_info->supported_video_codecs.h264 = true;
+    else if(line == "h264_software")
+        _gsr_info->supported_video_codecs.h264_software = true;
     else if(line == "hevc")
         _gsr_info->supported_video_codecs.hevc = true;
     else if(line == "av1")
@@ -2765,7 +2771,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         }
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, "H264 Software Encoder (Slow, not recommeded)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264_software ? "H264 Software Encoder (Slow, not recommeded)" : "H264 Software Encoder (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "h264_software", -1);
 
         video_codec_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(video_codec_selection_model));
@@ -3821,7 +3827,7 @@ static void activate(GtkApplication *app, gpointer) {
     gtk_window_set_resizable(GTK_WINDOW(window), false);
 
     select_window_userdata.app = app;
-    audio_inputs = get_pulseaudio_inputs();
+    audio_inputs = get_audio_devices();
 
     if(gsr_info.system_info.display_server != DisplayServer::WAYLAND)
         crosshair_cursor = XCreateFontCursor(gdk_x11_get_default_xdisplay(), XC_crosshair);
