@@ -42,7 +42,6 @@
             Note that this only applies to when recording a monitor on AMD/Intel or when recording on Wayland without using the desktop portal option.
         </p>
         <p>AV1 is currently not supported in the flatpak for Nvidia since GPU Screen Recorder uses an older ffmpeg version to support older Nvidia cards. Install GPU Screen Recorder from source or from AUR if you want to use AV1 on Nvidia.</p>
-        <p>On some Intel integrated GPUs the video can appear glitched or be a black screen when recording on Wayland. Right now the only way to fix this is to either record on X11 (maybe only with the window capture option) or to record with the desktop portal option (usually only available on Wayland).</p>
         <p>
             Videos are in variable framerate format. Very out of date video players might have an issue playing such videos. It's recommend to use MPV to play such videos, otherwise you might experience stuttering in the video.
             You can select constant frame rate mode in advanced view if you need it.
@@ -50,7 +49,7 @@
         <p>
             If the video doesn't play or you get green/yellow overlay then your video player is missing H264/HEVC video codec. Either install the video codecs or use mpv.
         </p>
-        <p>AMD has a driver/hardware fault that causes black bars/distorted colors on the right side/bottom of the video for certain video resolutions. This happens for both av1 and hevc, so if you have this issue then switch to h264 video codec option in advanced settings.
+        <p>AMD has a driver/hardware fault that causes black bars/distorted colors on the sides of the video for certain video resolutions. This happens for both av1 and hevc, so if you have this issue then switch to h264 video codec option in advanced settings.
         </p>
         <p>
             If H264/HEVC video encoding option is not available on your AMD/Intel system but you know that your GPU supports those codecs for encoding then you may need to install mesa-extra freedesktop runtime by running this command: "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra".
