@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.1" date="2024-08-15">
+            <description>
+                <ul>
+                    <li>Fix error when starting application on wayland when portal capture option is available but laptop monitor is disabled</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.0" date="2024-08-08">
             <description>
                 <ul>
