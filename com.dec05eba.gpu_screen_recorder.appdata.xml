@@ -80,6 +80,14 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.2" date="2024-08-16">
+            <description>
+                <ul>
+                    <li>Allow capturing external monitors on a laptop with a dedicated gpu on X11 (for example an intel laptop with a nvidia gpu), where the monitor is connected to the dedicated gpu</li>
+                    <li>Fix cursor not visible when using multiple monitors in some wayland compositors</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.1" date="2024-08-15">
             <description>
                 <ul>
