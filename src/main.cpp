@@ -205,7 +205,11 @@ struct SupportedVideoCodecs {
     bool h264 = false;
     bool h264_software = false;
     bool hevc = false;
+    bool hevc_hdr = false;
+    bool hevc_10bit = false;
     bool av1 = false;
+    bool av1_hdr = false;
+    bool av1_10bit = false;
     bool vp8 = false;
     bool vp9 = false;
 };
@@ -494,7 +498,7 @@ static void setup_systray(GtkApplication *app) {
 
 static AudioInput parse_audio_device_line(const std::string &line) {
     AudioInput audio_input;
-    const size_t space_index = line.find(' ');
+    const size_t space_index = line.find('|');
     if(space_index == std::string::npos)
         return audio_input;
 
@@ -617,19 +621,25 @@ static bool is_video_codec_enabled(const char *str) {
     if(strcmp(str, "hevc") == 0 && !gsr_info.supported_video_codecs.hevc)
         enabled = false;
 
+    if(strcmp(str, "hevc_hdr") == 0 && !gsr_info.supported_video_codecs.hevc_hdr)
+        enabled = false;
+
+    if(strcmp(str, "hevc_10bit") == 0 && !gsr_info.supported_video_codecs.hevc_10bit)
+        enabled = false;
+
     if(strcmp(str, "av1") == 0 && !gsr_info.supported_video_codecs.av1)
+        enabled = false;
+
+    if(strcmp(str, "av1_hdr") == 0 && !gsr_info.supported_video_codecs.av1_hdr)
+        enabled = false;
+
+    if(strcmp(str, "av1_10bit") == 0 && !gsr_info.supported_video_codecs.av1_10bit)
         enabled = false;
 
     if(strcmp(str, "vp8") == 0 && !gsr_info.supported_video_codecs.vp8)
         enabled = false;
 
     if(strcmp(str, "vp9") == 0 && !gsr_info.supported_video_codecs.vp9)
-        enabled = false;
-
-    if(strcmp(str, "hevc_hdr") == 0 && (!gsr_info.supported_video_codecs.hevc || gsr_info.system_info.display_server != DisplayServer::WAYLAND))
-        enabled = false;
-
-    if(strcmp(str, "av1_hdr") == 0 && (!gsr_info.supported_video_codecs.av1 || gsr_info.system_info.display_server != DisplayServer::WAYLAND))
         enabled = false;
 
     return enabled;
@@ -2326,7 +2336,7 @@ static gboolean on_hotkey_entry_click(GtkWidget *button, gpointer) {
 }
 
 static void parse_system_info_line(GsrInfo *_gsr_info, const std::string &line) {
-    const size_t space_index = line.find(' ');
+    const size_t space_index = line.find('|');
     if(space_index == std::string::npos)
         return;
 
@@ -2341,7 +2351,7 @@ static void parse_system_info_line(GsrInfo *_gsr_info, const std::string &line) 
 }
 
 static void parse_gpu_info_line(GsrInfo *_gsr_info, const std::string &line) {
-    const size_t space_index = line.find(' ');
+    const size_t space_index = line.find('|');
     if(space_index == std::string::npos)
         return;
 
@@ -2364,8 +2374,16 @@ static void parse_video_codecs_line(GsrInfo *_gsr_info, const std::string &line)
         _gsr_info->supported_video_codecs.h264_software = true;
     else if(line == "hevc")
         _gsr_info->supported_video_codecs.hevc = true;
+    else if(line == "hevc_hdr")
+        _gsr_info->supported_video_codecs.hevc_hdr = true;
+    else if(line == "hevc_10bit")
+        _gsr_info->supported_video_codecs.hevc_10bit = true;
     else if(line == "av1")
         _gsr_info->supported_video_codecs.av1 = true;
+    else if(line == "av1_hdr")
+        _gsr_info->supported_video_codecs.av1_hdr = true;
+    else if(line == "av1_10bit")
+        _gsr_info->supported_video_codecs.av1_10bit = true;
     else if(line == "vp8")
         _gsr_info->supported_video_codecs.vp8 = true;
     else if(line == "vp9")
@@ -2373,7 +2391,7 @@ static void parse_video_codecs_line(GsrInfo *_gsr_info, const std::string &line)
 }
 
 static GsrMonitor capture_option_line_to_monitor(const std::string &line) {
-    size_t space_index = line.find(' ');
+    size_t space_index = line.find('|');
     if(space_index == std::string::npos)
         return { line, {0, 0} };
 
@@ -2769,6 +2787,14 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_list_store_set(store, &iter, 0, "AV1 (HDR, not available on X11)", -1);
             gtk_list_store_set(store, &iter, 1, "av1_hdr", -1);
         }
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC (10 bits)" : "HEVC (10 bits, not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "hevc_10bit", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (10 bits)" : "AV1 (10 bits, not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "av1_10bit", -1);
 
         gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264_software ? "H264 Software Encoder (Slow, not recommeded)" : "H264 Software Encoder (Not available on your system)", -1);
