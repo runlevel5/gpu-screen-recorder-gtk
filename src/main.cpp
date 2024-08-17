@@ -2789,11 +2789,11 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         }
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC (10 bits)" : "HEVC (10 bits, not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC (10 bits, reduces banding)" : "HEVC (10 bits, not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "hevc_10bit", -1);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (10 bits)" : "AV1 (10 bits, not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (10 bits, reduces banding)" : "AV1 (10 bits, not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "av1_10bit", -1);
 
         gtk_list_store_append(store, &iter);

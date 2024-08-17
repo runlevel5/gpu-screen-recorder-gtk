@@ -80,10 +80,12 @@
     </screenshots>
 
     <releases>
-        <release version="4.1.2" date="2024-08-16">
+        <release version="4.1.2" date="2024-08-17">
             <description>
                 <ul>
                     <li>Allow capturing external monitors on a laptop with a dedicated gpu on X11 (for example an intel laptop with a nvidia gpu), where the monitor is connected to the dedicated gpu</li>
+                    <li>Fix capture not working if audio device id has space in it (happens with virtual audio sources)</li>
+                    <li>Add 10 bit color depth options for hevc and av1 to reduce banding</li>
                     <li>Fix cursor not visible when using multiple monitors in some wayland compositors</li>
                 </ul>
             </description>
