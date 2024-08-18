@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.3" date="2024-08-18">
+            <description>
+                <ul>
+                    <li>Fix capture not working on wayland when recording a monitor instead of desktop portal</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.2" date="2024-08-17">
             <description>
                 <ul>
