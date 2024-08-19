@@ -29,6 +29,7 @@ Add refresh button for audio devices. Put it beside the "add" button. In the new
 Gray out monitor capture on intel if plane is compressed. Show the user to desktop portal capture instead.
 
 Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do global hotkeys without x11/wayland. The password prompt for this can be removed by using polkit rules, this is how SwayOSD does it.
+    doing this in the flatpak requires --device=input in the flatpak manifest if we are doing it without hack where we launch an external process, running outside the flatpak with root access.
 
 A single flatpak can only be installed either system-wide or user, so there can be a check if it's installed system-wide or user and it will only match one. With this information we can guaranteed know the flatpak directory of the running gpu screen recorder instance. The command `flatpak info -l com.dec05eba.gpu_screen_recorder` can also be used and is available for all flatpak users.
 
