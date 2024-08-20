@@ -264,6 +264,7 @@ static GsrInfo gsr_info;
 
 enum class GsrInfoExitStatus {
     OK,
+    BROKEN_DRIVERS,
     FAILED_TO_RUN_COMMAND,
     OPENGL_FAILED,
     NO_DRM_CARD
@@ -514,14 +515,14 @@ static std::vector<AudioInput> get_audio_devices() {
 
     FILE *f = popen("gpu-screen-recorder --list-audio-devices", "r");
     if(!f) {
-        fprintf(stderr, "error: 'gpu-screen-recorder --info' failed\n");
+        fprintf(stderr, "error: 'gpu-screen-recorder --list-audio-devices' failed\n");
         return inputs;
     }
 
     char output[16384];
     ssize_t bytes_read = fread(output, 1, sizeof(output) - 1, f);
     if(bytes_read < 0 || ferror(f)) {
-        fprintf(stderr, "error: failed to read 'gpu-screen-recorder --info' output\n");
+        fprintf(stderr, "error: failed to read 'gpu-screen-recorder --list-audio-devices' output\n");
         pclose(f);
         return inputs;
     }
@@ -2494,6 +2495,7 @@ static GsrInfoExitStatus get_gpu_screen_recorder_info(GsrInfo *_gsr_info) {
     if(WIFEXITED(status)) {
         switch(WEXITSTATUS(status)) {
             case 0:  return GsrInfoExitStatus::OK;
+            case 14: return GsrInfoExitStatus::BROKEN_DRIVERS;
             case 22: return GsrInfoExitStatus::OPENGL_FAILED;
             case 23: return GsrInfoExitStatus::NO_DRM_CARD;
             default: return GsrInfoExitStatus::FAILED_TO_RUN_COMMAND;
@@ -3800,6 +3802,15 @@ static void activate(GtkApplication *app, gpointer) {
     if(gsr_info_exit_status == GsrInfoExitStatus::NO_DRM_CARD) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to find a valid DRM card. If you are running GPU Screen Recorder with prime-run then try running without it.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
+
+    if(gsr_info_exit_status == GsrInfoExitStatus::BROKEN_DRIVERS) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "GPU Screen Recorder has been disabled for your device at the moment because your device has broken drivers.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
