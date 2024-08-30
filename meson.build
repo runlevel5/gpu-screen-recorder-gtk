@@ -1,4 +1,4 @@
-project('gpu-screen-recorder-gtk', ['c', 'cpp'], version : '4.1.5', default_options : ['warning_level=2'])
+project('gpu-screen-recorder-gtk', ['c', 'cpp'], version : '4.1.6', default_options : ['warning_level=2'])
 
 add_project_arguments('-Wshadow', language : ['c', 'cpp'])
 if get_option('buildtype') == 'debug'
@@ -17,6 +17,8 @@ dep = [
     dependency('x11'),
     dependency('ayatana-appindicator3-0.1'),
 ]
+
+add_project_arguments('-DGSR_VERSION="' + meson.project_version() + '"', language: ['c', 'cpp'])
 
 executable('gpu-screen-recorder-gtk', src, dependencies : dep, install : true)
 

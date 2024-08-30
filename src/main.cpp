@@ -20,6 +20,10 @@ extern "C" {
 #include <vector>
 #include <libayatana-appindicator/app-indicator.h>
 
+#ifndef GSR_VERSION
+#define GSR_VERSION "unknown"
+#endif
+
 // Start/stop recording also means start/stop streaming and start/stop replay
 #define SHORTCUT_ID_START_STOP_RECORDING    "gpu_screen_recorder_start_stop_recording"
 #define SHORTCUT_ID_PAUSE_UNPAUSE_RECORDING "gpu_screen_recorder_pause_unpause_recording"
@@ -3857,7 +3861,7 @@ static void activate(GtkApplication *app, gpointer) {
         }
     }
 
-    std::string window_title = "GPU Screen Recorder | Running on ";
+    std::string window_title = "GPU Screen Recorder v" + std::string(GSR_VERSION) + " | Running on ";
     window_title += gpu_vendor_to_name(gsr_info.gpu_info.vendor);
 
     window = gtk_application_window_new(app);

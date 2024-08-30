@@ -80,6 +80,14 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.6" date="2024-08-30">
+            <description>
+                <ul>
+                    <li>Workaround steam deck driver bug and enable steam deck support again</li>
+                    <li>Improve startup time on certain systems</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.5" date="2024-08-20">
             <description>
                 <ul>
