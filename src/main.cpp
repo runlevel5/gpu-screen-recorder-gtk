@@ -240,6 +240,7 @@ enum class DisplayServer {
 
 struct SystemInfo {
     DisplayServer display_server = DisplayServer::UNKNOWN;
+    bool is_steam_deck = false;
 };
 
 enum class GpuVendor {
@@ -264,7 +265,6 @@ static GsrInfo gsr_info;
 
 enum class GsrInfoExitStatus {
     OK,
-    BROKEN_DRIVERS,
     FAILED_TO_RUN_COMMAND,
     OPENGL_FAILED,
     NO_DRM_CARD
@@ -2348,6 +2348,8 @@ static void parse_system_info_line(GsrInfo *_gsr_info, const std::string &line) 
             _gsr_info->system_info.display_server = DisplayServer::X11;
         else if(attribute_value == "wayland")
             _gsr_info->system_info.display_server = DisplayServer::WAYLAND;
+    } else if(attribute_name == "is_steam_deck") {
+        _gsr_info->system_info.is_steam_deck = attribute_value == "yes";
     }
 }
 
@@ -2495,7 +2497,6 @@ static GsrInfoExitStatus get_gpu_screen_recorder_info(GsrInfo *_gsr_info) {
     if(WIFEXITED(status)) {
         switch(WEXITSTATUS(status)) {
             case 0:  return GsrInfoExitStatus::OK;
-            case 14: return GsrInfoExitStatus::BROKEN_DRIVERS;
             case 22: return GsrInfoExitStatus::OPENGL_FAILED;
             case 23: return GsrInfoExitStatus::NO_DRM_CARD;
             default: return GsrInfoExitStatus::FAILED_TO_RUN_COMMAND;
@@ -2749,11 +2750,11 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         video_codec_selection_model = GTK_TREE_MODEL(store);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, "Auto (Recommended)", -1);
+        gtk_list_store_set(store, &iter, 0, "Auto (Recommended, H264)", -1);
         gtk_list_store_set(store, &iter, 1, "auto", -1);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264 ? "H264" : "H264 (Not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264 ? "H264 (Worst compression, best software compatibility)" : "H264 (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "h264", -1);
 
         gtk_list_store_append(store, &iter);
@@ -2761,7 +2762,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_set(store, &iter, 1, "hevc", -1);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1" : "AV1 (Not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (Best compression, worst software compatibility)" : "AV1 (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "av1", -1);
 
         gtk_list_store_append(store, &iter);
@@ -3733,6 +3734,16 @@ static void load_config() {
         gtk_widget_destroy(dialog);
         config.main_config.software_encoding_warning_shown = true;
     }
+
+    if(gsr_info.system_info.is_steam_deck && !config.main_config.steam_deck_warning_shown)  {
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
+            "Steam deck has multiple driver bugs, some which have been introduced in the last few months. For example one of them has been reported here: "
+            "<a href=\"https://github.com/ValveSoftware/SteamOS/issues/1609\">https://github.com/ValveSoftware/SteamOS/issues/1609</a>.\n"
+            "If you have issues with GPU Screen Recorder on steam deck but not on a desktop computer then report the issue to Valve and/or AMD.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        config.main_config.steam_deck_warning_shown = true;
+    }
 }
 
 static void init_shortcuts_callback(bool success, void *userdata) {
@@ -3802,15 +3813,6 @@ static void activate(GtkApplication *app, gpointer) {
     if(gsr_info_exit_status == GsrInfoExitStatus::NO_DRM_CARD) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Failed to find a valid DRM card. If you are running GPU Screen Recorder with prime-run then try running without it.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
-    }
-
-    if(gsr_info_exit_status == GsrInfoExitStatus::BROKEN_DRIVERS) {
-        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "GPU Screen Recorder has been disabled for your device at the moment because your device has broken drivers.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
