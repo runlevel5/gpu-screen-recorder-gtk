@@ -23,7 +23,12 @@ These are the dependencies needed to build GPU Screen Recorder GTK:
 
 * gtk3
 * libx11
-* ayatana-appindicator3-0.1
+* ayatana-appindicator3-0.1c
+
+## Runtime dependencies
+There are also additional dependencies needed at runtime:
+
+* [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/)
 
 # Screenshots
 ![](https://www.dec05eba.com/images/gpu-screen-recorder.png)
