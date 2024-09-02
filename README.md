@@ -16,7 +16,7 @@ Run `sudo ./install.sh` or if you are running Arch Linux, then you can find gpu 
 You can also install gpu screen recorder (the gtk gui version) from [flathub](https://flathub.org/apps/details/com.dec05eba.gpu_screen_recorder). This flatpak includes gpu-screen-recorder so no need to install that first.
 
 # Dependencies
-GPU Screen Recorder GTK uses meson build system so you need to install `meson` to build GPU Screen Recorder GTK:
+GPU Screen Recorder GTK uses meson build system so you need to install `meson` to build GPU Screen Recorder GTK.
 
 ## Build dependencies
 These are the dependencies needed to build GPU Screen Recorder GTK:

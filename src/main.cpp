@@ -2758,7 +2758,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_set(store, &iter, 1, "auto", -1);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264 ? "H264 (Worst compression, best software compatibility)" : "H264 (Not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264 ? "H264 (Largest file size, best software compatibility)" : "H264 (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "h264", -1);
 
         gtk_list_store_append(store, &iter);
@@ -2766,7 +2766,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_set(store, &iter, 1, "hevc", -1);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (Best compression, worst software compatibility)" : "AV1 (Not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (Smallest file size, worst software compatibility)" : "AV1 (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "av1", -1);
 
         gtk_list_store_append(store, &iter);
