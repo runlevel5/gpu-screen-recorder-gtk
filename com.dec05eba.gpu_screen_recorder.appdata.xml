@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.7" date="2024-09-06">
+            <description>
+                <ul>
+                    <li>Fix tearing/stutter/cursor flicker on amd after recent amd driver update</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.6" date="2024-08-30">
             <description>
                 <ul>
