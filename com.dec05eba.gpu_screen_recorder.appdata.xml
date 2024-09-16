@@ -80,6 +80,14 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.8" date="2024-09-17">
+            <description>
+                <ul>
+                    <li>Improve video capture sync, making the video smoother. The video is smoother on X11 than Wayland</li>
+                    <li>Improve video recording performance on AMD when the system usage is 100%</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.7" date="2024-09-06">
             <description>
                 <ul>
