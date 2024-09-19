@@ -40,6 +40,8 @@ struct MainConfig {
     bool hide_window_when_recording = false;
     bool software_encoding_warning_shown = false;
     bool steam_deck_warning_shown = false;
+    bool hevc_amd_bug_warning_shown = false;
+    bool av1_amd_bug_warning_shown = false;
     bool restore_portal_session = true;
 };
 
@@ -319,6 +321,8 @@ static std::map<std::string, ConfigValue> get_config_options(Config &config) {
         {"main.hide_window_when_recording", {CONFIG_TYPE_BOOL, &config.main_config.hide_window_when_recording}},
         {"main.software_encoding_warning_shown", {CONFIG_TYPE_BOOL, &config.main_config.software_encoding_warning_shown}},
         {"main.steam_deck_warning_shown", {CONFIG_TYPE_BOOL, &config.main_config.steam_deck_warning_shown}},
+        {"main.hevc_amd_bug_warning_shown", {CONFIG_TYPE_BOOL, &config.main_config.hevc_amd_bug_warning_shown}},
+        {"main.av1_amd_bug_warning_shown", {CONFIG_TYPE_BOOL, &config.main_config.av1_amd_bug_warning_shown}},
         {"main.restore_portal_session", {CONFIG_TYPE_BOOL, &config.main_config.restore_portal_session}},
 
         {"streaming.service", {CONFIG_TYPE_STRING, &config.streaming_config.streaming_service}},

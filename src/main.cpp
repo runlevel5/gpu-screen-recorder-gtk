@@ -1362,9 +1362,35 @@ static bool show_pkexec_flatpak_error_if_needed() {
     return false;
 }
 
+static void show_bugged_driver_warning() {
+    if(gsr_info.gpu_info.vendor != GpuVendor::AMD)
+        return;
+
+    const std::string video_codec = video_codec_selection_menu_get_active_id();
+    if((video_codec == "hevc" || video_codec == "hevc_10bit" || video_codec == "hevc_hdr") && !config.main_config.hevc_amd_bug_warning_shown) {
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
+            "There is an AMD driver bug and FFmpeg bug that causes black bars to appear on the sides of the video at certain resolutions when using HEVC codec.\n"
+            "Select H264 video codec instead if this is an issue for you.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        config.main_config.hevc_amd_bug_warning_shown = true;
+    }
+
+    if((video_codec == "av1" || video_codec == "av1_10bit" || video_codec == "av1_hdr") && !config.main_config.av1_amd_bug_warning_shown) {
+        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
+            "There is an AMD hardware bug that causes black bars to appear on the sides of the video at certain resolutions when using AV1 codec.\n"
+            "Select H264 video codec instead if this is an issue for you.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        config.main_config.av1_amd_bug_warning_shown = true;
+    }
+}
+
 static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
+
+    show_bugged_driver_warning();
 
     PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(_page_navigation_userdata->stack, _page_navigation_userdata->replay_page);
@@ -1379,6 +1405,8 @@ static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
 static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
+
+    show_bugged_driver_warning();
 
     PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(_page_navigation_userdata->stack, _page_navigation_userdata->recording_page);
@@ -1399,6 +1427,8 @@ void on_stream_key_icon_click(GtkWidget *widget, gpointer) {
 static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
+
+    show_bugged_driver_warning();
 
     int num_audio_tracks = 0;
     for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [&num_audio_tracks](const AudioRow*) {
@@ -2629,7 +2659,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_capture_options.portal ? "Desktop portal (Experimental, HDR not supported)" : "Desktop portal (Not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_capture_options.portal ? "Desktop portal (HDR not supported)" : "Desktop portal (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "portal", -1);
     } else {
         gtk_list_store_append(store, &iter);
