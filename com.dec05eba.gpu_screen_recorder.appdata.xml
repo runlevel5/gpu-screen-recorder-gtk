@@ -80,6 +80,15 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.9" date="2024-09-20">
+            <description>
+                <ul>
+                    <li>Improve frame timing for smoother video</li>
+                    <li>Improve screen recording performance on AMD when the system usage is very high</li>
+                    <li>Fix recording not working on old nvidia gpus (that are stuck on nvidia driver version 470)</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.8" date="2024-09-17">
             <description>
                 <ul>
