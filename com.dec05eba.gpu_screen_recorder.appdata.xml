@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.11" date="2024-09-21">
+            <description>
+                <ul>
+                    <li>Fix recording not working on some amd systems</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.10" date="2024-09-21">
             <description>
                 <ul>
