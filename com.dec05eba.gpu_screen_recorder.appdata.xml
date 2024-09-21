@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.1.10" date="2024-09-21">
+            <description>
+                <ul>
+                    <li>Revert frame timing change as it badly affected slower devices</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.1.9" date="2024-09-20">
             <description>
                 <ul>
