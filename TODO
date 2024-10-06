@@ -4,7 +4,6 @@ Add list of windows to select from. This makes it easier to select another windo
 Disable overclocking and show some kind of sign that overclocking is not possible (if coolbits not set).
 Button (in the field) to remove hotkey.
 Error if polkit agent is not running (pkexec --help may work but the agent might not be running anyways).
-Fix gui crash on stop recording on sway.
 Re-enable wlroots based capture when it's fixed.
 Add translation support (using gettext, which uses .mo files and _ macro). It should be easy for non-devs to contribute.
     But how? maybe have a page that links to the english translation files (or translation directory) in git and give instructions,
