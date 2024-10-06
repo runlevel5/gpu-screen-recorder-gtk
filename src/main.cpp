@@ -51,6 +51,7 @@ static SelectWindowUserdata select_window_userdata;
 static PageNavigationUserdata page_navigation_userdata;
 static Cursor crosshair_cursor;
 static GtkSpinButton *fps_entry;
+static GtkSpinButton *video_bitrate_entry;
 static GtkLabel *area_size_label;
 static GtkGrid *area_size_grid;
 static GtkSpinButton *area_width_entry;
@@ -103,6 +104,7 @@ static GtkGrid *video_codec_grid;
 static GtkGrid *audio_codec_grid;
 static GtkGrid *color_range_grid;
 static GtkGrid *framerate_mode_grid;
+static GtkGrid *video_bitrate_grid;
 static GtkComboBoxText *view_combo_box;
 static GtkGrid *overclock_grid;
 static GtkWidget *overclock_button;
@@ -854,6 +856,7 @@ static void save_configs() {
         config.main_config.record_area_height = gtk_spin_button_get_value_as_int(area_height_entry);
     }
     config.main_config.fps = gtk_spin_button_get_value_as_int(fps_entry);
+    config.main_config.video_bitrate = gtk_spin_button_get_value_as_int(video_bitrate_entry);
     config.main_config.merge_audio_tracks = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button));
 
     config.main_config.audio_input.clear();
@@ -1571,6 +1574,18 @@ static bool switch_video_codec_to_usable_hardware_encoder(std::string &video_cod
     return false;
 }
 
+static void add_quality_command_line_args(std::vector<const char*> &args, const char *quality_input_str, const char *video_bitrate_str) {
+    if(strcmp(quality_input_str, "custom") == 0) {
+        args.push_back("-bm");
+        args.push_back("cbr");
+        args.push_back("-vb");
+        args.push_back(video_bitrate_str);
+    } else {
+        args.push_back("-q");
+        args.push_back(quality_input_str);
+    }
+}
+
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
     const gchar *dir = gtk_button_get_label(replay_file_chooser_button);
@@ -1613,10 +1628,10 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
     save_configs();
 
-    int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
-    int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
+    const int fps = gtk_spin_button_get_value_as_int(fps_entry);
+    const int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
+    const int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    const int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, dir);
@@ -1647,6 +1662,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
     const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
+    const std::string video_bitrate_str = std::to_string(gtk_spin_button_get_value_as_int(video_bitrate_entry));
 
     const char *encoder = "gpu";
     std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
@@ -1666,8 +1682,10 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-r", replay_time_str.c_str(), "-encoder", encoder, "-o", dir
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-r", replay_time_str.c_str(), "-encoder", encoder, "-o", dir
     };
+
+    add_quality_command_line_args(args, quality_input_str, video_bitrate_str.c_str());
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
         args.insert(args.end(), { "-oc", "yes" });
@@ -1811,9 +1829,9 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
 
     save_configs();
 
-    int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
+    const int fps = gtk_spin_button_get_value_as_int(fps_entry);
+    const int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    const int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     bool follow_focused = false;
     std::string window_str = record_area_selection_menu_get_active_id();
@@ -1837,6 +1855,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
     const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
+    const std::string video_bitrate_str = std::to_string(gtk_spin_button_get_value_as_int(video_bitrate_entry));
 
     const char *encoder = "gpu";
     std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
@@ -1866,8 +1885,10 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-encoder", encoder, "-o", record_file_current_filename.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-encoder", encoder, "-o", record_file_current_filename.c_str()
     };
+
+    add_quality_command_line_args(args, quality_input_str, video_bitrate_str.c_str());
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
         args.insert(args.end(), { "-oc", "yes" });
@@ -1966,9 +1987,9 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
 
     save_configs();
 
-    int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
+    const int fps = gtk_spin_button_get_value_as_int(fps_entry);
+    const int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
+    const int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     bool follow_focused = false;
     std::string window_str = record_area_selection_menu_get_active_id();
@@ -2021,6 +2042,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     const gchar* framerate_mode_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(framerate_mode_input_menu));
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
     const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
+    const std::string video_bitrate_str = std::to_string(gtk_spin_button_get_value_as_int(video_bitrate_entry));
 
     const char *encoder = "gpu";
     std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
@@ -2040,8 +2062,10 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     snprintf(area, sizeof(area), "%dx%d", record_width, record_height);
 
     std::vector<const char*> args = {
-        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-q", quality_input_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-encoder", encoder, "-o", stream_url.c_str()
+        "gpu-screen-recorder", "-w", window_str.c_str(), "-c", container_str, "-k", video_codec_input_str.c_str(), "-ac", audio_codec_input_str, "-f", fps_str.c_str(), "-cursor", record_cursor ? "yes" : "no", "-restore-portal-session", restore_portal_session ? "yes" : "no", "-cr", color_range_input_str, "-encoder", encoder, "-o", stream_url.c_str()
     };
+
+    add_quality_command_line_args(args, quality_input_str, video_bitrate_str.c_str());
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(overclock_button)))
         args.insert(args.end(), { "-oc", "yes" });
@@ -2150,6 +2174,13 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     gtk_widget_set_visible(GTK_WIDGET(show_recording_started_notification_button), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(show_recording_stopped_notification_button), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(show_recording_saved_notification_button), advanced_view);
+}
+
+static void quality_combo_box_change_callback(GtkComboBox *widget, gpointer userdata) {
+    (void)userdata;
+    const gchar *selected_view = gtk_combo_box_get_active_id(widget);
+    const bool custom_selected = strcmp(selected_view, "custom") == 0;
+    gtk_widget_set_visible(GTK_WIDGET(video_bitrate_grid), custom_selected);
 }
 
 static void stream_service_item_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -2763,17 +2794,27 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(color_range_grid, GTK_WIDGET(color_range_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(color_range_input_menu), 0);
 
-    GtkGrid *quality_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(quality_grid), 0, grid_row++, 2, 1);
-    gtk_grid_attach(quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
+    GtkGrid *video_quality_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(video_quality_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
     quality_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(quality_input_menu, "custom", "Custom (Constant bitrate)");
     gtk_combo_box_text_append(quality_input_menu, "medium", "Medium");
     gtk_combo_box_text_append(quality_input_menu, "high", "High (Recommended for live streaming)");
     gtk_combo_box_text_append(quality_input_menu, "very_high", "Very High (Recommended)");
     gtk_combo_box_text_append(quality_input_menu, "ultra", "Ultra");
     gtk_widget_set_hexpand(GTK_WIDGET(quality_input_menu), true);
-    gtk_grid_attach(quality_grid, GTK_WIDGET(quality_input_menu), 1, 0, 1, 1);
+    gtk_grid_attach(video_quality_grid, GTK_WIDGET(quality_input_menu), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(quality_input_menu), 0);
+    g_signal_connect(quality_input_menu, "changed", G_CALLBACK(quality_combo_box_change_callback), quality_input_menu);
+
+    video_bitrate_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(grid, GTK_WIDGET(video_bitrate_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_bitrate_grid, gtk_label_new("Video bitrate (kbps): "), 0, 0, 1, 1);
+    video_bitrate_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 1000000.0, 1.0));
+    gtk_spin_button_set_value(video_bitrate_entry, 54000.0);
+    gtk_widget_set_hexpand(GTK_WIDGET(video_bitrate_entry), true);
+    gtk_grid_attach(video_bitrate_grid, GTK_WIDGET(video_bitrate_entry), 1, 0, 1, 1);
 
     video_codec_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(video_codec_grid), 0, grid_row++, 2, 1);
@@ -3672,7 +3713,7 @@ static void load_config() {
     if(config.main_config.color_range != "limited" && config.main_config.color_range != "full")
         config.main_config.color_range = "limited";
 
-    if(config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
+    if(config.main_config.quality != "custom" && config.main_config.quality != "medium" && config.main_config.quality != "high" && config.main_config.quality != "very_high" && config.main_config.quality != "ultra")
         config.main_config.quality = "very_high";
 
     if(config.main_config.audio_codec != "opus" && config.main_config.audio_codec != "aac")
@@ -3701,6 +3742,7 @@ static void load_config() {
         gtk_spin_button_set_value(area_height_entry, config.main_config.record_area_height);
     }
     gtk_spin_button_set_value(fps_entry, config.main_config.fps);
+    gtk_spin_button_set_value(video_bitrate_entry, config.main_config.video_bitrate);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button), config.main_config.merge_audio_tracks);
 
     for(const std::string &audio_input : config.main_config.audio_input) {
@@ -3740,6 +3782,7 @@ static void load_config() {
     gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), config.main_config.advanced_view ? "advanced" : "simple");
 
     view_combo_box_change_callback(GTK_COMBO_BOX(view_combo_box), view_combo_box);
+    quality_combo_box_change_callback(GTK_COMBO_BOX(quality_input_menu), quality_input_menu);
     if(gsr_info.system_info.display_server != DisplayServer::WAYLAND) {
         if(!config_empty) {
             for(int i = 0; i < num_hotkeys; ++i) {
