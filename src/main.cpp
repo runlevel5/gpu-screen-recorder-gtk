@@ -1578,7 +1578,7 @@ static void add_quality_command_line_args(std::vector<const char*> &args, const 
     if(strcmp(quality_input_str, "custom") == 0) {
         args.push_back("-bm");
         args.push_back("cbr");
-        args.push_back("-vb");
+        args.push_back("-q");
         args.push_back(video_bitrate_str);
     } else {
         args.push_back("-q");
