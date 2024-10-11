@@ -2798,9 +2798,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(grid, GTK_WIDGET(video_quality_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(video_quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
     quality_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(quality_input_menu, "custom", "Custom (Constant bitrate)");
+    gtk_combo_box_text_append(quality_input_menu, "custom", "Custom (Constant bitrate, recommended for live streaming)");
     gtk_combo_box_text_append(quality_input_menu, "medium", "Medium");
-    gtk_combo_box_text_append(quality_input_menu, "high", "High (Recommended for live streaming)");
+    gtk_combo_box_text_append(quality_input_menu, "high", "High");
     gtk_combo_box_text_append(quality_input_menu, "very_high", "Very High (Recommended)");
     gtk_combo_box_text_append(quality_input_menu, "ultra", "Ultra");
     gtk_widget_set_hexpand(GTK_WIDGET(quality_input_menu), true);
