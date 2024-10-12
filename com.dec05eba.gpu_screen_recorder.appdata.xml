@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.2.1" date="2024-10-12">
+            <description>
+                <ul>
+                    <li>Better frame timing when hardware is too slow to record at the desired framerate</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.2.0" date="2024-10-11">
             <description>
                 <ul>
