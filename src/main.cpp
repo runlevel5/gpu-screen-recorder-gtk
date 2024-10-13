@@ -3810,6 +3810,9 @@ static void load_config() {
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         config.main_config.software_encoding_warning_shown = true;
+        video_codec_selection_menu_set_active_id("h264_software");
+        config.main_config.advanced_view = true;
+        gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), "advanced");
     }
 
     if(gsr_info.system_info.is_steam_deck && !config.main_config.steam_deck_warning_shown)  {
