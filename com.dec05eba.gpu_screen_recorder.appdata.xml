@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.2.2" date="2024-10-15">
+            <description>
+                <ul>
+                    <li>Enable amd low latency mode (only available since mesa 24.1.4, released in july 17, 2024). This reduces stutter in video in some cases but increases power usage when idle</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.2.1" date="2024-10-12">
             <description>
                 <ul>
