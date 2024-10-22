@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.2.4" date="2024-10-22">
+            <description>
+                <ul>
+                    <li>Fix capture not working if one of the audio inputs is a virtual audio device with forward slash in its name, for example if NoiseTorch is used</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.2.2" date="2024-10-15">
             <description>
                 <ul>
