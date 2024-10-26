@@ -23,9 +23,12 @@ struct MainConfig {
     std::string record_area_option;
     int32_t record_area_width = 0;
     int32_t record_area_height = 0;
+    int32_t video_width = 0;
+    int32_t video_height = 0;
     int32_t fps = 60;
     int32_t video_bitrate = 5000;
     bool merge_audio_tracks = true;
+    bool change_video_resolution = false;
     std::vector<std::string> audio_input;
     std::string color_range;
     std::string quality;
@@ -305,9 +308,12 @@ static std::map<std::string, ConfigValue> get_config_options(Config &config) {
         {"main.record_area_option", {CONFIG_TYPE_STRING, &config.main_config.record_area_option}},
         {"main.record_area_width", {CONFIG_TYPE_I32, &config.main_config.record_area_width}},
         {"main.record_area_height", {CONFIG_TYPE_I32, &config.main_config.record_area_height}},
+        {"main.video_width", {CONFIG_TYPE_I32, &config.main_config.video_width}},
+        {"main.video_height", {CONFIG_TYPE_I32, &config.main_config.video_height}},
         {"main.fps", {CONFIG_TYPE_I32, &config.main_config.fps}},
         {"main.video_bitrate", {CONFIG_TYPE_I32, &config.main_config.video_bitrate}},
         {"main.merge_audio_tracks", {CONFIG_TYPE_BOOL, &config.main_config.merge_audio_tracks}},
+        {"main.change_video_resolution", {CONFIG_TYPE_BOOL, &config.main_config.change_video_resolution}},
         {"main.audio_input", {CONFIG_TYPE_STRING_ARRAY, &config.main_config.audio_input}},
         {"main.color_range", {CONFIG_TYPE_STRING, &config.main_config.color_range}},
         {"main.quality", {CONFIG_TYPE_STRING, &config.main_config.quality}},

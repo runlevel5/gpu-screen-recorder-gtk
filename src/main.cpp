@@ -52,10 +52,13 @@ static PageNavigationUserdata page_navigation_userdata;
 static Cursor crosshair_cursor;
 static GtkSpinButton *fps_entry;
 static GtkSpinButton *video_bitrate_entry;
-static GtkLabel *area_size_label;
 static GtkGrid *area_size_grid;
+static GtkWidget *change_video_resolution_button;
+static GtkGrid *video_resolution_grid;
 static GtkSpinButton *area_width_entry;
 static GtkSpinButton *area_height_entry;
+static GtkSpinButton *video_width_entry;
+static GtkSpinButton *video_height_entry;
 static GtkComboBox *record_area_selection_menu;
 static GtkTreeModel *record_area_selection_model;
 static GtkComboBoxText *quality_input_menu;
@@ -855,9 +858,12 @@ static void save_configs() {
         config.main_config.record_area_width = gtk_spin_button_get_value_as_int(area_width_entry);
         config.main_config.record_area_height = gtk_spin_button_get_value_as_int(area_height_entry);
     }
+    config.main_config.video_width = gtk_spin_button_get_value_as_int(video_width_entry);
+    config.main_config.video_height = gtk_spin_button_get_value_as_int(video_height_entry);
     config.main_config.fps = gtk_spin_button_get_value_as_int(fps_entry);
     config.main_config.video_bitrate = gtk_spin_button_get_value_as_int(video_bitrate_entry);
     config.main_config.merge_audio_tracks = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button));
+    config.main_config.change_video_resolution = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(change_video_resolution_button));
 
     config.main_config.audio_input.clear();
     for_each_used_audio_input(GTK_LIST_BOX(audio_input_used_list), [](const AudioRow *audio_row) {
@@ -1065,6 +1071,13 @@ static gboolean on_select_window_button_click(GtkButton *button, gpointer) {
         //g_application_send_notification(app, "select-window", notification);
     }
 
+    return true;
+}
+
+static gboolean on_change_video_resolution_button_click(GtkButton *button, gpointer) {
+    const bool clicked = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(button));
+    const std::string window_str = record_area_selection_menu_get_active_id();
+    gtk_widget_set_visible(GTK_WIDGET(video_resolution_grid), clicked && window_str != "focused");
     return true;
 }
 
@@ -1630,8 +1643,6 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
 
     const int fps = gtk_spin_button_get_value_as_int(fps_entry);
     const int replay_time = gtk_spin_button_get_value_as_int(replay_time_entry);
-    const int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    const int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     char dir_tmp[PATH_MAX];
     strcpy(dir_tmp, dir);
@@ -1652,8 +1663,9 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     } else if(window_str == "focused") {
         follow_focused = true;
     }
-    std::string fps_str = std::to_string(fps);
-    std::string replay_time_str = std::to_string(replay_time);
+    const std::string fps_str = std::to_string(fps);
+    const std::string replay_time_str = std::to_string(replay_time);
+    const bool change_video_resolution = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(change_video_resolution_button));
 
     const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(replay_container));
     const gchar* color_range_input_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(color_range_input_menu));
@@ -1663,6 +1675,9 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
     const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
     const std::string video_bitrate_str = std::to_string(gtk_spin_button_get_value_as_int(video_bitrate_entry));
+
+    const int record_width = follow_focused ? gtk_spin_button_get_value_as_int(area_width_entry) : gtk_spin_button_get_value_as_int(video_width_entry);
+    const int record_height = follow_focused ? gtk_spin_button_get_value_as_int(area_height_entry) : gtk_spin_button_get_value_as_int(video_height_entry);
 
     const char *encoder = "gpu";
     std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
@@ -1696,7 +1711,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
     std::string merge_audio_tracks_arg_value;
     add_audio_command_line_args(args, merge_audio_tracks_arg_value);
 
-    if(follow_focused)
+    if(follow_focused || change_video_resolution)
         args.insert(args.end(), { "-s", area });
 
     args.push_back(NULL);
@@ -1830,8 +1845,6 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     save_configs();
 
     const int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    const int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    const int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     bool follow_focused = false;
     std::string window_str = record_area_selection_menu_get_active_id();
@@ -1845,7 +1858,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         follow_focused = true;
     }
 
-    std::string fps_str = std::to_string(fps);
+    const std::string fps_str = std::to_string(fps);
+    const bool change_video_resolution = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(change_video_resolution_button));
 
     const gchar* container_str = gtk_combo_box_get_active_id(GTK_COMBO_BOX(record_container));
     const gchar* container_name = gtk_combo_box_text_get_active_text(record_container);
@@ -1856,6 +1870,9 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     const bool record_cursor = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_cursor_button));
     const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
     const std::string video_bitrate_str = std::to_string(gtk_spin_button_get_value_as_int(video_bitrate_entry));
+
+    const int record_width = follow_focused ? gtk_spin_button_get_value_as_int(area_width_entry) : gtk_spin_button_get_value_as_int(video_width_entry);
+    const int record_height = follow_focused ? gtk_spin_button_get_value_as_int(area_height_entry) : gtk_spin_button_get_value_as_int(video_height_entry);
 
     const char *encoder = "gpu";
     std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
@@ -1899,7 +1916,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
     std::string merge_audio_tracks_arg_value;
     add_audio_command_line_args(args, merge_audio_tracks_arg_value);
 
-    if(follow_focused)
+    if(follow_focused || change_video_resolution)
         args.insert(args.end(), { "-s", area });
 
     args.push_back(NULL);
@@ -1988,8 +2005,6 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     save_configs();
 
     const int fps = gtk_spin_button_get_value_as_int(fps_entry);
-    const int record_width = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_width_entry);
-    const int record_height = gsr_info.system_info.display_server == DisplayServer::WAYLAND ? 0 : gtk_spin_button_get_value_as_int(area_height_entry);
 
     bool follow_focused = false;
     std::string window_str = record_area_selection_menu_get_active_id();
@@ -2002,7 +2017,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     } else if(window_str == "focused") {
         follow_focused = true;
     }
-    std::string fps_str = std::to_string(fps);
+    const std::string fps_str = std::to_string(fps);
+    const bool change_video_resolution = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(change_video_resolution_button));
 
     std::string stream_url;
     const gchar *container_str = "flv";
@@ -2044,6 +2060,9 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     const bool restore_portal_session = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(restore_portal_session_button));
     const std::string video_bitrate_str = std::to_string(gtk_spin_button_get_value_as_int(video_bitrate_entry));
 
+    const int record_width = follow_focused ? gtk_spin_button_get_value_as_int(area_width_entry) : gtk_spin_button_get_value_as_int(video_width_entry);
+    const int record_height = follow_focused ? gtk_spin_button_get_value_as_int(area_height_entry) : gtk_spin_button_get_value_as_int(video_height_entry);
+
     const char *encoder = "gpu";
     std::string video_codec_input_str = video_codec_selection_menu_get_active_id();
     if(video_codec_input_str == "h264_software") {
@@ -2076,7 +2095,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
     std::string merge_audio_tracks_arg_value;
     add_audio_command_line_args(args, merge_audio_tracks_arg_value);
 
-    if(follow_focused)
+    if(follow_focused || change_video_resolution)
         args.insert(args.end(), { "-s", area });
 
     args.push_back(NULL);
@@ -2156,9 +2175,10 @@ static void record_area_item_change_callback(GtkComboBox *widget, gpointer userd
     (void)userdata;
     const std::string selected_window_area = record_area_selection_menu_get_active_id();
     gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(selected_window_area.c_str(), "window") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(selected_window_area.c_str(), "focused") == 0);
     gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(selected_window_area.c_str(), "focused") == 0);
     gtk_widget_set_visible(GTK_WIDGET(restore_portal_session_button), strcmp(selected_window_area.c_str(), "portal") == 0);
+    gtk_widget_set_visible(GTK_WIDGET(change_video_resolution_button), strcmp(selected_window_area.c_str(), "focused") != 0);
+    on_change_video_resolution_button_click(GTK_BUTTON(change_video_resolution_button), nullptr);
     enable_stream_record_button_if_info_filled();
 }
 
@@ -2717,24 +2737,55 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     g_signal_connect(select_window_button, "clicked", G_CALLBACK(on_select_window_button_click), app);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(select_window_button), 0, record_area_row++, 3, 1);
 
-    area_size_label = GTK_LABEL(gtk_label_new("Area size: "));
-    gtk_label_set_xalign(area_size_label, 0.0f);
-    gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_label), 0, record_area_row++, 2, 1);
+    change_video_resolution_button = gtk_check_button_new_with_label("Change video resolution");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(change_video_resolution_button), false);
+    gtk_widget_set_halign(change_video_resolution_button, GTK_ALIGN_START);
+    g_signal_connect(change_video_resolution_button, "clicked", G_CALLBACK(on_change_video_resolution_button_click), app);
+    gtk_grid_attach(record_area_grid, change_video_resolution_button, 0, record_area_row++, 3, 1);
 
-    area_size_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
+    {
+        area_size_grid = GTK_GRID(gtk_grid_new());
+        gtk_grid_set_row_spacing(area_size_grid, 10);
+        gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
 
-    area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
-    gtk_spin_button_set_value(area_width_entry, 1920.0);
-    gtk_widget_set_hexpand(GTK_WIDGET(area_width_entry), true);
-    gtk_grid_attach(area_size_grid, GTK_WIDGET(area_width_entry), 0, 0, 1, 1);
+        GtkLabel *video_resolution_label = GTK_LABEL(gtk_label_new("Video resolution: "));
+        gtk_label_set_xalign(video_resolution_label, 0.0f);
+        gtk_grid_attach(area_size_grid, GTK_WIDGET(video_resolution_label), 0, 0, 3, 1);
 
-    gtk_grid_attach(area_size_grid, gtk_label_new("x"), 1, 0, 1, 1);
+        area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        gtk_spin_button_set_value(area_width_entry, 1920.0);
+        gtk_widget_set_hexpand(GTK_WIDGET(area_width_entry), true);
+        gtk_grid_attach(area_size_grid, GTK_WIDGET(area_width_entry), 0, 1, 1, 1);
 
-    area_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
-    gtk_spin_button_set_value(area_height_entry, 1080.0);
-    gtk_widget_set_hexpand(GTK_WIDGET(area_height_entry), true);
-    gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 0, 1, 1);
+        gtk_grid_attach(area_size_grid, gtk_label_new("x"), 1, 1, 1, 1);
+
+        area_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        gtk_spin_button_set_value(area_height_entry, 1080.0);
+        gtk_widget_set_hexpand(GTK_WIDGET(area_height_entry), true);
+        gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 1, 1, 1);
+    }
+
+    {
+        video_resolution_grid = GTK_GRID(gtk_grid_new());
+        gtk_grid_set_row_spacing(video_resolution_grid, 10);
+        gtk_grid_attach(record_area_grid, GTK_WIDGET(video_resolution_grid), 0, record_area_row++, 3, 1);
+
+        GtkLabel *video_resolution_label = GTK_LABEL(gtk_label_new("Video resolution: "));
+        gtk_label_set_xalign(video_resolution_label, 0.0f);
+        gtk_grid_attach(video_resolution_grid, GTK_WIDGET(video_resolution_label), 0, 0, 3, 1);
+
+        video_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        gtk_spin_button_set_value(video_width_entry, 1920.0);
+        gtk_widget_set_hexpand(GTK_WIDGET(video_width_entry), true);
+        gtk_grid_attach(video_resolution_grid, GTK_WIDGET(video_width_entry), 0, 1, 1, 1);
+
+        gtk_grid_attach(video_resolution_grid, gtk_label_new("x"), 1, 1, 1, 1);
+
+        video_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        gtk_spin_button_set_value(video_height_entry, 1080.0);
+        gtk_widget_set_hexpand(GTK_WIDGET(video_height_entry), true);
+        gtk_grid_attach(video_resolution_grid, GTK_WIDGET(video_height_entry), 2, 1, 1, 1);
+    }
 
     restore_portal_session_button = gtk_check_button_new_with_label("Restore portal session");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(restore_portal_session_button), true);
@@ -3693,8 +3744,7 @@ static void load_config() {
     }
 
     gtk_widget_set_visible(GTK_WIDGET(select_window_button), strcmp(config.main_config.record_area_option.c_str(), "window") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(area_size_label), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
-    gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
+    //gtk_widget_set_visible(GTK_WIDGET(area_size_grid), strcmp(config.main_config.record_area_option.c_str(), "focused") == 0);
     gtk_widget_set_visible(GTK_WIDGET(restore_portal_session_button), strcmp(config.main_config.record_area_option.c_str(), "portal") == 0);
 
     if(config.main_config.record_area_width == 0)
@@ -3702,6 +3752,12 @@ static void load_config() {
 
     if(config.main_config.record_area_height == 0)
         config.main_config.record_area_height = 1080;
+
+    if(config.main_config.video_width == 0)
+        config.main_config.video_width = 1920;
+
+    if(config.main_config.video_height == 0)
+        config.main_config.video_height = 1080;
 
     if(config.main_config.fps == 0)
         config.main_config.fps = 60;
@@ -3741,9 +3797,12 @@ static void load_config() {
         gtk_spin_button_set_value(area_width_entry, config.main_config.record_area_width);
         gtk_spin_button_set_value(area_height_entry, config.main_config.record_area_height);
     }
+    gtk_spin_button_set_value(video_width_entry, config.main_config.video_width);
+    gtk_spin_button_set_value(video_height_entry, config.main_config.video_height);
     gtk_spin_button_set_value(fps_entry, config.main_config.fps);
     gtk_spin_button_set_value(video_bitrate_entry, config.main_config.video_bitrate);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button), config.main_config.merge_audio_tracks);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(change_video_resolution_button), config.main_config.change_video_resolution);
 
     for(const std::string &audio_input : config.main_config.audio_input) {
         add_audio_input_track(audio_input.c_str());
@@ -3796,8 +3855,10 @@ static void load_config() {
         gtk_widget_set_visible(streaming_start_stop_hotkey.hotkey_active_label, false);
         gtk_widget_set_visible(replay_start_stop_hotkey.hotkey_active_label, false);
     }
-    enable_stream_record_button_if_info_filled();
+    record_area_item_change_callback(nullptr, nullptr);
     stream_service_item_change_callback(GTK_COMBO_BOX(stream_service_input_menu), nullptr);
+
+    on_change_video_resolution_button_click(GTK_BUTTON(change_video_resolution_button), nullptr);
 
     std::string dummy;
     if(!config.main_config.software_encoding_warning_shown && !switch_video_codec_to_usable_hardware_encoder(dummy)) {
@@ -4021,20 +4082,6 @@ static void activate(GtkApplication *app, gpointer) {
 
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
-
-    // Stop nvidia driver from buffering frames
-    setenv("__GL_MaxFramesAllowed", "1", true);
-    // If this is set to 1 then cuGraphicsGLRegisterImage will fail for egl context with error: invalid OpenGL or DirectX context,
-    // so we overwrite it
-    setenv("__GL_THREADED_OPTIMIZATIONS", "0", true);
-    // Some people set this to nvidia (for nvdec) or vdpau (for nvidia vdpau), which breaks gpu screen recorder since
-    // nvidia doesn't support vaapi and nvidia-vaapi-driver doesn't support encoding yet.
-    // Let vaapi find the match vaapi driver instead of forcing a specific one.
-    unsetenv("LIBVA_DRIVER_NAME");
-    // Some people set this to force all applications to vsync on nvidia, but this makes eglSwapBuffers never return.
-    unsetenv("__GL_SYNC_TO_VBLANK");
-    // Same as above, but for amd/intel
-    unsetenv("vblank_mode");
 
     dpy = XOpenDisplay(NULL);
     gsr_info_exit_status = get_gpu_screen_recorder_info(&gsr_info);
