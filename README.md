@@ -2,7 +2,7 @@
 
 # GPU Screen Recorder GTK
 GTK frontend for [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).\
-There is an new alternative UI for GPU Screen Recorder in the style of ShadowPlay available here: [GPU Screen Recorder UI](https://git.dec05eba.com/gpu-screen-recorder-ui/).
+There is a new alternative UI for GPU Screen Recorder in the style of ShadowPlay available here: [GPU Screen Recorder UI](https://git.dec05eba.com/gpu-screen-recorder-ui/).
 
 # Installation
 This program depends on [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
