@@ -1,14 +1,8 @@
 ![](https://dec05eba.com/images/gpu_screen_recorder_logo_small.png)
 
-GTK frontend for [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
-
-This is a screen recorder that has minimal impact on system performance by recording your monitor using the GPU only,
-similar to shadowplay on windows. This is the fastest screen recording tool for Linux.
-
-This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia shadowplay-like instant replay,
-where only the last few minutes are saved.
-
-More info at [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).
+# GPU Screen Recorder GTK
+GTK frontend for [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).\
+There is an new alternative UI for GPU Screen Recorder in the style of ShadowPlay available here: [GPU Screen Recorder UI](https://git.dec05eba.com/gpu-screen-recorder-ui/).
 
 # Installation
 This program depends on [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/) which needs to be installed first.\
@@ -28,7 +22,7 @@ These are the dependencies needed to build GPU Screen Recorder GTK:
 ## Runtime dependencies
 There are also additional dependencies needed at runtime:
 
-* [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/)
+* [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/)
 
 # Screenshots
 ![](https://www.dec05eba.com/images/gpu-screen-recorder.png)

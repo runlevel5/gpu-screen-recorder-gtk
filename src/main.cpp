@@ -2748,7 +2748,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_grid_set_row_spacing(area_size_grid, 10);
         gtk_grid_attach(record_area_grid, GTK_WIDGET(area_size_grid), 0, record_area_row++, 3, 1);
 
-        GtkLabel *video_resolution_label = GTK_LABEL(gtk_label_new("Video resolution: "));
+        GtkLabel *video_resolution_label = GTK_LABEL(gtk_label_new("Video resolution limit: "));
         gtk_label_set_xalign(video_resolution_label, 0.0f);
         gtk_grid_attach(area_size_grid, GTK_WIDGET(video_resolution_label), 0, 0, 3, 1);
 
