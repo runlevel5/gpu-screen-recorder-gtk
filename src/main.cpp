@@ -919,8 +919,7 @@ static void show_notification(GtkApplication *app, const char *title, const char
 
     // KDE doesn't show notifications when using desktop portal capture unless either DoNotDisturb.WhenScreenSharing kde config
     // has been changed by the user or if the priority for the notification is set as urgent
-    const std::string recording_window = record_area_selection_menu_get_active_id();
-    if((recording || replaying || streaming) && wayland_compositor == WaylandCompositor::KDE && recording_window == "portal")
+    if((recording || replaying || streaming) && wayland_compositor == WaylandCompositor::KDE)
         priority = G_NOTIFICATION_PRIORITY_URGENT;
 
     fprintf(stderr, "Notification: title: %s, body: %s\n", title, body);
@@ -988,7 +987,6 @@ static Window window_get_target_window_child(Display *display, Window _window) {
     return found_window;
 }
 
-/* TODO: Look at xwininfo source to figure out how to make this work for different types of window managers */
 static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent*, gpointer userdata) {
     SelectWindowUserdata *_select_window_userdata = (SelectWindowUserdata*)userdata;
     XEvent *ev = (XEvent*)xevent;
@@ -1361,13 +1359,13 @@ static bool show_pkexec_flatpak_error_if_needed() {
             if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                     "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland when not using the portal option. To install GPU Screen recorder system-wide, you can run this command:\n"
-                    "flatpak install flathub --system com.dec05eba.gpu_screen_recorder\n");
+                    "flatpak install --system com.dec05eba.gpu_screen_recorder\n");
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
             } else {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                     "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel when not using the portal option. To install GPU Screen recorder system-wide, you can run this command:\n"
-                    "flatpak install flathub --system com.dec05eba.gpu_screen_recorder\n"
+                    "flatpak install --system com.dec05eba.gpu_screen_recorder\n"
                     "Alternatively, record a single window which doesn't have this restriction.");
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
@@ -1832,7 +1830,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         } else if(exit_status == 60) {
             // Canceled by the user
         } else if(!exit_success || (already_dead && exit_status != 0)) {
-            show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video. Run GPU Screen Recorder from the terminal to see more information when this failure happens", G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "Failed to save video. Either your graphics card doesn't support GPU Screen Recorder with the settings you used or you don't have enough disk space to record a video. Start this GPU Screen Recorder GUI application from the terminal to see more information when this failure happens", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_success) {
             if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_recording_saved_notification_button))) {
                 const std::string notification_body = std::string("The recording was saved to ") + record_file_current_filename;
@@ -2849,10 +2847,10 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(grid, GTK_WIDGET(video_quality_grid), 0, grid_row++, 2, 1);
     gtk_grid_attach(video_quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
     quality_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(quality_input_menu, "custom", "Custom (Constant bitrate, recommended for live streaming)");
+    gtk_combo_box_text_append(quality_input_menu, "custom", "Constant bitrate (Recommended for live streaming and replay)");
     gtk_combo_box_text_append(quality_input_menu, "medium", "Medium");
     gtk_combo_box_text_append(quality_input_menu, "high", "High");
-    gtk_combo_box_text_append(quality_input_menu, "very_high", "Very High (Recommended)");
+    gtk_combo_box_text_append(quality_input_menu, "very_high", "Very High (Recommended for recording)");
     gtk_combo_box_text_append(quality_input_menu, "ultra", "Ultra");
     gtk_widget_set_hexpand(GTK_WIDGET(quality_input_menu), true);
     gtk_grid_attach(video_quality_grid, GTK_WIDGET(quality_input_menu), 1, 0, 1, 1);
