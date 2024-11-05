@@ -26,7 +26,7 @@ struct MainConfig {
     int32_t video_width = 0;
     int32_t video_height = 0;
     int32_t fps = 60;
-    int32_t video_bitrate = 5000;
+    int32_t video_bitrate = 15000;
     bool merge_audio_tracks = true;
     bool change_video_resolution = false;
     std::vector<std::string> audio_input;
