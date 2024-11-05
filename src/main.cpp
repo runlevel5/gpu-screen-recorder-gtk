@@ -4004,6 +4004,21 @@ static void activate(GtkApplication *app, gpointer) {
     gtk_window_set_title(GTK_WINDOW(window), window_title.c_str());
     gtk_window_set_resizable(GTK_WINDOW(window), false);
 
+    GtkIconTheme *icon_theme = gtk_icon_theme_get_default();
+#ifdef GSR_ICONS_PATH
+    const char *icon_path = GSR_ICONS_PATH;
+#else
+    const char *icon_path = "/usr/share/icons";
+#endif
+    gtk_icon_theme_set_search_path(icon_theme, &icon_path, 1);
+
+    const char *icon_name = "com.dec05eba.gpu_screen_recorder";
+    if(!gtk_icon_theme_has_icon(icon_theme, icon_name))
+        fprintf(stderr, "Error: failed to find icon %s in %s\n", icon_name, icon_path);
+
+    gtk_window_set_default_icon_name(icon_name);
+    gtk_window_set_icon_name(GTK_WINDOW(window), icon_name);
+
     select_window_userdata.app = app;
     audio_inputs = get_audio_devices();
 

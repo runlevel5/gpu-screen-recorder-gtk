@@ -18,15 +18,23 @@ dep = [
     dependency('ayatana-appindicator3-0.1'),
 ]
 
-add_project_arguments('-DGSR_VERSION="' + meson.project_version() + '"', language: ['c', 'cpp'])
-
-executable('gpu-screen-recorder-gtk', src, dependencies : dep, install : true)
-
 prefix = get_option('prefix')
 datadir = get_option('datadir')
+icons_path = join_paths(prefix, datadir, 'icons')
+
+executable('gpu-screen-recorder-gtk',
+    src,
+    dependencies : dep,
+    install : true,
+    cpp_args : [
+        '-DGSR_ICONS_PATH="' + icons_path + '"',
+        '-DGSR_VERSION="' + meson.project_version() + '"'
+    ]
+)
+
 install_data(files('com.dec05eba.gpu_screen_recorder.desktop'), install_dir : join_paths(prefix, datadir, 'applications'))
 install_data(files('com.dec05eba.gpu_screen_recorder.appdata.xml'), install_dir : join_paths(prefix, datadir, 'metainfo'))
-install_subdir('icons/hicolor', install_dir : join_paths(prefix, datadir, 'icons'))
+install_subdir('icons/hicolor', install_dir : icons_path)
 
 gnome = import('gnome')
 gnome.post_install(gtk_update_icon_cache : true, update_desktop_database : true)
