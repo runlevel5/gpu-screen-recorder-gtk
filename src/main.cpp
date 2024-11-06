@@ -4107,7 +4107,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    GtkApplication *app = gtk_application_new("com.dec05eba.gpu_screen_recorder", G_APPLICATION_NON_UNIQUE);
+    char app_id[] = "com.dec05eba.gpu_screen_recorder";
+    argv[0] = app_id;
+
+    GtkApplication *app = gtk_application_new(app_id, G_APPLICATION_NON_UNIQUE);
     g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
     int status = g_application_run(G_APPLICATION(app), argc, argv);
     g_object_unref(app);
