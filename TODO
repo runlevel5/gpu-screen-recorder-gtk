@@ -62,3 +62,7 @@ Start recording after showing start recording notification has disappeared, not 
 Use modprobe command. modprobe on system startup in modprobe.d directory is only available for udev, other systems need to add it to linux kernel boot parameters (is this also needed for nvidia open kernel module driver?).
 
 Save gpu screen recorder status in $XDG_RUNTIME_DIR.
+
+Add option to capture application audio. This should show a popup where you can use one of the available applications or a custom one and choose to record that application or all applications except that one.
+
+Add profile option. Convert view to profile, add an option at the bottom that says "Edit profiles..." which should show a popup where you can create/remove profiles. New profiles should always be in advanced view.

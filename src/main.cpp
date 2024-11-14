@@ -98,6 +98,7 @@ static GtkWidget *replay_start_stop_hotkey_button;
 static GtkWidget *replay_save_hotkey_button;
 static GtkWidget *streaming_start_stop_hotkey_button;
 static GtkWidget *merge_audio_tracks_button;
+static GtkFrame *notifications_frame;
 static GtkWidget *show_recording_started_notification_button;
 static GtkWidget *show_recording_stopped_notification_button;
 static GtkWidget *show_recording_saved_notification_button;
@@ -2189,9 +2190,7 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     gtk_widget_set_visible(GTK_WIDGET(audio_codec_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(framerate_mode_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(overclock_grid), advanced_view && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA && gsr_info.system_info.display_server != DisplayServer::WAYLAND);
-    gtk_widget_set_visible(GTK_WIDGET(show_recording_started_notification_button), advanced_view);
-    gtk_widget_set_visible(GTK_WIDGET(show_recording_stopped_notification_button), advanced_view);
-    gtk_widget_set_visible(GTK_WIDGET(show_recording_saved_notification_button), advanced_view);
+    gtk_widget_set_visible(GTK_WIDGET(notifications_frame), advanced_view);
 }
 
 static void quality_combo_box_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -2621,6 +2620,8 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     int grid_row = 0;
     int record_area_row = 0;
     int audio_input_area_row = 0;
+    int video_input_area_row = 0;
+    int notifications_area_row = 0;
 
     GtkGrid *simple_advanced_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(simple_advanced_grid), 0, grid_row++, 2, 1);
@@ -2633,8 +2634,8 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
 
-    GtkFrame *record_area_frame = GTK_FRAME(gtk_frame_new("Record area"));
-    gtk_grid_attach(grid, GTK_WIDGET(record_area_frame), 0, grid_row++, 2, 1);
+    GtkFrame *capture_target_frame = GTK_FRAME(gtk_frame_new("Capture target"));
+    gtk_grid_attach(grid, GTK_WIDGET(capture_target_frame), 0, grid_row++, 2, 1);
 
     GtkGrid *record_area_grid = GTK_GRID(gtk_grid_new());
     gtk_widget_set_vexpand(GTK_WIDGET(record_area_grid), false);
@@ -2642,7 +2643,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_set_row_spacing(record_area_grid, 10);
     gtk_grid_set_column_spacing(record_area_grid, 10);
     gtk_widget_set_margin(GTK_WIDGET(record_area_grid), 10, 10, 10, 10);
-    gtk_container_add(GTK_CONTAINER(record_area_frame), GTK_WIDGET(record_area_grid));
+    gtk_container_add(GTK_CONTAINER(capture_target_frame), GTK_WIDGET(record_area_grid));
 
     GtkListStore *store = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_STRING);
     GtkTreeIter iter;
@@ -2825,26 +2826,29 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_halign(merge_audio_tracks_button, GTK_ALIGN_START);
     gtk_grid_attach(audio_grid, merge_audio_tracks_button, 0, audio_input_area_row++, 2, 1);
 
-    GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(fps_grid), 0, grid_row++, 2, 1);
-    gtk_grid_attach(fps_grid, gtk_label_new("Frame rate: "), 0, 0, 1, 1);
-    fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 5000.0, 1.0));
-    gtk_spin_button_set_value(fps_entry, 60.0);
-    gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
-    gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
+    audio_codec_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(audio_grid, GTK_WIDGET(audio_codec_grid), 0, audio_input_area_row++, 2, 1);
+    gtk_grid_attach(audio_codec_grid, gtk_label_new("Audio codec: "), 0, 0, 1, 1);
+    audio_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(audio_codec_input_menu, "opus", "Opus (Recommended)");
+    gtk_combo_box_text_append(audio_codec_input_menu, "aac", "AAC");
+    gtk_widget_set_hexpand(GTK_WIDGET(audio_codec_input_menu), true);
+    gtk_grid_attach(audio_codec_grid, GTK_WIDGET(audio_codec_input_menu), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(audio_codec_input_menu), 0);
 
-    color_range_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(color_range_grid), 0, grid_row++, 2, 1);
-    gtk_grid_attach(color_range_grid, gtk_label_new("Color range: "), 0, 0, 1, 1);
-    color_range_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(color_range_input_menu, "limited", "Limited");
-    gtk_combo_box_text_append(color_range_input_menu, "full", "Full");
-    gtk_widget_set_hexpand(GTK_WIDGET(color_range_input_menu), true);
-    gtk_grid_attach(color_range_grid, GTK_WIDGET(color_range_input_menu), 1, 0, 1, 1);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(color_range_input_menu), 0);
+    GtkFrame *video_input_frame = GTK_FRAME(gtk_frame_new("Video"));
+    gtk_grid_attach(grid, GTK_WIDGET(video_input_frame), 0, grid_row++, 2, 1);
+
+    GtkGrid *video_grid = GTK_GRID(gtk_grid_new());
+    gtk_widget_set_vexpand(GTK_WIDGET(video_grid), false);
+    gtk_widget_set_hexpand(GTK_WIDGET(video_grid), true);
+    gtk_grid_set_row_spacing(video_grid, 10);
+    gtk_grid_set_column_spacing(video_grid, 10);
+    gtk_widget_set_margin(GTK_WIDGET(video_grid), 10, 10, 10, 10);
+    gtk_container_add(GTK_CONTAINER(video_input_frame), GTK_WIDGET(video_grid));
 
     GtkGrid *video_quality_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(video_quality_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_grid, GTK_WIDGET(video_quality_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(video_quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
     quality_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(quality_input_menu, "custom", "Constant bitrate (Recommended for live streaming and replay)");
@@ -2858,7 +2862,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     g_signal_connect(quality_input_menu, "changed", G_CALLBACK(quality_combo_box_change_callback), quality_input_menu);
 
     video_bitrate_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(video_bitrate_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_grid, GTK_WIDGET(video_bitrate_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(video_bitrate_grid, gtk_label_new("Video bitrate (kbps): "), 0, 0, 1, 1);
     video_bitrate_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 500000.0, 1.0));
     gtk_spin_button_set_value(video_bitrate_entry, 15000.0);
@@ -2866,7 +2870,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_bitrate_grid, GTK_WIDGET(video_bitrate_entry), 1, 0, 1, 1);
 
     video_codec_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(video_codec_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_grid, GTK_WIDGET(video_codec_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(video_codec_grid, gtk_label_new("Video codec: "), 0, 0, 1, 1);
 
     {
@@ -2940,18 +2944,26 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_grid_attach(video_codec_grid, GTK_WIDGET(video_codec_selection_menu), 1, 0, 1, 1);
     }
 
-    audio_codec_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(audio_codec_grid), 0, grid_row++, 2, 1);
-    gtk_grid_attach(audio_codec_grid, gtk_label_new("Audio codec: "), 0, 0, 1, 1);
-    audio_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
-    gtk_combo_box_text_append(audio_codec_input_menu, "opus", "Opus (Recommended)");
-    gtk_combo_box_text_append(audio_codec_input_menu, "aac", "AAC");
-    gtk_widget_set_hexpand(GTK_WIDGET(audio_codec_input_menu), true);
-    gtk_grid_attach(audio_codec_grid, GTK_WIDGET(audio_codec_input_menu), 1, 0, 1, 1);
-    gtk_combo_box_set_active(GTK_COMBO_BOX(audio_codec_input_menu), 0);
+    color_range_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(video_grid, GTK_WIDGET(color_range_grid), 0, video_input_area_row++, 2, 1);
+    gtk_grid_attach(color_range_grid, gtk_label_new("Color range: "), 0, 0, 1, 1);
+    color_range_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    gtk_combo_box_text_append(color_range_input_menu, "limited", "Limited");
+    gtk_combo_box_text_append(color_range_input_menu, "full", "Full");
+    gtk_widget_set_hexpand(GTK_WIDGET(color_range_input_menu), true);
+    gtk_grid_attach(color_range_grid, GTK_WIDGET(color_range_input_menu), 1, 0, 1, 1);
+    gtk_combo_box_set_active(GTK_COMBO_BOX(color_range_input_menu), 0);
+
+    GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
+    gtk_grid_attach(video_grid, GTK_WIDGET(fps_grid), 0, video_input_area_row++, 2, 1);
+    gtk_grid_attach(fps_grid, gtk_label_new("Frame rate: "), 0, 0, 1, 1);
+    fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 5000.0, 1.0));
+    gtk_spin_button_set_value(fps_entry, 60.0);
+    gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
+    gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
 
     framerate_mode_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(framerate_mode_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_grid, GTK_WIDGET(framerate_mode_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(framerate_mode_grid, gtk_label_new("Frame rate mode: "), 0, 0, 1, 1);
     framerate_mode_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     gtk_combo_box_text_append(framerate_mode_input_menu, "auto", "Auto (Recommended)");
@@ -2962,7 +2974,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_combo_box_set_active(GTK_COMBO_BOX(framerate_mode_input_menu), 0);
 
     overclock_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(overclock_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_grid, GTK_WIDGET(overclock_grid), 0, video_input_area_row++, 2, 1);
     overclock_button = gtk_check_button_new_with_label("Overclock memory transfer rate to workaround NVIDIA driver performance bug");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(overclock_button), false);
     gtk_widget_set_halign(overclock_button, GTK_ALIGN_START);
@@ -2991,22 +3003,33 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     record_cursor_button = gtk_check_button_new_with_label("Record cursor");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_cursor_button), true);
     gtk_widget_set_halign(record_cursor_button, GTK_ALIGN_START);
-    gtk_grid_attach(grid, record_cursor_button, 0, grid_row++, 2, 1);
+    gtk_grid_attach(video_grid, record_cursor_button, 0, video_input_area_row++, 2, 1);
+
+    notifications_frame = GTK_FRAME(gtk_frame_new("Notifications"));
+    gtk_grid_attach(grid, GTK_WIDGET(notifications_frame), 0, grid_row++, 2, 1);
+
+    GtkGrid *notifications_grid = GTK_GRID(gtk_grid_new());
+    gtk_widget_set_vexpand(GTK_WIDGET(notifications_grid), false);
+    gtk_widget_set_hexpand(GTK_WIDGET(notifications_grid), true);
+    gtk_grid_set_row_spacing(notifications_grid, 10);
+    gtk_grid_set_column_spacing(notifications_grid, 10);
+    gtk_widget_set_margin(GTK_WIDGET(notifications_grid), 10, 10, 10, 10);
+    gtk_container_add(GTK_CONTAINER(notifications_frame), GTK_WIDGET(notifications_grid));
 
     show_recording_started_notification_button = gtk_check_button_new_with_label("Show recording/streaming/replay started notification");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_started_notification_button), false);
     gtk_widget_set_halign(show_recording_started_notification_button, GTK_ALIGN_START);
-    gtk_grid_attach(grid, show_recording_started_notification_button, 0, grid_row++, 2, 1);
+    gtk_grid_attach(notifications_grid, show_recording_started_notification_button, 0, notifications_area_row++, 2, 1);
 
     show_recording_stopped_notification_button = gtk_check_button_new_with_label("Show streaming/replay stopped notification");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_stopped_notification_button), false);
     gtk_widget_set_halign(show_recording_stopped_notification_button, GTK_ALIGN_START);
-    gtk_grid_attach(grid, show_recording_stopped_notification_button, 0, grid_row++, 2, 1);
+    gtk_grid_attach(notifications_grid, show_recording_stopped_notification_button, 0, notifications_area_row++, 2, 1);
 
     show_recording_saved_notification_button = gtk_check_button_new_with_label("Show video saved notification");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_recording_saved_notification_button), true);
     gtk_widget_set_halign(show_recording_saved_notification_button, GTK_ALIGN_START);
-    gtk_grid_attach(grid, show_recording_saved_notification_button, 0, grid_row++, 2, 1);
+    gtk_grid_attach(notifications_grid, show_recording_saved_notification_button, 0, notifications_area_row++, 2, 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, grid_row++, 2, 1);
@@ -4108,6 +4131,8 @@ int main(int argc, char **argv) {
     }
 
     char app_id[] = "com.dec05eba.gpu_screen_recorder";
+    // Gtk sets wayland app id / x11 wm class from the binary name, so we override it here.
+    // This is needed for the correct window icon on wayland (app id needs to match the desktop file name).
     argv[0] = app_id;
 
     GtkApplication *app = gtk_application_new(app_id, G_APPLICATION_NON_UNIQUE);
