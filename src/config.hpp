@@ -28,8 +28,11 @@ struct MainConfig {
     int32_t fps = 60;
     int32_t video_bitrate = 15000;
     bool merge_audio_tracks = true;
+    bool record_app_audio_inverted = false;
     bool change_video_resolution = false;
+    std::string audio_type_view = "audio_devices";
     std::vector<std::string> audio_input;
+    std::vector<std::string> application_audio;
     std::string color_range;
     std::string quality;
     std::string codec; // Video codec
@@ -313,8 +316,11 @@ static std::map<std::string, ConfigValue> get_config_options(Config &config) {
         {"main.fps", {CONFIG_TYPE_I32, &config.main_config.fps}},
         {"main.video_bitrate", {CONFIG_TYPE_I32, &config.main_config.video_bitrate}},
         {"main.merge_audio_tracks", {CONFIG_TYPE_BOOL, &config.main_config.merge_audio_tracks}},
+        {"main.record_app_audio_inverted", {CONFIG_TYPE_BOOL, &config.main_config.record_app_audio_inverted}},
         {"main.change_video_resolution", {CONFIG_TYPE_BOOL, &config.main_config.change_video_resolution}},
+        {"main.audio_type_view", {CONFIG_TYPE_STRING, &config.main_config.audio_type_view}},
         {"main.audio_input", {CONFIG_TYPE_STRING_ARRAY, &config.main_config.audio_input}},
+        {"main.application_audio", {CONFIG_TYPE_STRING_ARRAY, &config.main_config.application_audio}},
         {"main.color_range", {CONFIG_TYPE_STRING, &config.main_config.color_range}},
         {"main.quality", {CONFIG_TYPE_STRING, &config.main_config.quality}},
         {"main.codec", {CONFIG_TYPE_STRING, &config.main_config.codec}},

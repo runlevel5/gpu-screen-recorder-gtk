@@ -66,3 +66,10 @@ Save gpu screen recorder status in $XDG_RUNTIME_DIR.
 Add option to capture application audio. This should show a popup where you can use one of the available applications or a custom one and choose to record that application or all applications except that one.
 
 Add profile option. Convert view to profile, add an option at the bottom that says "Edit profiles..." which should show a popup where you can create/remove profiles. New profiles should always be in advanced view.
+
+Make content scrollable. The window is too tall now.
+Change audio devices movable items to same type of list as application audio.
+
+Move x11 hotkey code to its own file.
+
+Add audio devices/app refresh button.
