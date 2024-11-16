@@ -3062,6 +3062,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_grid, GTK_WIDGET(video_bitrate_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(video_bitrate_grid, gtk_label_new("Video bitrate (kbps): "), 0, 0, 1, 1);
     video_bitrate_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 500000.0, 1.0));
+    g_signal_connect(video_bitrate_entry, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_spin_button_set_value(video_bitrate_entry, 15000.0);
     gtk_widget_set_hexpand(GTK_WIDGET(video_bitrate_entry), true);
     gtk_grid_attach(video_bitrate_grid, GTK_WIDGET(video_bitrate_entry), 1, 0, 1, 1);
@@ -3457,6 +3458,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(grid, GTK_WIDGET(replay_time_grid), 0, row++, num_columns, 1);
     gtk_grid_attach(replay_time_grid, gtk_label_new("Replay time in seconds: "), 0, 0, 1, 1);
     replay_time_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 1200.0, 1.0));
+    g_signal_connect(replay_time_entry, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_spin_button_set_value(replay_time_entry, 30.0);
     gtk_widget_set_hexpand(GTK_WIDGET(replay_time_entry), true);
     gtk_grid_attach(replay_time_grid, GTK_WIDGET(replay_time_entry), 1, 0, 1, 1);
