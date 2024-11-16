@@ -3010,7 +3010,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         application_audio_items_box = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 10));
         gtk_grid_attach(application_audio_grid, GTK_WIDGET(application_audio_items_box), 0, application_audio_row++, 2, 1);
 
-        record_app_audio_inverted_button = gtk_check_button_new_with_label("Record all applications except the selected ones");
+        record_app_audio_inverted_button = gtk_check_button_new_with_label("Record audio from all applications except the selected ones");
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_app_audio_inverted_button), false);
         gtk_widget_set_halign(record_app_audio_inverted_button, GTK_ALIGN_START);
         gtk_grid_attach(application_audio_grid, record_app_audio_inverted_button, 0, application_audio_row++, 2, 1);
