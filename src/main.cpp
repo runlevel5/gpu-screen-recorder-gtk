@@ -104,6 +104,7 @@ static GtkWidget *show_recording_stopped_notification_button;
 static GtkWidget *show_recording_saved_notification_button;
 static GtkWidget *record_cursor_button;
 static GtkWidget *restore_portal_session_button;
+static GtkBox *audio_type_radio_button_box;
 static GtkWidget *audio_devices_radio_button;
 static GtkWidget *application_audio_radio_button;
 static GtkGrid *audio_devices_grid;
@@ -256,6 +257,7 @@ enum class DisplayServer {
 
 struct SystemInfo {
     DisplayServer display_server = DisplayServer::UNKNOWN;
+    bool supports_app_audio = false;
     bool is_steam_deck = false;
 };
 
@@ -2527,6 +2529,8 @@ static void parse_system_info_line(GsrInfo *_gsr_info, const std::string &line) 
             _gsr_info->system_info.display_server = DisplayServer::WAYLAND;
     } else if(attribute_name == "is_steam_deck") {
         _gsr_info->system_info.is_steam_deck = attribute_value == "yes";
+    } else if(attribute_name == "supports_app_audio") {
+        _gsr_info->system_info.supports_app_audio = attribute_value == "yes";
     }
 }
 
@@ -2936,15 +2940,15 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_margin(GTK_WIDGET(audio_grid), 10, 10, 10, 10);
     gtk_container_add(GTK_CONTAINER(audio_input_frame), GTK_WIDGET(audio_grid));
 
-    GtkBox *radio_button_box = GTK_BOX(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10));
-    gtk_grid_attach(audio_grid, GTK_WIDGET(radio_button_box), 0, audio_input_area_row++, 2, 1);
+    audio_type_radio_button_box = GTK_BOX(gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10));
+    gtk_grid_attach(audio_grid, GTK_WIDGET(audio_type_radio_button_box), 0, audio_input_area_row++, 2, 1);
 
     audio_devices_radio_button = gtk_radio_button_new_with_label_from_widget(nullptr, "Audio devices");
-    gtk_box_pack_start(radio_button_box, audio_devices_radio_button, false, false, 0);
+    gtk_box_pack_start(audio_type_radio_button_box, audio_devices_radio_button, false, false, 0);
     g_signal_connect(audio_devices_radio_button, "toggled", G_CALLBACK(audio_devices_application_audio_radio_toggled), nullptr);
 
     application_audio_radio_button = gtk_radio_button_new_with_label_from_widget(GTK_RADIO_BUTTON(audio_devices_radio_button), "Application audio");
-    gtk_box_pack_start(radio_button_box, GTK_WIDGET(application_audio_radio_button), false, false, 0);
+    gtk_box_pack_start(audio_type_radio_button_box, GTK_WIDGET(application_audio_radio_button), false, false, 0);
     g_signal_connect(application_audio_radio_button, "toggled", G_CALLBACK(audio_devices_application_audio_radio_toggled), nullptr);
 
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(audio_devices_radio_button), true);
@@ -4101,7 +4105,12 @@ static void load_config() {
 
     on_change_video_resolution_button_click(GTK_BUTTON(change_video_resolution_button), nullptr);
 
-    if(config.main_config.audio_type_view == "app_audio") {
+    if(!gsr_info.system_info.supports_app_audio) {
+        gtk_widget_set_visible(GTK_WIDGET(audio_type_radio_button_box), false);
+        gtk_widget_set_visible(GTK_WIDGET(application_audio_grid), false);
+    }
+
+    if(config.main_config.audio_type_view == "app_audio" && gsr_info.system_info.supports_app_audio) {
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(application_audio_radio_button), true);
         audio_devices_application_audio_radio_toggled(GTK_BUTTON(application_audio_radio_button), nullptr);
     } else /*if(config.main_config.audio_type_view == "audio_devices") */{

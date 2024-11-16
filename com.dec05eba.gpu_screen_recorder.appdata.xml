@@ -80,6 +80,13 @@
     </screenshots>
 
     <releases>
+        <release version="4.3.0" date="2024-11-16">
+            <description>
+                <ul>
+                    <li>Add option to record audio from applications instead of audio devices (pipewire only)</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.2.6" date="2024-11-05">
             <description>
                 <ul>
