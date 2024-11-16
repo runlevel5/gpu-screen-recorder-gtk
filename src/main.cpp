@@ -2970,6 +2970,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         GtkWidget *add_audio_device_button = gtk_button_new_with_label("Add audio device");
         gtk_grid_attach(add_audio_grid, add_audio_device_button, 0, 0, 1, 1);
         g_signal_connect(add_audio_device_button, "clicked", G_CALLBACK(+[](GtkButton*, gpointer){
+            audio_inputs = get_audio_devices();
             GtkWidget *row = create_audio_device_combo_box_row("");
             gtk_widget_show_all(row);
             gtk_box_pack_start(audio_devices_items_box, row, false, false, 0);
@@ -2996,6 +2997,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         GtkWidget *add_application_audio_button = gtk_button_new_with_label("Add application audio");
         gtk_grid_attach(add_button_grid, add_application_audio_button, 0, 0, 1, 1);
         g_signal_connect(add_application_audio_button, "clicked", G_CALLBACK(+[](GtkButton*, gpointer){
+            application_audio = get_application_audio();
             GtkWidget *row = create_application_audio_combo_box_row("");
             gtk_widget_show_all(row);
             gtk_box_pack_start(application_audio_items_box, row, false, false, 0);
