@@ -707,6 +707,10 @@ static void enable_stream_record_button_if_info_filled() {
     gtk_widget_set_sensitive(GTK_WIDGET(stream_button), true);
 }
 
+static gboolean scroll_event_ignore(GtkWidget*, GdkEvent*, void*) {
+    return TRUE;
+}
+
 // Return true from |callback_func| to continue to the next row
 static void for_each_item_in_combo_box(GtkComboBox *combo_box, std::function<bool(gint row_index, const gchar *row_id, const gchar *row_text)> callback_func) {
     const int id_column = gtk_combo_box_get_id_column(GTK_COMBO_BOX(combo_box));
@@ -758,6 +762,7 @@ static GtkWidget* create_audio_device_combo_box_row(const std::string &selected_
     gtk_widget_set_hexpand(GTK_WIDGET(grid), true);
 
     GtkComboBoxText *audio_device_combo_box = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(audio_device_combo_box, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     for(const auto &audio_input : audio_inputs) {
         gtk_combo_box_text_append(audio_device_combo_box, audio_input.name.c_str(), audio_input.description.c_str());
     }
@@ -794,6 +799,7 @@ static GtkWidget* create_application_audio_combo_box_row(const std::string &sele
     gtk_widget_set_hexpand(GTK_WIDGET(grid), true);
 
     GtkComboBoxText *application_audio_combo_box = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(application_audio_combo_box, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     for(const std::string &app_audio : application_audio) {
         gtk_combo_box_text_append(application_audio_combo_box, app_audio.c_str(), app_audio.c_str());
     }
@@ -2711,14 +2717,15 @@ static void audio_devices_application_audio_radio_toggled(GtkButton *button, gpo
 }
 
 static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app) {
-    GtkGrid *grid = GTK_GRID(gtk_grid_new());
-    gtk_stack_add_named(stack, GTK_WIDGET(grid), "common-settings");
-    gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
-    gtk_widget_set_hexpand(GTK_WIDGET(grid), true);
-    gtk_grid_set_row_spacing(grid, 10);
-    gtk_grid_set_column_spacing(grid, 10);
-    gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
+    GtkGrid *main_grid = GTK_GRID(gtk_grid_new());
+    gtk_stack_add_named(stack, GTK_WIDGET(main_grid), "common-settings");
+    gtk_widget_set_vexpand(GTK_WIDGET(main_grid), true);
+    gtk_widget_set_hexpand(GTK_WIDGET(main_grid), true);
+    gtk_grid_set_row_spacing(main_grid, 10);
+    gtk_grid_set_column_spacing(main_grid, 10);
+    gtk_widget_set_margin(GTK_WIDGET(main_grid), 10, 10, 10, 10);
 
+    int main_grid_row = 0;
     int grid_row = 0;
     int record_area_row = 0;
     int audio_input_area_row = 0;
@@ -2726,15 +2733,35 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     int notifications_area_row = 0;
 
     GtkGrid *simple_advanced_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(simple_advanced_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(main_grid, GTK_WIDGET(simple_advanced_grid), 0, main_grid_row++, 2, 1);
     gtk_grid_attach(simple_advanced_grid, gtk_label_new("View: "), 0, 0, 1, 1);
     view_combo_box = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(view_combo_box, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_combo_box_text_append(view_combo_box, "simple", "Simple");
     gtk_combo_box_text_append(view_combo_box, "advanced", "Advanced");
     gtk_widget_set_hexpand(GTK_WIDGET(view_combo_box), true);
     gtk_grid_attach(simple_advanced_grid, GTK_WIDGET(view_combo_box), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
+
+    GtkScrolledWindow *scrolled_window = GTK_SCROLLED_WINDOW(gtk_scrolled_window_new(NULL, NULL));
+    gtk_scrolled_window_set_min_content_width(scrolled_window, 650);
+    gtk_scrolled_window_set_min_content_height(scrolled_window, 300);
+    gtk_scrolled_window_set_max_content_width(scrolled_window, 650);
+    gtk_scrolled_window_set_max_content_height(scrolled_window, 800);
+    gtk_scrolled_window_set_propagate_natural_width(scrolled_window, true);
+    gtk_scrolled_window_set_propagate_natural_height(scrolled_window, true);
+    gtk_grid_attach(main_grid, GTK_WIDGET(scrolled_window), 0, main_grid_row++, 2, 1);
+
+    GtkGrid *grid = GTK_GRID(gtk_grid_new());
+    gtk_container_add(GTK_CONTAINER(scrolled_window), GTK_WIDGET(grid));
+    gtk_widget_set_halign(GTK_WIDGET(grid), GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(GTK_WIDGET(grid), GTK_ALIGN_START);
+    gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
+    gtk_widget_set_hexpand(GTK_WIDGET(grid), true);
+    gtk_grid_set_row_spacing(grid, 10);
+    gtk_grid_set_column_spacing(grid, 10);
+    gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
 
     GtkFrame *capture_target_frame = GTK_FRAME(gtk_frame_new("Capture target"));
     gtk_grid_attach(grid, GTK_WIDGET(capture_target_frame), 0, grid_row++, 2, 1);
@@ -2820,6 +2847,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     }
 
     record_area_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(record_area_selection_model));
+    g_signal_connect(record_area_selection_menu, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
 
     GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
     gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, TRUE);
@@ -2854,6 +2882,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_grid_attach(area_size_grid, GTK_WIDGET(video_resolution_label), 0, 0, 3, 1);
 
         area_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        g_signal_connect(area_width_entry, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
         gtk_spin_button_set_value(area_width_entry, 1920.0);
         gtk_widget_set_hexpand(GTK_WIDGET(area_width_entry), true);
         gtk_grid_attach(area_size_grid, GTK_WIDGET(area_width_entry), 0, 1, 1, 1);
@@ -2861,6 +2890,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_grid_attach(area_size_grid, gtk_label_new("x"), 1, 1, 1, 1);
 
         area_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        g_signal_connect(area_height_entry, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
         gtk_spin_button_set_value(area_height_entry, 1080.0);
         gtk_widget_set_hexpand(GTK_WIDGET(area_height_entry), true);
         gtk_grid_attach(area_size_grid, GTK_WIDGET(area_height_entry), 2, 1, 1, 1);
@@ -2876,6 +2906,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_grid_attach(video_resolution_grid, GTK_WIDGET(video_resolution_label), 0, 0, 3, 1);
 
         video_width_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        g_signal_connect(video_width_entry, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
         gtk_spin_button_set_value(video_width_entry, 1920.0);
         gtk_widget_set_hexpand(GTK_WIDGET(video_width_entry), true);
         gtk_grid_attach(video_resolution_grid, GTK_WIDGET(video_width_entry), 0, 1, 1, 1);
@@ -2883,6 +2914,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_grid_attach(video_resolution_grid, gtk_label_new("x"), 1, 1, 1, 1);
 
         video_height_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(5.0, 10000.0, 1.0));
+        g_signal_connect(video_height_entry, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
         gtk_spin_button_set_value(video_height_entry, 1080.0);
         gtk_widget_set_hexpand(GTK_WIDGET(video_height_entry), true);
         gtk_grid_attach(video_resolution_grid, GTK_WIDGET(video_height_entry), 2, 1, 1, 1);
@@ -2993,6 +3025,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(audio_grid, GTK_WIDGET(audio_codec_grid), 0, audio_input_area_row++, 2, 1);
     gtk_grid_attach(audio_codec_grid, gtk_label_new("Audio codec: "), 0, 0, 1, 1);
     audio_codec_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(audio_codec_input_menu, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_combo_box_text_append(audio_codec_input_menu, "opus", "Opus (Recommended)");
     gtk_combo_box_text_append(audio_codec_input_menu, "aac", "AAC");
     gtk_widget_set_hexpand(GTK_WIDGET(audio_codec_input_menu), true);
@@ -3014,6 +3047,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_grid, GTK_WIDGET(video_quality_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(video_quality_grid, gtk_label_new("Video quality: "), 0, 0, 1, 1);
     quality_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(quality_input_menu, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_combo_box_text_append(quality_input_menu, "custom", "Constant bitrate (Recommended for live streaming and replay)");
     gtk_combo_box_text_append(quality_input_menu, "medium", "Medium");
     gtk_combo_box_text_append(quality_input_menu, "high", "High");
@@ -3095,6 +3129,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_set(store, &iter, 1, "h264_software", -1);
 
         video_codec_selection_menu = GTK_COMBO_BOX(gtk_combo_box_new_with_model(video_codec_selection_model));
+        g_signal_connect(video_codec_selection_menu, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
 
         renderer = gtk_cell_renderer_text_new();
         gtk_cell_layout_pack_start(GTK_CELL_LAYOUT(video_codec_selection_menu), renderer, TRUE);
@@ -3111,6 +3146,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_grid, GTK_WIDGET(color_range_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(color_range_grid, gtk_label_new("Color range: "), 0, 0, 1, 1);
     color_range_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(color_range_input_menu, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_combo_box_text_append(color_range_input_menu, "limited", "Limited");
     gtk_combo_box_text_append(color_range_input_menu, "full", "Full");
     gtk_widget_set_hexpand(GTK_WIDGET(color_range_input_menu), true);
@@ -3121,6 +3157,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_grid, GTK_WIDGET(fps_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(fps_grid, gtk_label_new("Frame rate: "), 0, 0, 1, 1);
     fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 5000.0, 1.0));
+    g_signal_connect(fps_entry, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_spin_button_set_value(fps_entry, 60.0);
     gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
     gtk_grid_attach(fps_grid, GTK_WIDGET(fps_entry), 1, 0, 1, 1);
@@ -3129,6 +3166,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(video_grid, GTK_WIDGET(framerate_mode_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(framerate_mode_grid, gtk_label_new("Frame rate mode: "), 0, 0, 1, 1);
     framerate_mode_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(framerate_mode_input_menu, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_combo_box_text_append(framerate_mode_input_menu, "auto", "Auto (Recommended)");
     gtk_combo_box_text_append(framerate_mode_input_menu, "cfr", "Constant");
     gtk_combo_box_text_append(framerate_mode_input_menu, "vfr", "Variable");
@@ -3226,7 +3264,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_widget_set_sensitive(GTK_WIDGET(record_button), false);
     gtk_widget_set_sensitive(GTK_WIDGET(stream_button), false);
 
-    return GTK_WIDGET(grid);
+    return GTK_WIDGET(main_grid);
 }
 
 static void replace_meta_with_super(std::string &str) {
@@ -3404,6 +3442,7 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, row++, num_columns, 1);
     gtk_grid_attach(container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
     replay_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(replay_container, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(replay_container, supported_container.container_name, supported_container.file_extension);
     }
@@ -3571,6 +3610,7 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(grid, GTK_WIDGET(container_grid), 0, row++, num_columns, 1);
     gtk_grid_attach(container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
     record_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(record_container, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(record_container, supported_container.container_name, supported_container.file_extension);
     }
@@ -3706,6 +3746,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(grid, GTK_WIDGET(stream_service_grid), 0, row++, num_columns, 1);
     gtk_grid_attach(stream_service_grid, gtk_label_new("Stream service: "), 0, 0, 1, 1);
     stream_service_input_menu = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(stream_service_input_menu, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_combo_box_text_append(stream_service_input_menu, "twitch", "Twitch");
     gtk_combo_box_text_append(stream_service_input_menu, "youtube", "Youtube");
     gtk_combo_box_text_append(stream_service_input_menu, "custom", "Custom");
@@ -3736,6 +3777,7 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_grid_attach(grid, GTK_WIDGET(custom_stream_container_grid), 0, row++, num_columns, 1);
     gtk_grid_attach(custom_stream_container_grid, gtk_label_new("Container: "), 0, 0, 1, 1);
     custom_stream_container = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
+    g_signal_connect(custom_stream_container, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     for(auto &supported_container : supported_containers) {
         gtk_combo_box_text_append(custom_stream_container, supported_container.container_name, supported_container.file_extension);
     }
