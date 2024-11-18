@@ -2749,9 +2749,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
 
     GtkScrolledWindow *scrolled_window = GTK_SCROLLED_WINDOW(gtk_scrolled_window_new(NULL, NULL));
-    gtk_scrolled_window_set_min_content_width(scrolled_window, 650);
-    gtk_scrolled_window_set_min_content_height(scrolled_window, 300);
-    gtk_scrolled_window_set_max_content_width(scrolled_window, 650);
+    gtk_scrolled_window_set_min_content_width(scrolled_window, 100);
+    gtk_scrolled_window_set_min_content_height(scrolled_window, 100);
+    gtk_scrolled_window_set_max_content_width(scrolled_window, 1280);
     gtk_scrolled_window_set_max_content_height(scrolled_window, 800);
     gtk_scrolled_window_set_propagate_natural_width(scrolled_window, true);
     gtk_scrolled_window_set_propagate_natural_height(scrolled_window, true);
