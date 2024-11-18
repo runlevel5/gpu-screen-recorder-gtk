@@ -2757,15 +2757,23 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_scrolled_window_set_propagate_natural_height(scrolled_window, true);
     gtk_grid_attach(main_grid, GTK_WIDGET(scrolled_window), 0, main_grid_row++, 2, 1);
 
+    GtkGrid *scrolled_window_grid = GTK_GRID(gtk_grid_new());
+    gtk_container_add(GTK_CONTAINER(scrolled_window), GTK_WIDGET(scrolled_window_grid));
+    gtk_widget_set_vexpand(GTK_WIDGET(scrolled_window_grid), true);
+    gtk_widget_set_hexpand(GTK_WIDGET(scrolled_window_grid), true);
+    gtk_grid_set_row_spacing(scrolled_window_grid, 0);
+    gtk_grid_set_column_spacing(scrolled_window_grid, 0);
+    gtk_widget_set_margin(GTK_WIDGET(scrolled_window_grid), 0, 0, 0, 0);
+
     GtkGrid *grid = GTK_GRID(gtk_grid_new());
-    gtk_container_add(GTK_CONTAINER(scrolled_window), GTK_WIDGET(grid));
+    gtk_container_add(GTK_CONTAINER(scrolled_window_grid), GTK_WIDGET(grid));
     gtk_widget_set_halign(GTK_WIDGET(grid), GTK_ALIGN_CENTER);
     gtk_widget_set_valign(GTK_WIDGET(grid), GTK_ALIGN_START);
     gtk_widget_set_vexpand(GTK_WIDGET(grid), true);
     gtk_widget_set_hexpand(GTK_WIDGET(grid), true);
     gtk_grid_set_row_spacing(grid, 10);
     gtk_grid_set_column_spacing(grid, 10);
-    gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 10, 10);
+    gtk_widget_set_margin(GTK_WIDGET(grid), 10, 10, 25, 25);
 
     GtkFrame *capture_target_frame = GTK_FRAME(gtk_frame_new("Capture target"));
     gtk_grid_attach(grid, GTK_WIDGET(capture_target_frame), 0, grid_row++, 2, 1);
