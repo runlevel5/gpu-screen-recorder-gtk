@@ -3248,7 +3248,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(notifications_grid, show_recording_saved_notification_button, 0, notifications_area_row++, 2, 1);
 
     GtkGrid *start_button_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(grid, GTK_WIDGET(start_button_grid), 0, grid_row++, 2, 1);
+    gtk_grid_attach(main_grid, GTK_WIDGET(start_button_grid), 0, main_grid_row++, 2, 1);
     gtk_grid_set_column_spacing(start_button_grid, 10);
 
     stream_button = GTK_BUTTON(gtk_button_new_with_label("Stream"));
