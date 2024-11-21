@@ -802,7 +802,7 @@ static GtkWidget* create_application_audio_combo_box_row(const std::string &sele
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_hexpand(GTK_WIDGET(grid), true);
 
-    GtkLabel *label = GTK_LABEL(gtk_label_new("App:"));
+    GtkLabel *label = GTK_LABEL(gtk_label_new("Application:"));
     gtk_grid_attach(grid, GTK_WIDGET(label), 0, 0, 1, 1);
 
     GtkComboBoxText *application_audio_combo_box = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
@@ -837,7 +837,7 @@ static GtkWidget* create_application_audio_custom_row(const std::string &text) {
     gtk_grid_set_column_spacing(grid, 10);
     gtk_widget_set_hexpand(GTK_WIDGET(grid), true);
 
-    GtkLabel *label = GTK_LABEL(gtk_label_new("App:"));
+    GtkLabel *label = GTK_LABEL(gtk_label_new("Application:"));
     gtk_grid_attach(grid, GTK_WIDGET(label), 0, 0, 1, 1);
 
     GtkEntry *application_audio_entry = GTK_ENTRY(gtk_entry_new());
