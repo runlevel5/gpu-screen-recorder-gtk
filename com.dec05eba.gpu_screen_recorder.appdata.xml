@@ -80,6 +80,14 @@
     </screenshots>
 
     <releases>
+        <release version="4.3.2" date="2024-11-21">
+            <description>
+                <ul>
+                    <li>Allow recording from both audio devices and application audio at the same time</li>
+                    <li>Workaround amd driver bug that causes garbage output on some gpus in some amd driver versions</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.3.1" date="2024-11-17">
             <description>
                 <ul>
