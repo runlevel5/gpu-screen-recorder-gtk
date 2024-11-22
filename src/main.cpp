@@ -2852,7 +2852,10 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, "text", 0, NULL);
     gtk_cell_layout_set_cell_data_func(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, record_area_set_sensitive, NULL, NULL);
 
-    gtk_combo_box_set_active(record_area_selection_menu, (allow_screen_capture || gsr_info.supported_capture_options.portal) ? 2 : 0);
+    if(allow_screen_capture || gsr_info.supported_capture_options.portal)
+        gtk_combo_box_set_active(record_area_selection_menu, 2);
+    else
+        gtk_combo_box_set_active(record_area_selection_menu, 0);
 
     gtk_widget_set_hexpand(GTK_WIDGET(record_area_selection_menu), true);
     gtk_grid_attach(record_area_grid, GTK_WIDGET(record_area_selection_menu), 0, record_area_row++, 3, 1);
@@ -3281,20 +3284,19 @@ static gboolean on_register_hotkeys_button_clicked(GtkButton *button, gpointer u
         Key names are defined here: https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h.
         Remove the XKB_KEY_ (or XKB_KEY_KP_) prefix from the name and user the remaining part.
     */
-    /* LOGO = Super key */
     /* Unfortunately global shortcuts cant handle same key for different shortcuts, even though GPU Screen Recorder has page specific hotkeys */
     const gsr_bind_shortcut shortcuts[3] = {
         {
             "Start/stop recording/replay/streaming",
-            { SHORTCUT_ID_START_STOP_RECORDING, "LOGO+f1" }
+            { SHORTCUT_ID_START_STOP_RECORDING, "ALT+1" }
         },
         {
             "Pause/unpause recording",
-            { SHORTCUT_ID_PAUSE_UNPAUSE_RECORDING, "LOGO+f2" }
+            { SHORTCUT_ID_PAUSE_UNPAUSE_RECORDING, "ALT+2" }
         },
         {
             "Save replay",
-            { SHORTCUT_ID_SAVE_REPLAY, "LOGO+f3" }
+            { SHORTCUT_ID_SAVE_REPLAY, "ALT+3" }
         }
     };
 
@@ -3341,14 +3343,14 @@ static void create_replay_hotkey_items(GtkGrid *parent_grid, int row, int num_co
         gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         replay_start_stop_hotkey_button = gtk_entry_new();
-        gtk_entry_set_text(GTK_ENTRY(replay_start_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F1");
+        gtk_entry_set_text(GTK_ENTRY(replay_start_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Alt + 1");
         g_signal_connect(replay_start_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_start_stop_hotkey_button);
         gtk_grid_attach(replay_hotkeys_grid, replay_start_stop_hotkey_button, 1, hotkeys_row, 1, 1);
 
         gtk_grid_attach(replay_hotkeys_grid, gtk_label_new("to start/stop the replay and"), 2, hotkeys_row, 1, 1);
 
         replay_save_hotkey_button = gtk_entry_new();
-        gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F2");
+        gtk_entry_set_text(GTK_ENTRY(replay_save_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Alt + 2");
         g_signal_connect(replay_save_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), replay_save_hotkey_button);
         gtk_grid_attach(replay_hotkeys_grid, replay_save_hotkey_button, 3, hotkeys_row, 1, 1);
 
@@ -3472,8 +3474,8 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_valign(replay_record_time_label, GTK_ALIGN_CENTER);
     gtk_grid_attach(replay_bottom_panel_grid, replay_record_time_label, 1, 0, 1, 1);
 
-    replay_start_stop_hotkey.modkey_mask = modkey_to_mask(XK_Super_L);
-    replay_start_stop_hotkey.keysym = XK_F1;
+    replay_start_stop_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
+    replay_start_stop_hotkey.keysym = XK_1;
     replay_start_stop_hotkey.hotkey_entry = replay_start_stop_hotkey_button;
     replay_start_stop_hotkey.hotkey_active_label = hotkey_active_label;
     replay_start_stop_hotkey.config = &config.replay_config.start_stop_recording_hotkey;
@@ -3482,8 +3484,8 @@ static GtkWidget* create_replay_page(GtkApplication *app, GtkStack *stack) {
     replay_start_stop_hotkey.associated_button = start_replay_button;
     replay_start_stop_hotkey.shortcut_id = SHORTCUT_ID_START_STOP_RECORDING;
 
-    replay_save_hotkey.modkey_mask = modkey_to_mask(XK_Super_L);
-    replay_save_hotkey.keysym = XK_F2;
+    replay_save_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
+    replay_save_hotkey.keysym = XK_2;
     replay_save_hotkey.hotkey_entry = replay_save_hotkey_button;
     replay_save_hotkey.hotkey_active_label = hotkey_active_label;
     replay_save_hotkey.config = &config.replay_config.save_recording_hotkey;
@@ -3510,14 +3512,14 @@ static void create_recording_hotkey_items(GtkGrid *parent_grid, int row, int num
         gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         record_start_stop_hotkey_button = gtk_entry_new();
-        gtk_entry_set_text(GTK_ENTRY(record_start_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F1");
+        gtk_entry_set_text(GTK_ENTRY(record_start_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Alt + 1");
         g_signal_connect(record_start_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), record_start_stop_hotkey_button);
         gtk_grid_attach(recording_hotkeys_grid, record_start_stop_hotkey_button, 1, hotkeys_row, 1, 1);
 
         gtk_grid_attach(recording_hotkeys_grid, gtk_label_new("to start/stop recording and"), 2, hotkeys_row, 1, 1);
 
         pause_unpause_hotkey_button = gtk_entry_new();
-        gtk_entry_set_text(GTK_ENTRY(pause_unpause_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F2");
+        gtk_entry_set_text(GTK_ENTRY(pause_unpause_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Alt + 2");
         g_signal_connect(pause_unpause_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), pause_unpause_hotkey_button);
         gtk_grid_attach(recording_hotkeys_grid, pause_unpause_hotkey_button, 3, hotkeys_row, 1, 1);
 
@@ -3632,8 +3634,8 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_valign(recording_record_time_label, GTK_ALIGN_CENTER);
     gtk_grid_attach(recording_bottom_panel_grid, recording_record_time_label, 1, 0, 1, 1);
 
-    record_start_stop_hotkey.modkey_mask = modkey_to_mask(XK_Super_L);
-    record_start_stop_hotkey.keysym = XK_F1;
+    record_start_stop_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
+    record_start_stop_hotkey.keysym = XK_1;
     record_start_stop_hotkey.hotkey_entry = record_start_stop_hotkey_button;
     record_start_stop_hotkey.hotkey_active_label = hotkey_active_label;
     record_start_stop_hotkey.config = &config.record_config.start_stop_recording_hotkey;
@@ -3642,8 +3644,8 @@ static GtkWidget* create_recording_page(GtkApplication *app, GtkStack *stack) {
     record_start_stop_hotkey.associated_button = start_recording_button;
     record_start_stop_hotkey.shortcut_id = SHORTCUT_ID_START_STOP_RECORDING;
 
-    pause_unpause_hotkey.modkey_mask = modkey_to_mask(XK_Super_L);
-    pause_unpause_hotkey.keysym = XK_F2;
+    pause_unpause_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
+    pause_unpause_hotkey.keysym = XK_2;
     pause_unpause_hotkey.hotkey_entry = pause_unpause_hotkey_button;
     pause_unpause_hotkey.hotkey_active_label = hotkey_active_label;
     pause_unpause_hotkey.config = &config.record_config.pause_unpause_recording_hotkey;
@@ -3670,7 +3672,7 @@ static void create_streaming_hotkey_items(GtkGrid *parent_grid, int row, int num
         gtk_grid_attach(streaming_hotkeys_grid, gtk_label_new("Press"), 0, hotkeys_row, 1, 1);
 
         streaming_start_stop_hotkey_button = gtk_entry_new();
-        gtk_entry_set_text(GTK_ENTRY(streaming_start_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Super + F1");
+        gtk_entry_set_text(GTK_ENTRY(streaming_start_stop_hotkey_button), gsr_info.system_info.display_server == DisplayServer::WAYLAND ? "" : "Alt + 1");
         g_signal_connect(streaming_start_stop_hotkey_button, "button-press-event", G_CALLBACK(on_hotkey_entry_click), streaming_start_stop_hotkey_button);
         gtk_grid_attach(streaming_hotkeys_grid, streaming_start_stop_hotkey_button, 1, hotkeys_row, 1, 1);
 
@@ -3792,8 +3794,8 @@ static GtkWidget* create_streaming_page(GtkApplication *app, GtkStack *stack) {
     gtk_widget_set_valign(streaming_record_time_label, GTK_ALIGN_CENTER);
     gtk_grid_attach(streaming_bottom_panel_grid, streaming_record_time_label, 1, 0, 1, 1);
 
-    streaming_start_stop_hotkey.modkey_mask = modkey_to_mask(XK_Super_L);
-    streaming_start_stop_hotkey.keysym = XK_F1;
+    streaming_start_stop_hotkey.modkey_mask = modkey_to_mask(XK_Alt_L);
+    streaming_start_stop_hotkey.keysym = XK_1;
     streaming_start_stop_hotkey.hotkey_entry = streaming_start_stop_hotkey_button;
     streaming_start_stop_hotkey.hotkey_active_label = hotkey_active_label;
     streaming_start_stop_hotkey.config = &config.streaming_config.start_stop_recording_hotkey;
