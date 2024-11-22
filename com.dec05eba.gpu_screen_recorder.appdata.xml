@@ -80,6 +80,14 @@
     </screenshots>
 
     <releases>
+        <release version="4.3.3" date="2024-11-22">
+            <description>
+                <ul>
+                    <li>Fix application not starting on pulseaudio systems (for example linux mint 21.3)</li>
+                    <li>Dont display monitor capture option when not available</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.3.2" date="2024-11-21">
             <description>
                 <ul>
