@@ -4323,6 +4323,11 @@ static void activate(GtkApplication *app, gpointer) {
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
 
+    if(geteuid() == 0) {
+        fprintf(stderr, "Error: don't run gpu-screen-recorder-gtk as the root user\n");
+        return 1;
+    }
+
     dpy = XOpenDisplay(NULL);
     gsr_info_exit_status = get_gpu_screen_recorder_info(&gsr_info);
 
