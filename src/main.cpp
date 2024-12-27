@@ -241,7 +241,6 @@ struct GsrMonitor {
 struct SupportedCaptureOptions {
     bool window = false;
     bool focused = false;
-    bool screen = false;
     bool portal = false;
     std::vector<GsrMonitor> monitors;
 };
@@ -2595,8 +2594,6 @@ static void parse_capture_options_line(GsrInfo *_gsr_info, const std::string &li
         _gsr_info->supported_capture_options.window = true;
     else if(line == "focused")
         _gsr_info->supported_capture_options.focused = true;
-    else if(line == "screen")
-        _gsr_info->supported_capture_options.screen = true;
     else if(line == "portal")
         _gsr_info->supported_capture_options.portal = true;
     else
@@ -2796,12 +2793,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
 
     const bool allow_screen_capture = is_monitor_capture_drm() || nvfbc_installed;
     if(allow_screen_capture) {
-        if(gsr_info.supported_capture_options.screen) {
-            gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, 0, "All monitors", -1);
-            gtk_list_store_set(store, &iter, 1, "screen", -1);
-        }
-
         for(const auto &monitor : gsr_info.supported_capture_options.monitors) {
             std::string label = "Monitor ";
             label += monitor.name;
@@ -2852,7 +2843,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_cell_layout_set_attributes(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, "text", 0, NULL);
     gtk_cell_layout_set_cell_data_func(GTK_CELL_LAYOUT(record_area_selection_menu), renderer, record_area_set_sensitive, NULL, NULL);
 
-    if(allow_screen_capture || gsr_info.supported_capture_options.portal)
+    if(allow_screen_capture && !gsr_info.supported_capture_options.portal && gsr_info.supported_capture_options.monitors.empty())
+        gtk_combo_box_set_active(record_area_selection_menu, 0);
+    else if(allow_screen_capture || gsr_info.supported_capture_options.portal)
         gtk_combo_box_set_active(record_area_selection_menu, 2);
     else
         gtk_combo_box_set_active(record_area_selection_menu, 0);
@@ -3911,8 +3904,6 @@ static void load_config() {
         //
     } else if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && strcmp(config.main_config.record_area_option.c_str(), "focused") == 0) {
         //
-    } else if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA && strcmp(config.main_config.record_area_option.c_str(), "screen") == 0) {
-        //
     } else if(config.main_config.record_area_option == "portal" && gsr_info.supported_capture_options.portal && gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
         //
     } else {
@@ -4236,7 +4227,7 @@ static void activate(GtkApplication *app, gpointer) {
 #else
     const char *icon_path = "/usr/share/icons";
 #endif
-    gtk_icon_theme_set_search_path(icon_theme, &icon_path, 1);
+    gtk_icon_theme_append_search_path(icon_theme, icon_path);
 
     const char *icon_name = "com.dec05eba.gpu_screen_recorder";
     if(!gtk_icon_theme_has_icon(icon_theme, icon_name))
