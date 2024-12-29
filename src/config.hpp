@@ -48,6 +48,8 @@ struct MainConfig {
     bool hevc_amd_bug_warning_shown = false;
     bool av1_amd_bug_warning_shown = false;
     bool restore_portal_session = true;
+    bool use_new_ui = false;
+    int32_t installed_gsr_global_hotkeys_version = 0;
 };
 
 struct YoutubeStreamConfig {
@@ -334,6 +336,8 @@ static std::map<std::string, ConfigValue> get_config_options(Config &config) {
         {"main.hevc_amd_bug_warning_shown", {CONFIG_TYPE_BOOL, &config.main_config.hevc_amd_bug_warning_shown}},
         {"main.av1_amd_bug_warning_shown", {CONFIG_TYPE_BOOL, &config.main_config.av1_amd_bug_warning_shown}},
         {"main.restore_portal_session", {CONFIG_TYPE_BOOL, &config.main_config.restore_portal_session}},
+        {"main.use_new_ui", {CONFIG_TYPE_BOOL, &config.main_config.use_new_ui}},
+        {"main.installed_gsr_global_hotkeys_version", {CONFIG_TYPE_I32, &config.main_config.installed_gsr_global_hotkeys_version}},
 
         {"streaming.service", {CONFIG_TYPE_STRING, &config.streaming_config.streaming_service}},
         {"streaming.youtube.key", {CONFIG_TYPE_STRING, &config.streaming_config.youtube.stream_key}},

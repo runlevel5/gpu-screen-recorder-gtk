@@ -20,6 +20,8 @@ extern "C" {
 #include <vector>
 #include <libayatana-appindicator/app-indicator.h>
 
+#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 1
+
 #ifndef GSR_VERSION
 #define GSR_VERSION "unknown"
 #endif
@@ -151,6 +153,7 @@ static bool paused = false;
 static bool streaming = false;
 static pid_t gpu_screen_recorder_process = -1;
 static int prev_exit_status = -1;
+static bool config_empty = false;
 static Config config;
 static std::string record_file_current_filename;
 static bool nvfbc_installed = false;
@@ -1395,13 +1398,13 @@ static bool show_pkexec_flatpak_error_if_needed() {
         if(flatpak && !flatpak_is_installed_as_system()) {
             if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland when not using the portal option. To install GPU Screen recorder system-wide, you can run this command:\n"
+                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland when not using the portal option. You can run this command to install GPU Screen recorder system-wide:\n"
                     "flatpak install --system com.dec05eba.gpu_screen_recorder\n");
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
             } else {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel when not using the portal option. To install GPU Screen recorder system-wide, you can run this command:\n"
+                    "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel when not using the portal option. You can run this command to install GPU Screen recorder system-wide:\n"
                     "flatpak install --system com.dec05eba.gpu_screen_recorder\n"
                     "Alternatively, record a single window which doesn't have this restriction.");
                 gtk_dialog_run(GTK_DIALOG(dialog));
@@ -2703,6 +2706,105 @@ static void video_codec_set_sensitive(GtkCellLayout *cell_layout, GtkCellRendere
     g_free(id);
 }
 
+static void launch_gsr_ui(bool show_ui) {
+    const char *args[] = { "gsr-ui", show_ui ? "launch-show" : "launch-hide", nullptr };
+    execvp(args[0], (char* const*)args);
+    GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+        "gsr-ui (gpu-screen-recorder-ui) isn't installed. Please install it first.");
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+}
+
+static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
+    if(!dpy) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "The new UI only works on X11 or through XWayland on Wayland. Native Wayland is not supported because Wayland is missing features required by this software.\n"
+            "Install X11 on your system to use the new UI.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        return true;
+    }
+
+    if(!is_pkexec_installed()) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "pkexec needs to be installed to switch to the new UI");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        return true;
+    }
+
+    if(!flatpak_is_installed_as_system()) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "GPU Screen Recorder needs to be installed system-wide to use the new UI. You can run this command to install GPU Screen recorder system-wide:\n"
+            "flatpak install --system com.dec05eba.gpu_screen_recorder\n");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        return true;
+    }
+
+    GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
+        "You are about to try out the new UI, which is a ShadowPlay-like fullscreen UI. It runs in the background and you have to show/hide it by pressing Alt+Z.\n"
+        "This new UI is still experimental and you may experience issues depending on your system. You can switch back to the old UI at any time by opening the UI and clicking on the \"Go back to old UI\" button.\n"
+        "\n"
+        "This new UI comes with new features, such as being able to automatically launch it on system startup by enabling it in settings, and hotkey support on any Wayland compositor.\n"
+        "\n"
+        "If you are using an NVIDIA GPU then you may experience issue with recording/replay if a suspend happens while recording/using replay. This is an NVIDIA driver issue and it also happens in the old UI.\n"
+        "See this for a workaround: <a href=\"https://wiki.archlinux.org/title/NVIDIA/Tips_and_tricks#Preserve_video_memory_after_suspend\">Arch Wiki - Preserve video memory after suspend</a>.\n"
+        "\n"
+        "Are you sure you want to switch to the new UI?");
+    gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+
+    switch(response) {
+        case GTK_RESPONSE_YES:
+            break;
+        case GTK_RESPONSE_NO:
+        default:
+            return true;
+    }
+
+    dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
+        "The new UI needs root privileges to finish setup to make global hotkeys and recording work on any system. The new UI will also be added to system startup.\n"
+        "\n"
+        "Are you sure you want to continue?");
+    response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+
+    switch(response) {
+        case GTK_RESPONSE_YES:
+            break;
+        case GTK_RESPONSE_NO:
+        default:
+            return true;
+    }
+
+    int exit_code = system("kms-server-proxy setup-gsr-ui");
+    if(exit_code != 0) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "Failed to setup the new UI. You either cancelled the installation or you don't have pkexec installed and a polkit agent running.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        return true;
+    }
+
+    exit_code = system("flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service /usr/lib/systemd/user/gpu-screen-recorder-ui.service && systemctl --user daemon-reload && systemctl enable --user gpu-screen-recorder-ui");
+    if(exit_code != 0) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
+            "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need to add this command to system startup:\n"
+            "flatpak run com.dec05eba.gpu_screen_recorder gsr-ui");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+    }
+
+    config.main_config.use_new_ui = true;
+    config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
+    save_configs();
+
+    launch_gsr_ui(true);
+    exit(0);
+    return true;
+}
+
 static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *app) {
     GtkGrid *main_grid = GTK_GRID(gtk_grid_new());
     gtk_stack_add_named(stack, GTK_WIDGET(main_grid), "common-settings");
@@ -2720,7 +2822,9 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     int notifications_area_row = 0;
 
     GtkGrid *simple_advanced_grid = GTK_GRID(gtk_grid_new());
-    gtk_grid_attach(main_grid, GTK_WIDGET(simple_advanced_grid), 0, main_grid_row++, 2, 1);
+    gtk_grid_set_column_spacing(simple_advanced_grid, 10);
+    gtk_grid_attach(main_grid, GTK_WIDGET(simple_advanced_grid), 0, main_grid_row++, flatpak ? 3 : 2, 1);
+
     gtk_grid_attach(simple_advanced_grid, gtk_label_new("View: "), 0, 0, 1, 1);
     view_combo_box = GTK_COMBO_BOX_TEXT(gtk_combo_box_text_new());
     g_signal_connect(view_combo_box, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
@@ -2730,6 +2834,12 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     gtk_grid_attach(simple_advanced_grid, GTK_WIDGET(view_combo_box), 1, 0, 1, 1);
     gtk_combo_box_set_active(GTK_COMBO_BOX(view_combo_box), 0);
     g_signal_connect(view_combo_box, "changed", G_CALLBACK(view_combo_box_change_callback), view_combo_box);
+
+    if(flatpak) {
+        GtkButton *switch_to_new_ui_button = GTK_BUTTON(gtk_button_new_with_label("Try out the new UI"));
+        gtk_grid_attach(simple_advanced_grid, GTK_WIDGET(switch_to_new_ui_button), 2, 0, 1, 1);
+        g_signal_connect(switch_to_new_ui_button, "clicked", G_CALLBACK(on_click_switch_to_new_ui), nullptr);
+    }
 
     GtkScrolledWindow *scrolled_window = GTK_SCROLLED_WINDOW(gtk_scrolled_window_new(NULL, NULL));
     gtk_scrolled_window_set_min_content_width(scrolled_window, 100);
@@ -3896,9 +4006,6 @@ static const std::string* get_application_audio_by_name_case_insensitive(const s
 }
 
 static void load_config() {
-    bool config_empty = false;
-    config = read_config(config_empty);
-
     std::string first_monitor;
     if(gsr_info.system_info.display_server != DisplayServer::WAYLAND && strcmp(config.main_config.record_area_option.c_str(), "window") == 0) {
         //
@@ -4186,7 +4293,7 @@ static void activate(GtkApplication *app, gpointer) {
 
     if(gsr_info.system_info.display_server == DisplayServer::X11 && !dpy) {
         GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to connect to X11 server");
+            "Failed to connect to the X11 server");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
@@ -4227,7 +4334,7 @@ static void activate(GtkApplication *app, gpointer) {
 #else
     const char *icon_path = "/usr/share/icons";
 #endif
-    gtk_icon_theme_append_search_path(icon_theme, icon_path);
+    gtk_icon_theme_prepend_search_path(icon_theme, icon_path);
 
     const char *icon_name = "com.dec05eba.gpu_screen_recorder";
     if(!gtk_icon_theme_has_icon(icon_theme, icon_name))
@@ -4311,6 +4418,62 @@ static void activate(GtkApplication *app, gpointer) {
     }
 }
 
+static void startup_new_ui(bool launched_by_daemon) {
+    if(!dpy) {
+        if(launched_by_daemon) {
+            fprintf(stderr, "Error: failed to connect to the X11 server, assuming no graphical session has started yet\n");
+            exit(1);
+        } else {
+            GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+                "Failed to connect to the X11 server while trying to start the new UI. Please install X11 on your system to use the new UI");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            
+            config.main_config.use_new_ui = false;
+            save_configs();
+            return;
+        }
+    }
+
+    if(config.main_config.installed_gsr_global_hotkeys_version != GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
+            "An update is available. The new UI needs root privileges to finish update to make global hotkeys and recording work on any system.\n"
+            "\n"
+            "Are you sure you want to continue?");
+        const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+
+        switch(response) {
+            case GTK_RESPONSE_YES:
+                break;
+            case GTK_RESPONSE_NO:
+            default: {
+                config.main_config.use_new_ui = false;
+                save_configs();
+                return;
+            }
+        }
+
+        const int exit_code = system("kms-server-proxy setup-gsr-ui");
+        if(exit_code != 0) {
+            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "Failed to setup the new UI");
+            gtk_dialog_run(GTK_DIALOG(dialog));
+            gtk_widget_destroy(dialog);
+            
+            config.main_config.use_new_ui = false;
+            save_configs();
+            return;
+        }
+
+        config.main_config.use_new_ui = true;
+        config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
+        save_configs();
+    }
+
+    launch_gsr_ui(true);
+    exit(0);
+}
+
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
 
@@ -4319,7 +4482,15 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    const bool launched_by_daemon = argc == 2 && strcmp(argv[1], "gsr-ui") == 0;
+    argc = 1;
     dpy = XOpenDisplay(NULL);
+
+    config_empty = false;
+    config = read_config(config_empty);
+    if(config.main_config.use_new_ui)
+        startup_new_ui(launched_by_daemon);
+
     gsr_info_exit_status = get_gpu_screen_recorder_info(&gsr_info);
 
     if(gsr_info_exit_status == GsrInfoExitStatus::OK) {
