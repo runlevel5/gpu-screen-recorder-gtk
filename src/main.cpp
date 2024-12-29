@@ -2789,7 +2789,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
 
     bool service_install_successful = system("flatpak-spawn --host -- pkexec install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service /usr/lib/systemd/user/gpu-screen-recorder-ui.service") == 0;
     service_install_successful &= (system("flatpak-spawn --host -- systemctl --user daemon-reload") == 0);
-    service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --user gpu-screen-recorder-ui") == 0);
+    service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --now --user gpu-screen-recorder-ui") == 0);
     if(!service_install_successful) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need to add this command to system startup:\n"
@@ -2802,7 +2802,9 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
     config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
     save_configs();
 
-    launch_gsr_ui(true);
+    if(!service_install_successful)
+        launch_gsr_ui(true);
+
     exit(0);
     return true;
 }
