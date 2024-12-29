@@ -2787,7 +2787,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         return true;
     }
 
-    bool service_install_successful = system("flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service \"${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/gpu-screen-recorder-ui.service\"") == 0;
+    bool service_install_successful = system("flatpak-spawn --host -- pkexec install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service /usr/lib/systemd/user/gpu-screen-recorder-ui.service") == 0;
     service_install_successful &= (system("flatpak-spawn --host -- systemctl --user daemon-reload") == 0);
     service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --user gpu-screen-recorder-ui") == 0);
     if(!service_install_successful) {
@@ -4479,6 +4479,7 @@ static void startup_new_ui(bool launched_by_daemon) {
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
 
+    const bool use_old_ui_opt = argc == 2 && strcmp(argv[1], "use-old-ui") == 0;
     const bool launched_by_daemon_opt = argc == 2 && strcmp(argv[1], "gsr-ui") == 0;
     argc = 1;
 
@@ -4491,6 +4492,13 @@ int main(int argc, char **argv) {
 
     config_empty = false;
     config = read_config(config_empty);
+
+    if(use_old_ui_opt) {
+        system("flatpak-spawn --host -- systemctl disable --user gpu-screen-recorder-ui");
+        config.main_config.use_new_ui = false;
+        save_configs();
+    }
+
     if(config.main_config.use_new_ui)
         startup_new_ui(launched_by_daemon_opt);
 
