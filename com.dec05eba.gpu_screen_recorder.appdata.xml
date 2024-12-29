@@ -37,6 +37,9 @@
             <li>AAC</li>
         </ul>
         <p>
+            At the moment the program comes with two different UIs. A gtk based one and a new experimental ShadowPlay-like fullscreen overlay UI. The gtk based UI will be removed in the future.
+        </p>
+        <p>
             Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: "flatpak install --system com.dec05eba.gpu_screen_recorder"
             and pkexec needs to be installed on the system and a polkit agent needs to be running.
             Note that this only applies to when recording a monitor on AMD/Intel or when recording on Wayland without using the desktop portal option.
@@ -66,20 +69,37 @@
     <launchable type="desktop-id">com.dec05eba.gpu_screen_recorder.desktop</launchable>
     <screenshots>
         <screenshot type="default">
-            <caption>Simple view</caption>
+            <caption>Front page</caption>
+            <image>https://raw.githubusercontent.com/dec05eba/com.dec05eba.gpu_screen_recorder/master/resources/front_page.jpg</image>
+        </screenshot>
+        <screenshot>
+            <caption>Settings page</caption>
+            <image>https://raw.githubusercontent.com/dec05eba/com.dec05eba.gpu_screen_recorder/master/resources/settings_page.jpg</image>
+        </screenshot>
+        <screenshot>
+            <caption>Simple view in the old UI</caption>
             <image>https://raw.githubusercontent.com/dec05eba/com.dec05eba.gpu_screen_recorder/master/resources/screenshot1.png</image>
         </screenshot>
         <screenshot>
-            <caption>Advanced view</caption>
+            <caption>Advanced view in the old UI</caption>
             <image>https://raw.githubusercontent.com/dec05eba/com.dec05eba.gpu_screen_recorder/master/resources/screenshot2.png</image>
         </screenshot>
         <screenshot>
-            <caption>Recording page</caption>
+            <caption>Recording page in the old UI</caption>
             <image>https://raw.githubusercontent.com/dec05eba/com.dec05eba.gpu_screen_recorder/master/resources/screenshot3.png</image>
         </screenshot>
     </screenshots>
 
     <releases>
+        <release version="5.0.0" date="2024-12-29">
+            <description>
+                <ul>
+                    <li>Add a new experimental UI, a ShadowPlay-like fullscreen overlay UI with support for global hotkeys on any Wayland compositor</li>
+                    <li>Better compatibility and performance on some older AMD GPUs</li>
+                    <li>Better handle application audio nodes, fixing possible issue with application audio not working</li>
+                </ul>
+            </description>
+        </release>
         <release version="4.3.3" date="2024-11-22">
             <description>
                 <ul>
