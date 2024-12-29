@@ -2787,7 +2787,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         return true;
     }
 
-    exit_code = system("flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service /usr/lib/systemd/user/gpu-screen-recorder-ui.service && systemctl --user daemon-reload && systemctl enable --user gpu-screen-recorder-ui");
+    exit_code = system("flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service \"${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/gpu-screen-recorder-ui.service\" && systemctl --user daemon-reload && systemctl enable --user gpu-screen-recorder-ui");
     if(exit_code != 0) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need to add this command to system startup:\n"
@@ -4470,26 +4470,27 @@ static void startup_new_ui(bool launched_by_daemon) {
         save_configs();
     }
 
-    launch_gsr_ui(true);
+    launch_gsr_ui(!launched_by_daemon);
     exit(0);
 }
 
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
 
+    const bool launched_by_daemon_opt = argc == 2 && strcmp(argv[1], "gsr-ui") == 0;
+    argc = 1;
+
     if(geteuid() == 0) {
         fprintf(stderr, "Error: don't run gpu-screen-recorder-gtk as the root user\n");
         return 1;
     }
 
-    const bool launched_by_daemon = argc == 2 && strcmp(argv[1], "gsr-ui") == 0;
-    argc = 1;
     dpy = XOpenDisplay(NULL);
 
     config_empty = false;
     config = read_config(config_empty);
     if(config.main_config.use_new_ui)
-        startup_new_ui(launched_by_daemon);
+        startup_new_ui(launched_by_daemon_opt);
 
     gsr_info_exit_status = get_gpu_screen_recorder_info(&gsr_info);
 
