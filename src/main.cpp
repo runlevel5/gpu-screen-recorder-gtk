@@ -4432,7 +4432,7 @@ static void startup_new_ui(bool launched_by_daemon) {
             gtk_widget_destroy(dialog);
             
             config.main_config.use_new_ui = false;
-            save_configs();
+            save_config(config);
             return;
         }
     }
@@ -4451,7 +4451,7 @@ static void startup_new_ui(bool launched_by_daemon) {
             case GTK_RESPONSE_NO:
             default: {
                 config.main_config.use_new_ui = false;
-                save_configs();
+                save_config(config);
                 return;
             }
         }
@@ -4469,7 +4469,7 @@ static void startup_new_ui(bool launched_by_daemon) {
 
         config.main_config.use_new_ui = true;
         config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
-        save_configs();
+        save_config(config);
     }
 
     launch_gsr_ui(!launched_by_daemon);
@@ -4496,7 +4496,7 @@ int main(int argc, char **argv) {
     if(use_old_ui_opt) {
         system("flatpak-spawn --host -- systemctl disable --user gpu-screen-recorder-ui");
         config.main_config.use_new_ui = false;
-        save_configs();
+        save_config(config);
     }
 
     if(config.main_config.use_new_ui)
