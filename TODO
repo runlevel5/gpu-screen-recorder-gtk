@@ -69,4 +69,4 @@ Add profile option. Convert view to profile, add an option at the bottom that sa
 
 Move x11 hotkey code to its own file.
 
-Add audio devices/app refresh button.
+Detect gpu screen recorder flatpak update and restart the gsr-ui systemd service to apply the update. Or show a notification when it has been updated and can be restarted to apply update.

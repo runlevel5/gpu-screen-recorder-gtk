@@ -4422,6 +4422,59 @@ static void activate(GtkApplication *app, gpointer) {
     }
 }
 
+static bool kms_server_proxy_setup_gsr_ui(const char *msg) {
+    GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO, "%s", msg);
+    const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+
+    switch(response) {
+        case GTK_RESPONSE_YES:
+            break;
+        case GTK_RESPONSE_NO:
+        default: {
+            config.main_config.use_new_ui = false;
+            save_config(config);
+            return false;
+        }
+    }
+
+    const int exit_code = system("flatpak-spawn --host -- /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/kms-server-proxy setup-gsr-ui");
+    if(exit_code != 0) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "Failed to setup the new UI. You either cancelled the installation or you don't have pkexec installed and a polkit agent running.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        
+        config.main_config.use_new_ui = false;
+        save_configs();
+        return false;
+    }
+
+    config.main_config.use_new_ui = true;
+    config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
+    save_config(config);
+    return true;
+}
+
+static bool is_gsr_global_hotkeys_installed() {
+    const char *user_homepath = getenv("HOME");
+    if(!user_homepath)
+        user_homepath = "/tmp";
+
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/.local/share/gpu-screen-recorder/gsr-global-hotkeys", user_homepath);
+    return access(path, F_OK) == 0;
+}
+
+static bool is_kms_server_proxy_installed() {
+    const char *user_homepath = getenv("HOME");
+    if(!user_homepath)
+        user_homepath = "/tmp";
+
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/.local/share/gpu-screen-recorder/kms-server-proxy-1", user_homepath);
+    return access(path, F_OK) == 0;
+}
+
 static void startup_new_ui(bool launched_by_daemon) {
     if(!dpy) {
         if(launched_by_daemon) {
@@ -4429,7 +4482,7 @@ static void startup_new_ui(bool launched_by_daemon) {
             exit(1);
         } else {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-                "Failed to connect to the X11 server while trying to start the new UI. Please install X11 on your system to use the new UI");
+                "Failed to connect to the X11 server while trying to start the new GPU Screen Recorder UI. Please install X11 on your system to use the new UI");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             
@@ -4440,38 +4493,21 @@ static void startup_new_ui(bool launched_by_daemon) {
     }
 
     if(config.main_config.installed_gsr_global_hotkeys_version != GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION) {
-        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
-            "An update is available. The new UI needs root privileges to finish update to make global hotkeys and recording work on any system.\n"
+        if(!kms_server_proxy_setup_gsr_ui(
+            "An update is available. The new GPU Screen Recorder UI needs root privileges to finish update to make global hotkeys and recording work on any system.\n"
             "\n"
-            "Are you sure you want to continue?");
-        const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-
-        switch(response) {
-            case GTK_RESPONSE_YES:
-                break;
-            case GTK_RESPONSE_NO:
-            default: {
-                config.main_config.use_new_ui = false;
-                save_config(config);
-                return;
-            }
-        }
-
-        const int exit_code = system("kms-server-proxy setup-gsr-ui");
-        if(exit_code != 0) {
-            GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "Failed to setup the new UI");
-            gtk_dialog_run(GTK_DIALOG(dialog));
-            gtk_widget_destroy(dialog);
-            
-            config.main_config.use_new_ui = false;
-            save_configs();
+            "Are you sure you want to continue?"))
+        {
             return;
         }
-
-        config.main_config.use_new_ui = true;
-        config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
-        save_config(config);
+    } else if(!is_gsr_global_hotkeys_installed() || !is_kms_server_proxy_installed()) {
+        if(!kms_server_proxy_setup_gsr_ui(
+            "Required files are missing to launch the new GPU Screen Recorder UI. These files will be installed again.\n"
+            "\n"
+            "Are you sure you want to continue?"))
+        {
+            return;
+        }
     }
 
     launch_gsr_ui(!launched_by_daemon);
