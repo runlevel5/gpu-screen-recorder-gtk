@@ -91,6 +91,13 @@
     </screenshots>
 
     <releases>
+        <release version="5.0.1" date="2024-12-30">
+            <description>
+                <ul>
+                    <li>Open the running new UI when trying to launch it again instead of showing an error, to allow switching back to the old UI in case of errors</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.0" date="2024-12-29">
             <description>
                 <ul>

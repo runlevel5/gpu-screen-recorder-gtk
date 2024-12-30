@@ -2745,6 +2745,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
     GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
         "You are about to try out the new UI, which is a ShadowPlay-like fullscreen UI. It runs in the background and you have to show/hide it by pressing Alt+Z.\n"
         "This new UI is still experimental and you may experience issues depending on your system. You can switch back to the old UI at any time by opening the UI and clicking on the settings button and clicking on the \"Go back to the old UI\" button.\n"
+        "Note that at the moment it assumes you are using a keyboard with qwerty layout. If you are using another keyboard layout then instead of pressing Alt+Z you have to press the key that has been switched the with Z key.\n"
         "\n"
         "This new UI comes with new features, such as being able to automatically launch it on system startup by enabling it in settings, and hotkey support on any Wayland compositor.\n"
         "\n"
