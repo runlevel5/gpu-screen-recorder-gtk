@@ -1035,6 +1035,7 @@ static GdkFilterReturn filter_callback(GdkXEvent *xevent, GdkEvent*, gpointer us
         return GDK_FILTER_CONTINUE;
 
     Window target_win = ev->xbutton.subwindow;
+    // TODO: Fix, this is incorrect when trying to record steam window. For steam window
     Window new_window = window_get_target_window_child(_select_window_userdata->display, target_win);
     if(new_window)
         target_win = new_window;
@@ -2788,7 +2789,8 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         return true;
     }
 
-    bool service_install_successful = system("flatpak-spawn --host -- pkexec install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service /usr/lib/systemd/user/gpu-screen-recorder-ui.service") == 0;
+    bool service_install_successful = (system("flatpak-spawn --host -- pkexec rm /usr/lib/systemd/user/gpu-screen-recorder-ui.service") <= 1);
+    service_install_successful &= (system("flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service \"${XDG_DATA_HOME:-$HOME/.local/share}/systemd/user/gpu-screen-recorder-ui.service\"") == 0);
     service_install_successful &= (system("flatpak-spawn --host -- systemctl --user daemon-reload") == 0);
     service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --now --user gpu-screen-recorder-ui") == 0);
     if(!service_install_successful) {

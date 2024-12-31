@@ -92,6 +92,13 @@
     </screenshots>
 
     <releases>
+        <release version="5.0.3" date="2024-12-31">
+            <description>
+                <ul>
+                    <li>Fix unable to properly add program to system startup on immutable distros</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.2" date="2024-12-31">
             <description>
                 <ul>
