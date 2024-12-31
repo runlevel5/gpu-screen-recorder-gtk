@@ -2789,6 +2789,10 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         return true;
     }
 
+    config.main_config.use_new_ui = true;
+    config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
+    save_configs();
+
     bool service_install_successful = (system("flatpak-spawn --host -- pkexec rm /usr/lib/systemd/user/gpu-screen-recorder-ui.service") <= 1);
     service_install_successful &= (system(
         "data_home=$(flatpak-spawn --host -- /bin/sh -c 'echo \"${XDG_DATA_HOME:-$HOME/.local/share}\"') && "
@@ -2802,10 +2806,6 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
     }
-
-    config.main_config.use_new_ui = true;
-    config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
-    save_configs();
 
     if(!service_install_successful)
         launch_gsr_ui(true);
