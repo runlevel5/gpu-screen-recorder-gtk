@@ -2794,11 +2794,15 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
     save_configs();
 
     bool service_install_successful = (system("flatpak-spawn --host -- pkexec rm /usr/lib/systemd/user/gpu-screen-recorder-ui.service") <= 1);
+    fprintf(stderr, "1 success: %s\n", service_install_successful ? "yes" : "no");
     service_install_successful &= (system(
         "data_home=$(flatpak-spawn --host -- /bin/sh -c 'echo \"${XDG_DATA_HOME:-$HOME/.local/share}\"') && "
         "flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service \"$data_home/systemd/user/gpu-screen-recorder-ui.service\"") == 0);
+    fprintf(stderr, "2 success: %s\n", service_install_successful ? "yes" : "no");
     service_install_successful &= (system("flatpak-spawn --host -- systemctl --user daemon-reload") == 0);
+    fprintf(stderr, "3 success: %s\n", service_install_successful ? "yes" : "no");
     service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --now --user gpu-screen-recorder-ui") == 0);
+    fprintf(stderr, "4 success: %s\n", service_install_successful ? "yes" : "no");
     if(!service_install_successful) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need to add this command to system startup:\n"
