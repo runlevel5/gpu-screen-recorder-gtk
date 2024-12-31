@@ -64,7 +64,7 @@
             You can find which NVIDIA driver version is running on your system by running "cat /proc/driver/nvidia/version".
         </p>
         <p>GPU Screen Recorder flatpak can install files in $HOME/.local/share/gpu-screen-recorder. If you want to uninstall GPU Screen Recorder then you will have to remove this directory manually.</p>
-        <p>If you tried out the new UI then a systemd service was added to /usr/lib/systemd/user/gpu-screen-recorder-ui.service. If you want to uninstall GPU Screen Recorder then you will have to remove this file.</p>
+        <p>If you tried out the new UI then a systemd service was added to ~/.local/share/systemd/user/gpu-screen-recorder-ui.service. If you want to uninstall GPU Screen Recorder then you will have to remove this file.</p>
     </description>
 
     <launchable type="desktop-id">com.dec05eba.gpu_screen_recorder.desktop</launchable>
