@@ -2806,7 +2806,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
     if(!service_install_successful)
         launch_gsr_ui(true);
 
-    exit(0);
+    g_application_quit(G_APPLICATION(select_window_userdata.app));
     return true;
 }
 
