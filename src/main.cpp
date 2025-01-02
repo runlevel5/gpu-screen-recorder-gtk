@@ -3172,8 +3172,36 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_set(store, &iter, 1, "hevc", -1);
 
         gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC (10 bit, reduces banding)" : "HEVC (10 bit, not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "hevc_10bit", -1);
+
+        if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC (HDR)" : "HEVC (HDR, not available on your system)", -1);
+            gtk_list_store_set(store, &iter, 1, "hevc_hdr", -1);
+        } else {
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, "HEVC (HDR, not available on X11)", -1);
+            gtk_list_store_set(store, &iter, 1, "hevc_hdr", -1);
+        }
+
+        gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (Smallest file size, worst software compatibility)" : "AV1 (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "av1", -1);
+
+        gtk_list_store_append(store, &iter);
+        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (10 bit, reduces banding)" : "AV1 (10 bit, not available on your system)", -1);
+        gtk_list_store_set(store, &iter, 1, "av1_10bit", -1);
+
+        if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (HDR)" : "AV1 (HDR, not available on your system)", -1);
+            gtk_list_store_set(store, &iter, 1, "av1_hdr", -1);
+        } else {
+            gtk_list_store_append(store, &iter);
+            gtk_list_store_set(store, &iter, 0, "AV1 (HDR, not available on X11)", -1);
+            gtk_list_store_set(store, &iter, 1, "av1_hdr", -1);
+        }
 
         gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.vp8 ? "VP8" : "VP8 (Not available on your system)", -1);
@@ -3182,32 +3210,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.vp9 ? "VP9" : "VP9 (Not available on your system)", -1);
         gtk_list_store_set(store, &iter, 1, "vp9", -1);
-
-        if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
-            gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC (HDR)" : "HEVC (HDR, not available on your system)", -1);
-            gtk_list_store_set(store, &iter, 1, "hevc_hdr", -1);
-
-            gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (HDR)" : "AV1 (HDR, not available on your system)", -1);
-            gtk_list_store_set(store, &iter, 1, "av1_hdr", -1);
-        } else {
-            gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, 0, "HEVC (HDR, not available on X11)", -1);
-            gtk_list_store_set(store, &iter, 1, "hevc_hdr", -1);
-
-            gtk_list_store_append(store, &iter);
-            gtk_list_store_set(store, &iter, 0, "AV1 (HDR, not available on X11)", -1);
-            gtk_list_store_set(store, &iter, 1, "av1_hdr", -1);
-        }
-
-        gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.hevc ? "HEVC (10 bit, reduces banding)" : "HEVC (10 bit, not available on your system)", -1);
-        gtk_list_store_set(store, &iter, 1, "hevc_10bit", -1);
-
-        gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.av1 ? "AV1 (10 bit, reduces banding)" : "AV1 (10 bit, not available on your system)", -1);
-        gtk_list_store_set(store, &iter, 1, "av1_10bit", -1);
 
         gtk_list_store_append(store, &iter);
         gtk_list_store_set(store, &iter, 0, gsr_info.supported_video_codecs.h264_software ? "H264 Software Encoder (Slow, not recommeded)" : "H264 Software Encoder (Not available on your system)", -1);
