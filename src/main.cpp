@@ -405,7 +405,7 @@ static void hide_window_when_recording_systray_callback(GtkMenuItem*, gpointer) 
 
 static void set_label_selectable(gpointer data, gpointer) {
     GtkWidget *widget = GTK_WIDGET(data);
-    if (GTK_IS_LABEL(widget))
+    if(GTK_IS_LABEL(widget))
         gtk_label_set_selectable(GTK_LABEL(widget), true);
 }
 
@@ -4518,6 +4518,16 @@ static void startup_new_ui(bool launched_by_daemon) {
             save_config(config);
             return;
         }
+    }
+
+    if(!flatpak_is_installed_as_system()) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
+            "GPU Screen Recorder needs to be installed system-wide to use the new UI. You can run this command to install GPU Screen recorder system-wide:\n"
+            "flatpak install --system com.dec05eba.gpu_screen_recorder\n");
+        set_dialog_selectable(dialog);
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        return;
     }
 
     if(config.main_config.installed_gsr_global_hotkeys_version != GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION) {
