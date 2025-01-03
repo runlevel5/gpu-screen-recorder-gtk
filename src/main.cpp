@@ -403,6 +403,19 @@ static void hide_window_when_recording_systray_callback(GtkMenuItem*, gpointer) 
     config.main_config.hide_window_when_recording = gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(hide_window_when_recording_menu_item));
 }
 
+static void set_label_selectable(gpointer data, gpointer) {
+    GtkWidget *widget = GTK_WIDGET(data);
+    if (GTK_IS_LABEL(widget))
+        gtk_label_set_selectable(GTK_LABEL(widget), true);
+}
+
+static void set_dialog_selectable(GtkWidget *dialog) {
+    GtkWidget *area = gtk_message_dialog_get_message_area(GTK_MESSAGE_DIALOG(dialog));
+    GList *children = gtk_container_get_children(GTK_CONTAINER(area));
+    g_list_foreach(children, set_label_selectable, nullptr);
+    g_list_free(children);
+}
+
 static void start_stop_streaming_menu_item_systray_callback(GtkMenuItem*, gpointer userdata);
 static void start_stop_recording_systray_callback(GtkMenuItem*, gpointer userdata);
 static void pause_recording_systray_callback(GtkMenuItem*, gpointer userdata);
@@ -1401,6 +1414,7 @@ static bool show_pkexec_flatpak_error_if_needed() {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                     "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland when not using the portal option. You can run this command to install GPU Screen recorder system-wide:\n"
                     "flatpak install --system com.dec05eba.gpu_screen_recorder\n");
+                set_dialog_selectable(dialog);
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
             } else {
@@ -1408,6 +1422,7 @@ static bool show_pkexec_flatpak_error_if_needed() {
                     "GPU Screen Recorder needs to be installed system-wide to record your monitor on AMD/Intel when not using the portal option. You can run this command to install GPU Screen recorder system-wide:\n"
                     "flatpak install --system com.dec05eba.gpu_screen_recorder\n"
                     "Alternatively, record a single window which doesn't have this restriction.");
+                set_dialog_selectable(dialog);
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
             }
@@ -2712,6 +2727,7 @@ static void launch_gsr_ui(bool show_ui) {
     execvp(args[0], (char* const*)args);
     GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
         "gsr-ui (gpu-screen-recorder-ui) isn't installed. Please install it first.");
+    set_dialog_selectable(dialog);
     gtk_dialog_run(GTK_DIALOG(dialog));
     gtk_widget_destroy(dialog);
 }
@@ -2738,6 +2754,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "GPU Screen Recorder needs to be installed system-wide to use the new UI. You can run this command to install GPU Screen recorder system-wide:\n"
             "flatpak install --system com.dec05eba.gpu_screen_recorder\n");
+        set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         return true;
@@ -2802,6 +2819,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need to add this command to system startup:\n"
             "flatpak run com.dec05eba.gpu_screen_recorder gsr-ui");
+        set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
     }
@@ -3282,6 +3300,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             "Note that this only works when Xorg server is running as root.\n"
             "\n"
             "Note! use at your own risk!");
+        set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
 
@@ -4199,6 +4218,7 @@ static void load_config() {
             "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
             "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
             "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
+        set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         config.main_config.software_encoding_warning_shown = true;
@@ -4266,6 +4286,7 @@ static void activate(GtkApplication *app, gpointer) {
             "Failed to run 'gpu-screen-recorder' command. If you are using gpu-screen-recorder flatpak then this is a bug. Otherwise you need to make sure gpu-screen-recorder is installed on your system and working properly (install necessary depedencies depending on your GPU, such as libva-mesa-driver, libva-intel-driver, intel-media-driver and linux-firmware). Run:\n"
             "%s\n"
             "in a terminal to see more information about the issue.", cmd);
+        set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
@@ -4277,6 +4298,7 @@ static void activate(GtkApplication *app, gpointer) {
             "Failed to get OpenGL information. Make sure your GPU drivers are properly installed.\n"
             "If you are using nvidia then make sure to run \"flatpak update\" to make sure that your flatpak nvidia driver version matches your distros nvidia driver version. If this doesn't work then you might need to manually install a flatpak nvidia driver version that matches your distros nvidia driver version.\n"
             "If you are using nvidia and have recently updated your nvidia driver then make sure to reboot your computer first.");
+        set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         g_application_quit(G_APPLICATION(app));
