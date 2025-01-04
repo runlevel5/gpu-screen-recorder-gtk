@@ -92,6 +92,14 @@
     </screenshots>
 
     <releases>
+        <release version="5.0.5" date="2025-01-04">
+            <description>
+                <ul>
+                    <li>Fix some applications receiving mouse input when gpu screen recorder UI is open. Please report if this causes issues for you.</li>
+                    <li>Make the old UIs popup menu text selectable to allow copying commands from it.</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.4" date="2025-01-01">
             <description>
                 <ul>
