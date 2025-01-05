@@ -38,6 +38,7 @@
         </ul>
         <p>
             At the moment the program comes with two different UIs. A gtk based one and a new experimental ShadowPlay-like fullscreen overlay UI. The gtk based UI will be removed in the future.
+            You can switch to the new UI by clicking on "Try out the new UI" and then after that is done press Left Alt+Z to open it.
         </p>
         <p>
             Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: "flatpak install --system com.dec05eba.gpu_screen_recorder"
@@ -92,6 +93,14 @@
     </screenshots>
 
     <releases>
+        <release version="5.0.6" date="2025-01-05">
+            <description>
+                <ul>
+                    <li>Fix unable to open the UI on some kde plasma wayland systems when a wayland native application is focused</li>
+                    <li>Only grab left alt for global hotkeys to allow AltGr+Z to be pressed to allow some characters to be typed on some keyboards, such as ż on a polish keyboard</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.5" date="2025-01-04">
             <description>
                 <ul>
