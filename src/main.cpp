@@ -4467,7 +4467,7 @@ static bool kms_server_proxy_setup_gsr_ui(const char *msg) {
 
     const int exit_code = system("flatpak-spawn --host -- /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/kms-server-proxy setup-gsr-ui");
     if(exit_code != 0) {
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "Failed to setup the new UI. You either cancelled the installation or you don't have pkexec installed and a polkit agent running.");
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "Failed to setup the new UI. You either cancelled the installation or you don't have pkexec installed and a polkit agent running.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
         
