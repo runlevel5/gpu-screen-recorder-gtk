@@ -93,6 +93,14 @@
     </screenshots>
 
     <releases>
+        <release version="5.0.7" date="2025-01-07">
+            <description>
+                <ul>
+                    <li>Fix UI opening on the wrong monitor on gnome and sometimes not being properly fullscreen</li>
+                    <li>Support different keyboard layouts where Z is switched to another location on the keyboard</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.6" date="2025-01-05">
             <description>
                 <ul>
