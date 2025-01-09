@@ -20,7 +20,7 @@ extern "C" {
 #include <vector>
 #include <libayatana-appindicator/app-indicator.h>
 
-#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 2
+#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 3
 
 #ifndef GSR_VERSION
 #define GSR_VERSION "unknown"
@@ -2725,6 +2725,8 @@ static void video_codec_set_sensitive(GtkCellLayout *cell_layout, GtkCellRendere
 static void launch_gsr_ui(bool show_ui) {
     const char *args[] = { "gsr-ui", show_ui ? "launch-show" : "launch-hide", nullptr };
     execvp(args[0], (char* const*)args);
+    // TODO: This is incorrect because window wont be defined here if this is called from startup.
+    // This is fine for not because this is only called inside the flatpak where gsr-ui is always available.
     GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
         "gsr-ui (gpu-screen-recorder-ui) isn't installed. Please install it first.");
     set_dialog_selectable(dialog);
@@ -2956,7 +2958,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
             g_application_quit(G_APPLICATION(select_window_userdata.app));
-            return GTK_WIDGET(grid);
+            return GTK_WIDGET(main_grid); // TODO: ???
         }
     }
 
@@ -4573,6 +4575,9 @@ static void startup_new_ui(bool launched_by_daemon) {
         if(!finished)
             return;
     }
+
+    if(dpy)
+        XCloseDisplay(dpy);
 
     launch_gsr_ui(!launched_by_daemon);
     exit(0);

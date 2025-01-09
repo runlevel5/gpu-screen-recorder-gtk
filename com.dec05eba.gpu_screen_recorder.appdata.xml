@@ -93,6 +93,13 @@
     </screenshots>
 
     <releases>
+        <release version="5.0.8" date="2025-01-08">
+            <description>
+                <ul>
+                    <li>Fix global hotkeys not working in the new UI on some older systems, such as Linux Mint 21.3. Requires restarting the new UI</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.7" date="2025-01-07">
             <description>
                 <ul>
