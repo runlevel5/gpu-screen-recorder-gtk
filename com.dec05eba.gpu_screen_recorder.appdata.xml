@@ -93,6 +93,16 @@
     </screenshots>
 
     <releases>
+        <release version="5.0.9" date="2025-01-17">
+            <description>
+                <ul>
+                    <li>Workaround possibly incorrect opengl setup and buggy nvidia driver (uses glx instead of egl)</li>
+                    <li>Workaround teamspeak bug causing teamspeak to crash when recording application audio</li>
+                    <li>Fix possibility of monitor capture changing to another monitor on wayland when monitors are reconfigured</li>
+                    <li>Fix overlay background not being transparent on sway (and other wlroots based wayland compositors) when opening the ui when a wayland window is focused</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.8" date="2025-01-08">
             <description>
                 <ul>
