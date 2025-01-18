@@ -93,6 +93,14 @@
     </screenshots>
 
     <releases>
+        <release version="5.0.10" date="2025-01-18">
+            <description>
+                <ul>
+                    <li>Add a workaround for amd recording performance issue on wayland with a 10-bit monitor when recording a monitor instead of desktop portal. This is fixed in mesa version 25.0.0</li>
+                    <li>Fix different keyboard layouts not working in the flatpak version of the software</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.9" date="2025-01-17">
             <description>
                 <ul>
