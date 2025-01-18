@@ -97,7 +97,6 @@
             <description>
                 <ul>
                     <li>Add a workaround for amd recording performance issue on wayland with a 10-bit monitor when recording a monitor instead of desktop portal. This is fixed in mesa version 25.0.0</li>
-                    <li>Fix different keyboard layouts not working in the flatpak version of the software</li>
                 </ul>
             </description>
         </release>
