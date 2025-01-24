@@ -93,6 +93,15 @@
     </screenshots>
 
     <releases>
+        <release version="5.1.0" date="2025-01-24">
+            <description>
+                <ul>
+                    <li>Make hotkeys configurable, fix hotkey keyboard layout issues and add option to save replay with (ps4) controller</li>
+                    <li>Make notification smoother on wayland and other wayland fixes</li>
+                    <li>Improve startup time (fixes key getting grabbed for too long)</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.0.10" date="2025-01-18">
             <description>
                 <ul>

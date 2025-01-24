@@ -20,7 +20,7 @@ extern "C" {
 #include <vector>
 #include <libayatana-appindicator/app-indicator.h>
 
-#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 3
+#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 4
 
 #ifndef GSR_VERSION
 #define GSR_VERSION "unknown"
@@ -2765,7 +2765,6 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
     GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
         "You are about to try out the new UI, which is a ShadowPlay-like fullscreen UI. It runs in the background and you have to show/hide it by pressing Left Alt+Z.\n"
         "This new UI is still experimental and you may experience issues depending on your system. You can switch back to the old UI at any time by opening the UI and clicking on the settings button and clicking on the \"Go back to the old UI\" button.\n"
-        "Note that at the moment the flatpak version of the software assumes you are using a keyboard with qwerty layout. If you are using another keyboard layout then instead of pressing Left Alt+Z you have to press the key that has been switched the with Z key.\n"
         "\n"
         "This new UI comes with new features, such as being able to automatically launch it on system startup by enabling it in settings, and hotkey support on any Wayland compositor.\n"
         "\n"
@@ -2816,7 +2815,8 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         "data_home=$(flatpak-spawn --host -- /bin/sh -c 'echo \"${XDG_DATA_HOME:-$HOME/.local/share}\"') && "
         "flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service \"$data_home/systemd/user/gpu-screen-recorder-ui.service\"") == 0);
     service_install_successful &= (system("flatpak-spawn --host -- systemctl --user daemon-reload") == 0);
-    service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --now --user gpu-screen-recorder-ui") == 0);
+    service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --user gpu-screen-recorder-ui") == 0);
+    service_install_successful &= (system("flatpak-spawn --host -- systemctl start --user gpu-screen-recorder-ui") == 0);
     if(!service_install_successful) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need to add this command to system startup:\n"
