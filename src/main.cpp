@@ -4514,7 +4514,7 @@ static bool has_input_device_with_keyboard_and_mouse() {
     while(fgets(line, sizeof(line), f)) {
         if(strncmp(line, "S:", 2) == 0) {
             current_device_is_virtual = strstr(line, "/virtual/") != nullptr;
-        } else if(current_device_is_virtual && strncmp(line, "H:", 2) == 0 && strstr(line, "kbd") && strstr(line, "mouse")) {
+        } else if(!current_device_is_virtual && strncmp(line, "H:", 2) == 0 && strstr(line, "kbd") && strstr(line, "mouse")) {
             kbd_and_mouse = true;
             break;
         }
