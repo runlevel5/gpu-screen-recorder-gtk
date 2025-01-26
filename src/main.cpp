@@ -2734,6 +2734,40 @@ static void launch_gsr_ui(bool show_ui) {
     gtk_widget_destroy(dialog);
 }
 
+static bool kms_server_proxy_setup_gsr_ui(const char *msg) {
+    GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO, "%s", msg);
+    const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+
+    switch(response) {
+        case GTK_RESPONSE_YES:
+            break;
+        case GTK_RESPONSE_NO:
+        default: {
+            config.main_config.use_new_ui = false;
+            save_config(config);
+            return false;
+        }
+    }
+
+    const int exit_code = system("flatpak-spawn --host -- /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/kms-server-proxy setup-gsr-ui");
+    if(exit_code != 0) {
+        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "Failed to setup the new UI. You either cancelled the installation or you don't have pkexec installed and a polkit agent running.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+
+        config.main_config.use_new_ui = false;
+        save_configs();
+        return false;
+    }
+
+    config.main_config.use_new_ui = true;
+    config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
+    config.main_config.kbd_mouse_update_installed = true;
+    save_config(config);
+    return true;
+}
+
 static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
     if(!dpy) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
@@ -2783,33 +2817,12 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
             return true;
     }
 
-    dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO,
+    const bool kms_server_setup_finished = kms_server_proxy_setup_gsr_ui(
         "The new UI needs root privileges to finish setup to make global hotkeys and recording work on any system. The new UI will also be added to system startup.\n"
         "\n"
         "Are you sure you want to continue?");
-    response = gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-
-    switch(response) {
-        case GTK_RESPONSE_YES:
-            break;
-        case GTK_RESPONSE_NO:
-        default:
-            return true;
-    }
-
-    const int exit_code = system("flatpak-spawn --host -- /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/kms-server-proxy setup-gsr-ui");
-    if(exit_code != 0) {
-        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-            "Failed to setup the new UI. You either cancelled the installation or you don't have pkexec installed and a polkit agent running.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
+    if(!kms_server_setup_finished)
         return true;
-    }
-
-    config.main_config.use_new_ui = true;
-    config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
-    save_configs();
 
     bool service_install_successful = (system(
         "data_home=$(flatpak-spawn --host -- /bin/sh -c 'echo \"${XDG_DATA_HOME:-$HOME/.local/share}\"') && "
@@ -4452,39 +4465,6 @@ static void activate(GtkApplication *app, gpointer) {
     }
 }
 
-static bool kms_server_proxy_setup_gsr_ui(const char *msg) {
-    GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO, "%s", msg);
-    const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
-    gtk_widget_destroy(dialog);
-
-    switch(response) {
-        case GTK_RESPONSE_YES:
-            break;
-        case GTK_RESPONSE_NO:
-        default: {
-            config.main_config.use_new_ui = false;
-            save_config(config);
-            return false;
-        }
-    }
-
-    const int exit_code = system("flatpak-spawn --host -- /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/kms-server-proxy setup-gsr-ui");
-    if(exit_code != 0) {
-        GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK, "Failed to setup the new UI. You either cancelled the installation or you don't have pkexec installed and a polkit agent running.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        
-        config.main_config.use_new_ui = false;
-        save_configs();
-        return false;
-    }
-
-    config.main_config.use_new_ui = true;
-    config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
-    save_config(config);
-    return true;
-}
-
 static bool is_gsr_global_hotkeys_installed() {
     const char *user_homepath = getenv("HOME");
     if(!user_homepath)
@@ -4522,6 +4502,28 @@ static void start_gtk_run_handler(std::function<void()> handler) {
     g_object_unref(app);
 }
 
+// TODO: Remove this once GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION is updated to 5
+static bool has_input_device_with_keyboard_and_mouse() {
+    FILE *f = fopen("/proc/bus/input/devices", "rb");
+    if(!f)
+        return false;
+
+    bool current_device_is_virtual = false;
+    bool kbd_and_mouse = false;
+    char line[1024];
+    while(fgets(line, sizeof(line), f)) {
+        if(strncmp(line, "S:", 2) == 0) {
+            current_device_is_virtual = strstr(line, "/virtual/") != nullptr;
+        } else if(current_device_is_virtual && strncmp(line, "H:", 2) == 0 && strstr(line, "kbd") && strstr(line, "mouse")) {
+            kbd_and_mouse = true;
+            break;
+        }
+    }
+
+    fclose(f);
+    return kbd_and_mouse;
+}
+
 static void startup_new_ui(bool launched_by_daemon) {
     if(!dpy) {
         if(launched_by_daemon) {
@@ -4534,7 +4536,7 @@ static void startup_new_ui(bool launched_by_daemon) {
                 gtk_dialog_run(GTK_DIALOG(dialog));
                 gtk_widget_destroy(dialog);
             });
-            
+
             config.main_config.use_new_ui = false;
             save_config(config);
             return;
@@ -4553,11 +4555,12 @@ static void startup_new_ui(bool launched_by_daemon) {
         return;
     }
 
-    if(config.main_config.installed_gsr_global_hotkeys_version != GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION) {
+    if(config.main_config.installed_gsr_global_hotkeys_version != GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION || (!config.main_config.kbd_mouse_update_installed && has_input_device_with_keyboard_and_mouse())) {
         bool finished = false;
         start_gtk_run_handler([&finished]() {
             finished = kms_server_proxy_setup_gsr_ui(
                 "An update is available. The new GPU Screen Recorder UI needs root privileges to finish update to make global hotkeys and recording work on any system.\n"
+                "You will need to restart the application to apply the update.\n"
                 "\n"
                 "Are you sure you want to continue?");
         });
