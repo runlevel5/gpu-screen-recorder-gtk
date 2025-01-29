@@ -1711,6 +1711,16 @@ static void debug_print_args(const char **args) {
     fprintf(stderr, "\n");
 }
 
+static bool validate_window(GtkApplication *app, Window window) {
+    XWindowAttributes attr;
+    if(XGetWindowAttributes(dpy, window, &attr)) {
+        return true;
+    } else {
+        show_notification(app, "GPU Screen Recorder", "The window you are trying to record no longer exists", G_NOTIFICATION_PRIORITY_URGENT);
+        return false;
+    }
+}
+
 static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdata) {
     GtkApplication *app = (GtkApplication*)userdata;
     const gchar *dir = gtk_button_get_label(replay_file_chooser_button);
@@ -1772,6 +1782,8 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
             return true;
         }
         window_str = std::to_string(select_window_userdata.selected_window);
+        if(!validate_window(app, select_window_userdata.selected_window))
+            return true;
     } else if(window_str == "focused") {
         follow_focused = true;
     }
@@ -1968,6 +1980,8 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
             return true;
         }
         window_str = std::to_string(select_window_userdata.selected_window);
+        if(!validate_window(app, select_window_userdata.selected_window))
+            return true;
     } else if(window_str == "focused") {
         follow_focused = true;
     }
@@ -2130,6 +2144,8 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
             return true;
         }
         window_str = std::to_string(select_window_userdata.selected_window);
+        if(!validate_window(app, select_window_userdata.selected_window))
+            return true;
     } else if(window_str == "focused") {
         follow_focused = true;
     }
