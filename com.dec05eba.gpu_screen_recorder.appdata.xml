@@ -93,6 +93,13 @@
     </screenshots>
 
     <releases>
+        <release version="5.1.3" date="2025-02-03">
+            <description>
+                <ul>
+                    <li>Fix unable to type keys (except hotkeys) when switching to new ui on steam deck (and possibly other devices)</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.1.2" date="2025-01-26">
             <description>
                 <ul>

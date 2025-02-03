@@ -20,7 +20,7 @@ extern "C" {
 #include <vector>
 #include <libayatana-appindicator/app-indicator.h>
 
-#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 4
+#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 5
 
 #ifndef GSR_VERSION
 #define GSR_VERSION "unknown"
@@ -2779,7 +2779,6 @@ static bool kms_server_proxy_setup_gsr_ui(const char *msg) {
 
     config.main_config.use_new_ui = true;
     config.main_config.installed_gsr_global_hotkeys_version = GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION;
-    config.main_config.kbd_mouse_update_installed = true;
     save_config(config);
     return true;
 }
@@ -4518,28 +4517,6 @@ static void start_gtk_run_handler(std::function<void()> handler) {
     g_object_unref(app);
 }
 
-// TODO: Remove this once GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION is updated to 5
-static bool has_input_device_with_keyboard_and_mouse() {
-    FILE *f = fopen("/proc/bus/input/devices", "rb");
-    if(!f)
-        return false;
-
-    bool current_device_is_virtual = false;
-    bool kbd_and_mouse = false;
-    char line[1024];
-    while(fgets(line, sizeof(line), f)) {
-        if(strncmp(line, "S:", 2) == 0) {
-            current_device_is_virtual = strstr(line, "/virtual/") != nullptr;
-        } else if(!current_device_is_virtual && strncmp(line, "H:", 2) == 0 && strstr(line, "kbd") && strstr(line, "mouse")) {
-            kbd_and_mouse = true;
-            break;
-        }
-    }
-
-    fclose(f);
-    return kbd_and_mouse;
-}
-
 static void startup_new_ui(bool launched_by_daemon) {
     if(!dpy) {
         if(launched_by_daemon) {
@@ -4571,7 +4548,7 @@ static void startup_new_ui(bool launched_by_daemon) {
         return;
     }
 
-    if(config.main_config.installed_gsr_global_hotkeys_version != GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION || (!config.main_config.kbd_mouse_update_installed && has_input_device_with_keyboard_and_mouse())) {
+    if(config.main_config.installed_gsr_global_hotkeys_version != GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION) {
         bool finished = false;
         start_gtk_run_handler([&finished]() {
             finished = kms_server_proxy_setup_gsr_ui(

@@ -50,7 +50,6 @@ struct MainConfig {
     bool restore_portal_session = true;
     bool use_new_ui = false;
     int32_t installed_gsr_global_hotkeys_version = 0;
-    bool kbd_mouse_update_installed = false;
 };
 
 struct YoutubeStreamConfig {
@@ -339,7 +338,6 @@ static std::map<std::string, ConfigValue> get_config_options(Config &config) {
         {"main.restore_portal_session", {CONFIG_TYPE_BOOL, &config.main_config.restore_portal_session}},
         {"main.use_new_ui", {CONFIG_TYPE_BOOL, &config.main_config.use_new_ui}},
         {"main.installed_gsr_global_hotkeys_version", {CONFIG_TYPE_I32, &config.main_config.installed_gsr_global_hotkeys_version}},
-        {"main.kbd_mouse_update_installed", {CONFIG_TYPE_BOOL, &config.main_config.kbd_mouse_update_installed}},
 
         {"streaming.service", {CONFIG_TYPE_STRING, &config.streaming_config.streaming_service}},
         {"streaming.youtube.key", {CONFIG_TYPE_STRING, &config.streaming_config.youtube.stream_key}},
