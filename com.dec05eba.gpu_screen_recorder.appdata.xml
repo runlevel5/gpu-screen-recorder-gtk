@@ -40,30 +40,8 @@
             At the moment the program comes with two different UIs. A gtk based one and a new experimental ShadowPlay-like fullscreen overlay UI. The gtk based UI will be removed in the future.
             You can switch to the new UI by clicking on "Try out the new UI" and then after that is done press Left Alt+Z to open it.
         </p>
-        <p>
-            Recording a monitor requires (restricted) root access which means that you have to install GPU Screen Recorder system-wide: "flatpak install --system com.dec05eba.gpu_screen_recorder"
-            and pkexec needs to be installed on the system and a polkit agent needs to be running.
-            Note that this only applies to when recording a monitor on AMD/Intel or when recording on Wayland without using the desktop portal option.
-        </p>
         <p>AV1 is currently not supported in the flatpak for Nvidia since GPU Screen Recorder uses an older ffmpeg version to support older Nvidia cards. Install GPU Screen Recorder from source or from AUR if you want to use AV1 on Nvidia.</p>
-        <p>
-            Videos are in variable framerate format. Very out of date video players might have an issue playing such videos. It's recommend to use MPV to play such videos, otherwise you might experience stuttering in the video.
-            You can select constant frame rate mode in advanced view if you need it.
-        </p>
-        <p>
-            If the video doesn't play or you get green/yellow overlay then your video player is missing H264/HEVC video codec. Either install the video codecs or use mpv.
-        </p>
-        <p>AMD has a driver/hardware fault that causes black bars/distorted colors on the sides of the video for certain video resolutions. This happens for both av1 and hevc, so if you have this issue then switch to h264 video codec option in advanced settings.
-        </p>
-        <p>
-            If H264/HEVC video encoding option is not available on your AMD/Intel system but you know that your GPU supports those codecs for encoding then you may need to install mesa-extra freedesktop runtime by running this command: "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra".
-        </p>
-        <p>
-            On NVIDIA systems the flatpak NVIDIA driver needs to match the systems NVIDIA driver version or the NVIDIA driver will fail to properly load in flatpaks.
-            Make sure you update flatpak on your system with: "flatpak update", or if that doesn't fix it you can try to install the specific flatpak NVIDIA driver version version that matches your systems NVIDIA driver version by running:
-            "flatpak install org.freedesktop.Platform.GL.nvidia-version", for example "flatpak install org.freedesktop.Platform.GL.nvidia-550-54-14".
-            You can find which NVIDIA driver version is running on your system by running "cat /proc/driver/nvidia/version".
-        </p>
+        <p>For more information, visit: <a href="https://git.dec05eba.com/gpu-screen-recorder/about/">https://git.dec05eba.com/gpu-screen-recorder/about/</a></p>
         <p>GPU Screen Recorder flatpak can install files in $HOME/.local/share/gpu-screen-recorder. If you want to uninstall GPU Screen Recorder then you will have to remove this directory manually.</p>
         <p>If you tried out the new UI then a systemd service was added to ~/.local/share/systemd/user/gpu-screen-recorder-ui.service. If you want to uninstall GPU Screen Recorder then you will have to remove this file.</p>
     </description>
@@ -93,6 +71,14 @@
     </screenshots>
 
     <releases>
+        <release version="5.1.4" date="2025-02-05">
+            <description>
+                <ul>
+                    <li>Fix virtual hotkey option not working with some keyboard remapping software such as kanata</li>
+                    <li>Fix too long audio device name hiding the remove audio device button</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.1.3" date="2025-02-03">
             <description>
                 <ul>

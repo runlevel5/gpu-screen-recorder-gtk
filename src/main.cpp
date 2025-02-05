@@ -20,7 +20,7 @@ extern "C" {
 #include <vector>
 #include <libayatana-appindicator/app-indicator.h>
 
-#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 5
+#define GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION 6
 
 #ifndef GSR_VERSION
 #define GSR_VERSION "unknown"
@@ -4480,16 +4480,6 @@ static void activate(GtkApplication *app, gpointer) {
     }
 }
 
-static bool is_gsr_global_hotkeys_installed() {
-    const char *user_homepath = getenv("HOME");
-    if(!user_homepath)
-        user_homepath = "/tmp";
-
-    char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/.local/share/gpu-screen-recorder/gsr-global-hotkeys", user_homepath);
-    return access(path, F_OK) == 0;
-}
-
 static bool is_kms_server_proxy_installed() {
     const char *user_homepath = getenv("HOME");
     if(!user_homepath)
@@ -4560,7 +4550,7 @@ static void startup_new_ui(bool launched_by_daemon) {
 
         if(!finished)
             return;
-    } else if(!is_gsr_global_hotkeys_installed() || !is_kms_server_proxy_installed()) {
+    } else if(!is_kms_server_proxy_installed()) {
         bool finished = false;
         start_gtk_run_handler([&finished]() {
             finished = kms_server_proxy_setup_gsr_ui(
