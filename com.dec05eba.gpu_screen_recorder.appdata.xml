@@ -3,13 +3,17 @@
     <id>com.dec05eba.gpu_screen_recorder</id>
     <name>GPU Screen Recorder</name>
     <summary>A shadowplay-like screen recorder for Linux. The fastest screen recorder for Linux</summary>
-    <developer_name>dec05eba</developer_name>
+    <developer id="com.dec05eba.gpu_screen_recorder">
+        <name>dec05eba</name>
+    </developer>
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>GPL-3.0</project_license>
     <url type="homepage">https://git.dec05eba.com/gpu-screen-recorder/about/</url>
     <url type="bugtracker">https://github.com/dec05eba/gpu-screen-recorder-issues</url>
     <url type="contribute">https://git.dec05eba.com/?p=about</url>
     <url type="donation">https://git.dec05eba.com/?p=about</url>
+    <url type="help">https://git.dec05eba.com/gpu-screen-recorder/about/</url>
+    <url type="faq">https://git.dec05eba.com/gpu-screen-recorder/about/</url>
 
     <supports>
         <control>pointing</control>
