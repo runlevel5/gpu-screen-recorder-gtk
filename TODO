@@ -9,41 +9,15 @@ Add translation support (using gettext, which uses .mo files and _ macro). It sh
     But how? maybe have a page that links to the english translation files (or translation directory) in git and give instructions,
     telling them to copy the file content and then send me the file by email with the language name (then I can add it to the correct)
     file with correct locale. Or if they know how to use git they can use that directly.
-Add option to start replay on system startup (use the gpu screen recorder systemd file?) and use the settings from the replay page.
-    Dont add this option if not running systemd, or disable the button then.
-    Fix screen capture breaking after suspend/monitor change on nvidia x11.
-    Add note about replaying can get bugged on suspend unless nvidia reg for suspend is added (because cuda breaks, nvidia driver bug).
-    Detect suspend before it happens and unload cuda/nvenc then and reload after suspend. This is a workaround to nvidia driver bug that breaks cuda on suspend.
-    Disable the gpu screen recorders aur/source package systemd service if enabled in the gui since these are two different services. Or make that service and gui service the same and work with the same (gui) config file.
 Remove the need to install gpu screen recorder flatpak as system. This can now be done because of kms-server-proxy.
 Implement profiles to quickly switch between settings.
 Use https://hosted.weblate.org/ for translation.
 
-Detect game name by using x11 window class or title. Fallback to finding pressure vessel, find the binary is runs and get the directory name directly under the proton game list directory. Fallback to pure wine. x11 window class works in xwayland too.
-
 Have separate options for each record option (stream, record and replay) or have option to use profiles. Remake the gui and have a proper overlay! on wlroots and kde use https://wayland.app/protocols/wlr-layer-shell-unstable-v1.
-
-Add refresh button for audio devices. Put it beside the "add" button. In the new ui this should update automatically without a button.
-
-Gray out monitor capture on intel if plane is compressed. Show the user to desktop portal capture instead.
-
-Look at showmethekey https://github.com/AlynxZhou/showmethekey to see how to do global hotkeys without x11/wayland. The password prompt for this can be removed by using polkit rules, this is how SwayOSD does it.
-    doing this in the flatpak requires --device=input in the flatpak manifest if we are doing it without hack where we launch an external process, running outside the flatpak with root access.
 
 A single flatpak can only be installed either system-wide or user, so there can be a check if it's installed system-wide or user and it will only match one. With this information we can guaranteed know the flatpak directory of the running gpu screen recorder instance. The command `flatpak info -l com.dec05eba.gpu_screen_recorder` can also be used and is available for all flatpak users.
 
 Re-renable hotkeys on hyprland after it's fixed in the hyprland desktop portal. Or use hyprland specific protocol to do it ourselves, and it also works better.
-
-Replay on startup should be its own page with its own settings for everything and should not allow enabling the feature unless global hotkeys can be enable.
-    To make sure this works, create a separate program to handle global hotkeys with root access to make it work for every user and keys should be registered by requiring root access (every time its changed), with a confirm button.
-    Or have a predefined set of keys that can be changed. Also have a key to show the gui.
-    The replay on startup should be this gpu screen recorder gtk program but should launch a separate gui (in a different cpp file)
-    and should be a single page with start/stop button and whatever. It should also show a systray similar to the default one but with only
-    start/stop/save/exit button. The UI is needed for gnome users that dont have a systray!
-    Maybe create gnome extension so that gnome users can see recording status, or mention to the user that it's a gnome limitation.
-    The system startup program should work like the gpu screen recorder systemd daemon but start gpu screen recorder gtk with a special argument to launch it into this
-    replay mode. The replay mode program should loop and launch gpu screen recorder, restarting it if it crashes. If it crashes show an error dialog to the user
-    and if hotkeys cant be registered then also show an error.
 
 Notifications are not shown on kde plasma while using desktop portal capture (system-wide). This is a design choice by kde, see https://invent.kde.org/plasma/xdg-desktop-portal-kde/-/blob/master/src/screencast.cpp?ref_type=heads#L41 . The DoNotDisturb.WhenScreenSharing config controls this. This can be bypassed by making the notification critical. Maybe notifications should be set as critical? but only on kde.
     Maybe we should create our own notification system with gtk layer shell (which is supported by every platform except gnome wayland).
@@ -52,18 +26,7 @@ Notifications are not shown on kde plasma while using desktop portal capture (sy
     Maybe map the drm framebuffer to opengl with write permission and draw to that opengl texture with a framebuffer. That would allow us to draw on the screen anywhere on any wayland compositor (and x11 amd/intel). We can also do this after the video frame has been captured to not include it in the video.
     Maybe use drm overlay plane, if possible.
 
-For replay on system startup add functionality to only record if an application is fullscreen (on the focused monitor, or any monitor if not possible).
-    This is easy to do with x11. For hyprland/sway we can maybe use hyprctl/swaymsg. On kde maybe we can do something similar to this: https://github.com/jinliu/kdotool. For gnome maybe do something like this: https://github.com/ActivityWatch/aw-watcher-window/pull/46/files
-
-When replay on system startup option is added also install gsr-nvidia.conf and tell the user to reboot and explain the issue.
-
 Start recording after showing start recording notification has disappeared, not at the same time.
-
-Use modprobe command. modprobe on system startup in modprobe.d directory is only available for udev, other systems need to add it to linux kernel boot parameters (is this also needed for nvidia open kernel module driver?).
-
-Save gpu screen recorder status in $XDG_RUNTIME_DIR.
-
-Add option to capture application audio. This should show a popup where you can use one of the available applications or a custom one and choose to record that application or all applications except that one.
 
 Add profile option. Convert view to profile, add an option at the bottom that says "Edit profiles..." which should show a popup where you can create/remove profiles. New profiles should always be in advanced view.
 

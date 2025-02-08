@@ -4305,11 +4305,7 @@ static const char* gpu_vendor_to_name(GpuVendor vendor) {
     return "";
 }
 
-static void activate(GtkApplication *app, gpointer) {
-    flatpak = is_inside_flatpak();
-    nvfbc_installed = gsr_info.system_info.display_server != DisplayServer::WAYLAND && is_nv_fbc_installed();
-    page_navigation_userdata.app = app;
-
+static bool gsr_startup_validation() {
     if(gsr_info_exit_status == GsrInfoExitStatus::FAILED_TO_RUN_COMMAND) {
         const char *cmd = flatpak ? "flatpak run --command=gpu-screen-recorder com.dec05eba.gpu_screen_recorder -w screen -f 60 -o video.mp4" : "gpu-screen-recorder -w screen -f 60 -o video.mp4";
         GtkWidget *dialog = gtk_message_dialog_new_with_markup(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
@@ -4319,8 +4315,7 @@ static void activate(GtkApplication *app, gpointer) {
         set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
+        return false;
     }
 
     if(gsr_info_exit_status == GsrInfoExitStatus::OPENGL_FAILED) {
@@ -4331,8 +4326,7 @@ static void activate(GtkApplication *app, gpointer) {
         set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
+        return false;
     }
 
     if(gsr_info_exit_status == GsrInfoExitStatus::NO_DRM_CARD) {
@@ -4340,8 +4334,7 @@ static void activate(GtkApplication *app, gpointer) {
             "Failed to find a valid DRM card. If you are running GPU Screen Recorder with prime-run then try running without it.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
+        return false;
     }
 
     if(gsr_info.system_info.display_server == DisplayServer::UNKNOWN) {
@@ -4349,8 +4342,7 @@ static void activate(GtkApplication *app, gpointer) {
             "Neither X11 nor Wayland is running.");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
+        return false;
     }
 
     if(gsr_info.system_info.display_server == DisplayServer::X11 && !dpy) {
@@ -4358,8 +4350,7 @@ static void activate(GtkApplication *app, gpointer) {
             "Failed to connect to the X11 server");
         gtk_dialog_run(GTK_DIALOG(dialog));
         gtk_widget_destroy(dialog);
-        g_application_quit(G_APPLICATION(app));
-        return;
+        return false;
     }
 
     if(gsr_info.gpu_info.vendor == GpuVendor::NVIDIA) {
@@ -4368,8 +4359,7 @@ static void activate(GtkApplication *app, gpointer) {
                 "CUDA is not installed on your system. GPU Screen Recorder requires CUDA to be installed to work with a NVIDIA GPU.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(app));
-            return;
+            return false;
         }
 
         if(!is_nvenc_installed()) {
@@ -4377,10 +4367,20 @@ static void activate(GtkApplication *app, gpointer) {
                 "NVENC is not installed on your system. GPU Screen Recorder requires NVENC to be installed to work with a NVIDIA GPU.");
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
-            g_application_quit(G_APPLICATION(app));
-            return;
+            return false;
         }
     }
+
+    return true;
+}
+
+static void activate(GtkApplication *app, gpointer) {
+    if(!gsr_startup_validation()) {
+        g_application_quit(G_APPLICATION(app));
+        return;
+    }
+
+    page_navigation_userdata.app = app;
 
     std::string window_title = "GPU Screen Recorder v" + std::string(GSR_VERSION) + " | Running on ";
     window_title += gpu_vendor_to_name(gsr_info.gpu_info.vendor);
@@ -4526,6 +4526,11 @@ static void startup_new_ui(bool launched_by_daemon) {
         }
     }
 
+    start_gtk_run_handler([]() {
+        if(!gsr_startup_validation())
+            exit(0);
+    });
+
     if(!flatpak_is_installed_as_system()) {
         start_gtk_run_handler([]() {
             GtkWidget *dialog = gtk_message_dialog_new(NULL, GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
@@ -4587,17 +4592,7 @@ int main(int argc, char **argv) {
     config_empty = false;
     config = read_config(config_empty);
 
-    if(use_old_ui_opt) {
-        system("flatpak-spawn --host -- systemctl disable --now --user gpu-screen-recorder-ui");
-        config.main_config.use_new_ui = false;
-        save_config(config);
-    }
-
-    if(config.main_config.use_new_ui)
-        startup_new_ui(launched_by_daemon_opt);
-
     gsr_info_exit_status = get_gpu_screen_recorder_info(&gsr_info);
-
     if(gsr_info_exit_status == GsrInfoExitStatus::OK) {
         if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
             setenv("GDK_BACKEND", "wayland", true);
@@ -4605,6 +4600,19 @@ int main(int argc, char **argv) {
             setenv("GDK_BACKEND", "x11", true);
         }
     }
+
+    flatpak = is_inside_flatpak();
+    nvfbc_installed = gsr_info.system_info.display_server != DisplayServer::WAYLAND && is_nv_fbc_installed();
+
+    if(use_old_ui_opt) {
+        system("flatpak-spawn --host -- systemctl disable --user gpu-screen-recorder-ui");
+        system("flatpak-spawn --host -- systemctl stop --user gpu-screen-recorder-ui");
+        config.main_config.use_new_ui = false;
+        save_config(config);
+    }
+
+    if(config.main_config.use_new_ui)
+        startup_new_ui(launched_by_daemon_opt);
 
     char app_id[] = "com.dec05eba.gpu_screen_recorder";
     // Gtk sets wayland app id / x11 wm class from the binary name, so we override it here.
