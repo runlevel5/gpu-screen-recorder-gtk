@@ -25,10 +25,8 @@ There are also additional dependencies needed at runtime:
 
 * [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/)
 
+# Reporting bugs, contributing patches, questions or donation
+See [https://git.dec05eba.com/?p=about](https://git.dec05eba.com/?p=about).
+
 # Screenshots
 ![](https://www.dec05eba.com/images/gpu-screen-recorder.png)
-
-# Donations
-If you want to donate you can donate via bitcoin or monero.
-* Bitcoin: bc1qqvuqnwrdyppf707ge27fqz2n9y9gu7lf5ypyuf
-* Monero: 4An9kp2qW1C9Gah7ewv4JzcNFQ5TAX7ineGCqXWK6vQnhsGGcRpNgcn8r9EC3tMcgY7vqCKs3nSRXhejMHBaGvFdN2egYet
