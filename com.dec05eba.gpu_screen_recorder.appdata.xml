@@ -75,6 +75,14 @@
     </screenshots>
 
     <releases>
+        <release version="5.1.5" date="2025-02-22">
+            <description>
+                <ul>
+                    <li>Fix new UI and monitor capture not working on some distros such as openSUSE tumbleweed. Needs password prompted update</li>
+                    <li>Add option to take a screenshot (alt+F1 by default)</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.1.4" date="2025-02-05">
             <description>
                 <ul>

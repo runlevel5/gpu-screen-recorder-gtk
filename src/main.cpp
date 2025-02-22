@@ -1744,8 +1744,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         app_indicator_set_icon_full(app_indicator, get_tray_idle_icon_name(), "Idle");
 
         if(exit_status == 10) {
-            show_notification(app, "GPU Screen Recorder",
-                "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "You need to have pkexec installed and have a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_status == 50) {
             show_notification(app, "GPU Screen Recorder", "Desktop portal capture failed. Either you canceled the desktop portal or your Wayland compositor doesn't support desktop portal capture or it's incorrectly setup on your system", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_status == 60) {
@@ -1951,8 +1950,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         app_indicator_set_icon_full(app_indicator, get_tray_idle_icon_name(), "Idle");
 
         if(exit_status == 10) {
-            show_notification(app, "GPU Screen Recorder",
-                "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "You need to have pkexec installed and have a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_status == 50) {
             show_notification(app, "GPU Screen Recorder", "Desktop portal capture failed. Either you canceled the desktop portal or your Wayland compositor doesn't support desktop portal capture or it's incorrectly setup on your system", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_status == 60) {
@@ -2116,8 +2114,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         app_indicator_set_icon_full(app_indicator, get_tray_idle_icon_name(), "Idle");
 
         if(exit_status == 10) {
-            show_notification(app, "GPU Screen Recorder",
-                "You need to have pkexec installed and a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
+            show_notification(app, "GPU Screen Recorder", "You need to have pkexec installed and have a polkit agent running to record your monitor", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_status == 50) {
             show_notification(app, "GPU Screen Recorder", "Desktop portal capture failed. Either you canceled the desktop portal or your Wayland compositor doesn't support desktop portal capture or it's incorrectly setup on your system", G_NOTIFICATION_PRIORITY_URGENT);
         } else if(exit_status == 60) {
@@ -4246,7 +4243,8 @@ static void load_config() {
             "Unable to find a hardware video encoder on your system, using software video encoder instead (slow!). If you know that your system supports H264/HEVC hardware video encoding and "
             "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
             "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
-            "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro.\n"
+            "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro if you are using AMD.\n"
+            "If you are using NVIDIA then you might also need to install cuda and nvidia-encode package.\n"
             "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
         set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
@@ -4486,7 +4484,7 @@ static bool is_kms_server_proxy_installed() {
         user_homepath = "/tmp";
 
     char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/.local/share/gpu-screen-recorder/kms-server-proxy-1", user_homepath);
+    snprintf(path, sizeof(path), "%s/.local/share/gpu-screen-recorder/kms-server-proxy-2", user_homepath);
     return access(path, F_OK) == 0;
 }
 
