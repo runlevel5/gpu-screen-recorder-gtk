@@ -4244,6 +4244,7 @@ static void load_config() {
             "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
             "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
             "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro if you are using AMD.\n"
+            "If you are using NVIDIA then you might need to run the \"nvidia-smi\" command first before starting GPU Screen Recorder if NVIDIA is incorrectly setup on your distro.\n"
             "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
         set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
