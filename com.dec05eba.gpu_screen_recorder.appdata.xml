@@ -9,7 +9,7 @@
     <metadata_license>CC0-1.0</metadata_license>
     <project_license>GPL-3.0</project_license>
     <url type="homepage">https://git.dec05eba.com/gpu-screen-recorder/about/</url>
-    <url type="bugtracker">https://github.com/dec05eba/gpu-screen-recorder-issues</url>
+    <url type="bugtracker">https://git.dec05eba.com/?p=about</url>
     <url type="contribute">https://git.dec05eba.com/?p=about</url>
     <url type="donation">https://git.dec05eba.com/?p=about</url>
     <url type="help">https://git.dec05eba.com/gpu-screen-recorder/about/</url>
@@ -25,7 +25,7 @@
             This is a screen recorder that has minimal impact on system performance by recording a monitor using the GPU only, similar to shadowplay on windows. This is the fastest screen recording tool for Linux. This screen recorder works on X11 and Wayland on AMD, Intel and NVIDIA.
         </p>
         <p>
-            This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few minutes are saved.
+            This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few minutes are saved. Replay data is stored in RAM, not disk.
         </p>
         <p>Supported video codecs:</p>
         <ul>
