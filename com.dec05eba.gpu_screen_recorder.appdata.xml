@@ -75,6 +75,15 @@
     </screenshots>
 
     <releases>
+        <release version="5.1.6" date="2025-02-27">
+            <description>
+                <ul>
+                    <li>Only start replay on system startup (in the new ui) when the audio device becomes available. This fixes an issue where replay can record the wrong device when using a bluetooth device</li>
+                    <li>When default output/input audio is selected it will now automatically switch the device it records from when the default output/input is changed in system audio settings</li>
+                    <li>Fix microphone capture not working when the microphone is mono input and when it's mixed with app audio</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.1.5" date="2025-02-22">
             <description>
                 <ul>
