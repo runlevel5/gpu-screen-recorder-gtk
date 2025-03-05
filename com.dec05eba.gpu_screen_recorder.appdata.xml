@@ -75,6 +75,13 @@
     </screenshots>
 
     <releases>
+        <release version="5.1.7" date="2025-03-05">
+            <description>
+                <ul>
+                    <li>Fix pipewire audio server breaking (unable to change default audio output) in some pipewire versions when opening the gpu screen recorder ui</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.1.6" date="2025-02-27">
             <description>
                 <ul>
