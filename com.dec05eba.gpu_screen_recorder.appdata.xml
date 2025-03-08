@@ -75,6 +75,13 @@
     </screenshots>
 
     <releases>
+        <release version="5.1.8" date="2025-03-08">
+            <description>
+                <ul>
+                    <li>Fix monitor recording/switching to new UI not working if the home drive is encrypted</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.1.7" date="2025-03-05">
             <description>
                 <ul>
