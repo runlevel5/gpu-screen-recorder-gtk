@@ -4479,13 +4479,8 @@ static void activate(GtkApplication *app, gpointer) {
 }
 
 static bool is_kms_server_proxy_installed() {
-    const char *user_homepath = getenv("HOME");
-    if(!user_homepath)
-        user_homepath = "/tmp";
-
-    char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/.local/share/gpu-screen-recorder/kms-server-proxy-2", user_homepath);
-    return access(path, F_OK) == 0;
+    const int exit_code = system("flatpak-spawn --host -- /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/bin/kms-server-proxy is-setup");
+    return exit_code == 0;
 }
 
 static void gtk_activate_handler_run_and_quit(GtkApplication *app, gpointer userdata) {
