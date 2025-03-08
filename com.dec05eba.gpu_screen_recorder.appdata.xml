@@ -79,6 +79,7 @@
             <description>
                 <ul>
                     <li>Fix monitor recording/switching to new UI not working if the home drive is encrypted</li>
+                    <li>Fix global hotkeys not working on some systems</li>
                 </ul>
             </description>
         </release>
