@@ -75,6 +75,15 @@
     </screenshots>
 
     <releases>
+        <release version="5.2.0" date="2025-03-15">
+            <description>
+                <ul>
+                    <li>Add option to record/screenshot a region of the screen</li>
+                    <li>Fix unable to take a screenshot while recording on nvidia x11 (workaround nvidia driver limitation)</li>
+                    <li>Add support for more global hotkey key options (media keys)</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.1.8" date="2025-03-08">
             <description>
                 <ul>
