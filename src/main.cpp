@@ -99,7 +99,7 @@ static GtkWidget *replay_start_stop_hotkey_button;
 static GtkWidget *replay_save_hotkey_button;
 static GtkWidget *streaming_start_stop_hotkey_button;
 static GtkWidget *record_app_audio_inverted_button;
-static GtkWidget *merge_audio_tracks_button;
+static GtkWidget *split_audio_button;
 static GtkFrame *notifications_frame;
 static GtkWidget *show_recording_started_notification_button;
 static GtkWidget *show_recording_stopped_notification_button;
@@ -899,7 +899,7 @@ static void save_configs() {
     config.main_config.video_height = gtk_spin_button_get_value_as_int(video_height_entry);
     config.main_config.fps = gtk_spin_button_get_value_as_int(fps_entry);
     config.main_config.video_bitrate = gtk_spin_button_get_value_as_int(video_bitrate_entry);
-    config.main_config.merge_audio_tracks = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button));
+    config.main_config.merge_audio_tracks = !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(split_audio_button));
     config.main_config.record_app_audio_inverted = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_app_audio_inverted_button));
     config.main_config.change_video_resolution = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(change_video_resolution_button));
 
@@ -1508,7 +1508,7 @@ static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
             ++num_audio_tracks;
     }, &num_audio_tracks);
 
-    if(num_audio_tracks > 1 && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
+    if(num_audio_tracks > 1 && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(split_audio_button))) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_DESTROY_WITH_PARENT, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
             "Streaming doesn't work with more than 1 audio track. Please remove all audio tracks or only use 1 audio track or select to merge audio tracks.");
         gtk_dialog_run(GTK_DIALOG(dialog));
@@ -1648,7 +1648,7 @@ static std::vector<std::string> create_audio_tracks_real_names(std::string &merg
 }
 
 static void add_audio_command_line_args(std::vector<const char*> &args, const std::vector<std::string> &audio_tracks, const std::string &merge_audio_tracks) {
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button))) {
+    if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(split_audio_button))) {
         if(!merge_audio_tracks.empty())
             args.insert(args.end(), { "-a", merge_audio_tracks.c_str() });
     } else {
@@ -2323,6 +2323,7 @@ static void view_combo_box_change_callback(GtkComboBox *widget, gpointer userdat
     gtk_widget_set_visible(GTK_WIDGET(framerate_mode_grid), advanced_view);
     gtk_widget_set_visible(GTK_WIDGET(overclock_grid), advanced_view && gsr_info.gpu_info.vendor == GpuVendor::NVIDIA && gsr_info.system_info.display_server != DisplayServer::WAYLAND);
     gtk_widget_set_visible(GTK_WIDGET(notifications_frame), advanced_view);
+    gtk_widget_set_visible(GTK_WIDGET(split_audio_button), advanced_view);
 }
 
 static void quality_combo_box_change_callback(GtkComboBox *widget, gpointer userdata) {
@@ -3140,10 +3141,10 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         gtk_grid_attach(audio_devices_grid, GTK_WIDGET(audio_devices_items_box), 0, audio_devices_row++, 2, 1);
     }
 
-    merge_audio_tracks_button = gtk_check_button_new_with_label("Merge audio tracks");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button), true);
-    gtk_widget_set_halign(merge_audio_tracks_button, GTK_ALIGN_START);
-    gtk_grid_attach(audio_grid, merge_audio_tracks_button, 0, audio_input_area_row++, 2, 1);
+    split_audio_button = gtk_check_button_new_with_label("Split each device/app audio into separate audio tracks");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(split_audio_button), false);
+    gtk_widget_set_halign(split_audio_button, GTK_ALIGN_START);
+    gtk_grid_attach(audio_grid, split_audio_button, 0, audio_input_area_row++, 2, 1);
 
     record_app_audio_inverted_button = gtk_check_button_new_with_label("Record audio from all applications except the selected ones");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_app_audio_inverted_button), false);
@@ -4150,7 +4151,7 @@ static void load_config() {
     gtk_spin_button_set_value(video_height_entry, config.main_config.video_height);
     gtk_spin_button_set_value(fps_entry, config.main_config.fps);
     gtk_spin_button_set_value(video_bitrate_entry, config.main_config.video_bitrate);
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(merge_audio_tracks_button), config.main_config.merge_audio_tracks);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(split_audio_button), !config.main_config.merge_audio_tracks);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(record_app_audio_inverted_button), config.main_config.record_app_audio_inverted);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(change_video_resolution_button), config.main_config.change_video_resolution);
 
@@ -4521,7 +4522,7 @@ static void startup_new_ui(bool launched_by_daemon) {
 
     start_gtk_run_handler([]() {
         if(!gsr_startup_validation())
-            exit(0);
+            exit(1);
     });
 
     if(!flatpak_is_installed_as_system()) {
@@ -4533,7 +4534,7 @@ static void startup_new_ui(bool launched_by_daemon) {
             gtk_dialog_run(GTK_DIALOG(dialog));
             gtk_widget_destroy(dialog);
         });
-        return;
+        exit(1);
     }
 
     if(config.main_config.installed_gsr_global_hotkeys_version != GSR_CURRENT_GLOBAL_HOTKEYS_CODE_VERSION) {
