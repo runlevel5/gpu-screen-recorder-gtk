@@ -264,7 +264,8 @@ enum class GpuVendor {
     UNKNOWN,
     AMD,
     INTEL,
-    NVIDIA
+    NVIDIA,
+    BROADCOM
 };
 
 struct GpuInfo {
@@ -2584,6 +2585,8 @@ static void parse_gpu_info_line(GsrInfo *_gsr_info, const std::string &line) {
             _gsr_info->gpu_info.vendor = GpuVendor::INTEL;
         else if(attribute_value == "nvidia")
             _gsr_info->gpu_info.vendor = GpuVendor::NVIDIA;
+        else if(attribute_value == "broadcom")
+            _gsr_info->gpu_info.vendor = GpuVendor::BROADCOM;
     }
 }
 
@@ -4296,10 +4299,11 @@ static void init_shortcuts_callback(bool success, void *userdata) {
 
 static const char* gpu_vendor_to_name(GpuVendor vendor) {
     switch(vendor) {
-        case GpuVendor::UNKNOWN: return "Unknown";
-        case GpuVendor::AMD:     return "AMD";
-        case GpuVendor::INTEL:   return "Intel";
-        case GpuVendor::NVIDIA:  return "NVIDIA";
+        case GpuVendor::UNKNOWN:  return "Unknown";
+        case GpuVendor::AMD:      return "AMD";
+        case GpuVendor::INTEL:    return "Intel";
+        case GpuVendor::NVIDIA:   return "NVIDIA";
+        case GpuVendor::BROADCOM: return "Broadcom";
     }
     return "";
 }
