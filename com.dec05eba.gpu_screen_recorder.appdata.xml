@@ -40,6 +40,11 @@
             <li>Opus (default)</li>
             <li>AAC</li>
         </ul>
+        <p>Supported image formats:</p>
+        <ul>
+            <li>JPEG</li>
+            <li>PNG</li>
+        </ul>
         <p>
             At the moment the program comes with two different UIs. A gtk based one and a new experimental ShadowPlay-like fullscreen overlay UI. The gtk based UI will be removed in the future.
             You can switch to the new UI by clicking on "Try out the new UI" and then after that is done press Left Alt+Z to open it.
@@ -75,6 +80,16 @@
     </screenshots>
 
     <releases>
+        <release version="5.3.0" date="2025-04-05">
+            <description>
+                <ul>
+                    <li>Improve capture performance in certain games on amd when gpu usage is 100% (from less than half of the games fps to the same fps as the game, for example from 21 fps to 60 fps). Report if this update caused an issue</li>
+                    <li>Add option to capture the focused monitor in the new ui (experimental on wayland). This is now the default option</li>
+                    <li>Fix region capture on wlroots (sway, etc) and Hyprland when multiple monitors are connected</li>
+                    <li>Add support for using f16-f24 keys as hotkeys in the new ui</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.2.0" date="2025-03-15">
             <description>
                 <ul>
