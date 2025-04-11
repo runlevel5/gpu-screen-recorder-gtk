@@ -51,6 +51,11 @@
         </p>
         <p>AV1 is currently not supported in the flatpak for Nvidia since GPU Screen Recorder uses an older ffmpeg version to support older Nvidia cards. Install GPU Screen Recorder from source or from AUR if you want to use AV1 on Nvidia.</p>
         <p>For more information visit the GPU Screen Recorder homepage.</p>
+        <p>
+            If you use the new UI and also keyboard remapping software such as keyd then make sure you make the keyboard remapping software ignores "gsr-ui virtual keyboard" (dec0:5eba device id), otherwise you may be unable to use your keyboard.
+            You can press (left) ctrl+shift+alt+esc to close gpu screen recorder and remove it from system startup if this happens.
+            You should also change hotkeys option in gpu screen recorder to only grab virtual devices when using keyboard remapping software.
+        </p>
         <p>GPU Screen Recorder flatpak can install files in $HOME/.local/share/gpu-screen-recorder. If you want to uninstall GPU Screen Recorder then you will have to remove this directory manually.</p>
         <p>If you tried out the new UI then a systemd service was added to ~/.local/share/systemd/user/gpu-screen-recorder-ui.service. If you want to uninstall GPU Screen Recorder then you will have to remove this file.</p>
     </description>
