@@ -85,6 +85,13 @@
     </screenshots>
 
     <releases>
+        <release version="5.4.0" date="2025-04-20">
+            <description>
+                <ul>
+                    <li>Redesign audio settings in the new UI to allow more complex audio setup (allow configuring each audio track separately)</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.3.0" date="2025-04-05">
             <description>
                 <ul>

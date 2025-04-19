@@ -2632,7 +2632,7 @@ static void parse_capture_options_line(GsrInfo *_gsr_info, const std::string &li
         _gsr_info->supported_capture_options.focused = true;
     else if(line == "portal")
         _gsr_info->supported_capture_options.portal = true;
-    else
+    else if(line != "region") // We dont support region capture in the gtk application
         _gsr_info->supported_capture_options.monitors.push_back(capture_option_line_to_monitor(line));
 }
 
