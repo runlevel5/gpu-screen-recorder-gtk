@@ -85,6 +85,14 @@
     </screenshots>
 
     <releases>
+        <release version="5.5.0" date="2025-04-26">
+            <description>
+                <ul>
+                    <li>Allow recording while using replay/streaming (in the new UI). This is done without any extra performance cost as it only records once</li>
+                    <li>Add option to save a shorter replay instead of a full replay (1 min/10 min) (in the new UI)</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.4.0" date="2025-04-20">
             <description>
                 <ul>
