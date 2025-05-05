@@ -25,7 +25,7 @@
             This is a screen recorder that has minimal impact on system performance by recording a monitor using the GPU only, similar to shadowplay on windows. This is the fastest screen recording tool for Linux. This screen recorder works on X11 and Wayland on AMD, Intel and NVIDIA.
         </p>
         <p>
-            This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few minutes are saved. Replay data is stored in RAM, not disk.
+            This screen recorder can be used for recording your desktop offline, for live streaming and for nvidia-like instant replay, where only the last few minutes are saved.
         </p>
         <p>Supported video codecs:</p>
         <ul>
@@ -85,6 +85,17 @@
     </screenshots>
 
     <releases>
+        <release version="5.6.0" date="2025-05-05">
+            <description>
+                <ul>
+                    <li>Add option to store temporary replay data on disk instead of ram (in the new UI)</li>
+                    <li>Fix UI opening on the wrong monitor/incorrect size and focused monitor capture using the wrong monitor if vrr is enabled on kde plasma wayland</li>
+                    <li>Fix h264 software encoding option not working</li>
+                    <li>Fix capture not working if multiple audio devices have been selected in one audio track and one of them is a noise torch audio that has forward slash in its name (id)</li>
+                    <li>Redesign audio in the new UI to separate audio output and input, to make it clear which device is an output/input device</li>
+                </ul>
+            </description>
+        </release>
         <release version="5.5.0" date="2025-04-26">
             <description>
                 <ul>
