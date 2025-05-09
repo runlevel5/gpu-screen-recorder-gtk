@@ -1,4 +1,4 @@
-project('gpu-screen-recorder-gtk', ['c', 'cpp'], version : '5.6.0', default_options : ['warning_level=2'])
+project('gpu-screen-recorder-gtk', ['c', 'cpp'], version : '5.7.0', default_options : ['warning_level=2'])
 
 add_project_arguments('-Wshadow', language : ['c', 'cpp'])
 if get_option('buildtype') == 'debug'
@@ -33,7 +33,6 @@ executable('gpu-screen-recorder-gtk',
 )
 
 install_data(files('com.dec05eba.gpu_screen_recorder.desktop'), install_dir : join_paths(prefix, datadir, 'applications'))
-install_data(files('com.dec05eba.gpu_screen_recorder.appdata.xml'), install_dir : join_paths(prefix, datadir, 'metainfo'))
 install_subdir('icons/hicolor', install_dir : icons_path)
 
 gnome = import('gnome')

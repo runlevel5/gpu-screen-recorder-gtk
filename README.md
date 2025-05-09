@@ -4,6 +4,10 @@
 GTK frontend for [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).\
 There is a new alternative UI for GPU Screen Recorder in the style of ShadowPlay available here: [GPU Screen Recorder UI](https://git.dec05eba.com/gpu-screen-recorder-ui/).
 
+## Deprecation
+This project is no longer being developed as it has been superseded by [GPU Screen Recorder UI](https://git.dec05eba.com/gpu-screen-recorder-ui/) which has more features. This project will remain available until GPU Screen Recorder UI can run as a regular window, just like GPU Screen Recorder GTK does.\
+The `com.dec05eba.gpu_screen_recorder.appdata.xml` file has been moved to the [AppData](https://git.dec05eba.com/gpu-screen-recorder-appdata/) repository.
+
 # Installation
 If you are using an Arch Linux based distro then you can find gpu screen recorder gtk on aur under the name gpu-screen-recorder-gtk (`yay -S gpu-screen-recorder-gtk`).\
 If you are running another distro then you can run `sudo ./install.sh`, but you need to manually install the dependencies, as described below.\
