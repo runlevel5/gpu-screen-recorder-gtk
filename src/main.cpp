@@ -2739,8 +2739,8 @@ static void video_codec_set_sensitive(GtkCellLayout *cell_layout, GtkCellRendere
     g_free(id);
 }
 
-static void launch_gsr_ui(bool show_ui) {
-    const char *args[] = { "gsr-ui", show_ui ? "launch-show" : "launch-hide", nullptr };
+static void launch_gsr_ui(bool launched_by_daemon) {
+    const char *args[] = { "gsr-ui", show_ui ? "launch-daemon" : "launch-hide", nullptr };
     execvp(args[0], (char* const*)args);
     // TODO: This is incorrect because window wont be defined here if this is called from startup.
     // This is fine for not because this is only called inside the flatpak where gsr-ui is always available.
