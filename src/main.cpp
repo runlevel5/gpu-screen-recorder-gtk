@@ -3482,13 +3482,17 @@ static void add_wayland_global_hotkeys_ui(GtkGrid *grid, int &row, int width) {
     gtk_grid_attach(grid, GTK_WIDGET(aa_grid), 0, row++, width, 1);
     gtk_grid_set_column_spacing(aa_grid, 10);
 
-    gtk_grid_attach(aa_grid, gtk_label_new("On Wayland hotkeys are managed externally by the Wayland compositor, click here to change hotkeys:"), 0, 0, 1, 1);
+    if(wayland_compositor == WaylandCompositor::KDE) {
+        gtk_grid_attach(aa_grid, gtk_label_new("Hotkeys are managed externally on KDE Plasma Wayland. Click here to change hotkeys:"), 0, 0, 1, 1);
 
-    GtkButton *register_hotkeys_button = GTK_BUTTON(gtk_button_new_with_label("Change hotkeys"));
-    gtk_widget_set_hexpand(GTK_WIDGET(register_hotkeys_button), true);
-    //gtk_widget_set_halign(GTK_WIDGET(register_hotkeys_button), GTK_ALIGN_START);
-    g_signal_connect(register_hotkeys_button, "clicked", G_CALLBACK(on_register_hotkeys_button_clicked), nullptr);
-    gtk_grid_attach(aa_grid, GTK_WIDGET(register_hotkeys_button), 1, 0, 1, 1);
+        GtkButton *register_hotkeys_button = GTK_BUTTON(gtk_button_new_with_label("Change hotkeys"));
+        gtk_widget_set_hexpand(GTK_WIDGET(register_hotkeys_button), true);
+        //gtk_widget_set_halign(GTK_WIDGET(register_hotkeys_button), GTK_ALIGN_START);
+        g_signal_connect(register_hotkeys_button, "clicked", G_CALLBACK(on_register_hotkeys_button_clicked), nullptr);
+        gtk_grid_attach(aa_grid, GTK_WIDGET(register_hotkeys_button), 1, 0, 1, 1);
+    } else {
+        gtk_grid_attach(aa_grid, gtk_label_new("Hotkeys are managed externally on Wayland. Go into your system application/hotkey settings to change hotkeys."), 0, 0, 1, 1);
+    }
 
     row++;
     gtk_grid_attach(grid, gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), 0, row, width, 1);
@@ -4290,6 +4294,12 @@ static void init_shortcuts_callback(bool success, void *userdata) {
             fprintf(stderr, "gsr error: failed to list shortcuts\n");
         }
         gsr_global_shortcuts_subscribe_activated_signal(&global_shortcuts, deactivated_callback, shortcut_changed_callback, NULL);
+
+        // On KDE plasma the shortcut menu popup will show up everytime this is used, so we dont want to call it everytime.
+        // On Hyprland the global shortcut desktop portal is broken on older versions and crashes the desktop portal.
+        // On GNOME this needs to be called everytime to register the shortcuts. The shortcut popup menu will show the first time only.
+        if(wayland_compositor == WaylandCompositor::UNKNOWN)
+            on_register_hotkeys_button_clicked(nullptr, nullptr);
     } else {
         gtk_widget_set_visible(GTK_WIDGET(recording_hotkeys_grid), false);
         gtk_widget_set_visible(GTK_WIDGET(replay_hotkeys_grid), false);
@@ -4412,6 +4422,14 @@ static void activate(GtkApplication *app, gpointer) {
     gtk_window_set_default_icon_name(icon_name);
     gtk_window_set_icon_name(GTK_WINDOW(window), icon_name);
 
+    if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
+        if(gdk_wayland_display_query_registry(gdk_display_get_default(), "hyprland_global_shortcuts_manager_v1")) {
+            wayland_compositor = WaylandCompositor::HYPRLAND;
+        } else if(gdk_wayland_display_query_registry(gdk_display_get_default(), "org_kde_plasma_shell")) {
+            wayland_compositor = WaylandCompositor::KDE;
+        }
+    }
+
     select_window_userdata.app = app;
     audio_inputs = get_audio_devices();
     application_audio = get_application_audio();
@@ -4461,12 +4479,6 @@ static void activate(GtkApplication *app, gpointer) {
     load_config();
 
     if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
-        if(gdk_wayland_display_query_registry(gdk_display_get_default(), "hyprland_global_shortcuts_manager_v1")) {
-            wayland_compositor = WaylandCompositor::HYPRLAND;
-        } else if(gdk_wayland_display_query_registry(gdk_display_get_default(), "org_kde_plasma_shell")) {
-            wayland_compositor = WaylandCompositor::KDE;
-        }
-
         init_shortcuts_callback(false, nullptr);
         // TODO:
         // Disable global hotkeys on Hyprland for now. It crashes the hyprland desktop portal.
@@ -4475,7 +4487,7 @@ static void activate(GtkApplication *app, gpointer) {
         // the desktop portal is restarted (when the computer is restarted for example).
 
         if(wayland_compositor == WaylandCompositor::HYPRLAND) {
-            const char *hotkeys_not_supported_text = "Global hotkeys have been disabled on your system because of a Hyprland bug.\nUse X11 or KDE Plasma on Wayland if you want to use hotkeys.";
+            const char *hotkeys_not_supported_text = "Hotkeys have been disabled on your system because of a Hyprland bug.\nUse X11 or KDE Plasma on Wayland if you want to use hotkeys.";
             gtk_label_set_text(GTK_LABEL(recording_hotkeys_not_supported_label), hotkeys_not_supported_text);
             gtk_label_set_text(GTK_LABEL(replay_hotkeys_not_supported_label), hotkeys_not_supported_text);
             gtk_label_set_text(GTK_LABEL(streaming_hotkeys_not_supported_label), hotkeys_not_supported_text);

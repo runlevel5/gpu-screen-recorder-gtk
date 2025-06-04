@@ -4,6 +4,9 @@
 GTK frontend for [GPU Screen Recorder](https://git.dec05eba.com/gpu-screen-recorder/about/).\
 There is a new alternative UI for GPU Screen Recorder in the style of ShadowPlay available here: [GPU Screen Recorder UI](https://git.dec05eba.com/gpu-screen-recorder-ui/).
 
+## Notes
+The program has to be launched from your application launcher or hotkeys may not work properly in your Wayland compositor (this is the case with GNOME).
+
 ## Deprecation
 This project is no longer being developed as it has been superseded by [GPU Screen Recorder UI](https://git.dec05eba.com/gpu-screen-recorder-ui/) which has more features. This project will remain available until GPU Screen Recorder UI can run as a regular window, just like GPU Screen Recorder GTK does.\
 The `com.dec05eba.gpu_screen_recorder.appdata.xml` file has been moved to the [AppData](https://git.dec05eba.com/gpu-screen-recorder-appdata/) repository.
@@ -11,7 +14,7 @@ The `com.dec05eba.gpu_screen_recorder.appdata.xml` file has been moved to the [A
 # Installation
 If you are using an Arch Linux based distro then you can find gpu screen recorder gtk on aur under the name gpu-screen-recorder-gtk (`yay -S gpu-screen-recorder-gtk`).\
 If you are running another distro then you can run `sudo ./install.sh`, but you need to manually install the dependencies, as described below.\
-You can also install gpu screen recorder from [flathub](https://flathub.org/apps/details/com.dec05eba.gpu_screen_recorder). This flatpak includes both this UI and gpu-screen-recorder so no need to install that first.
+You can also install gpu screen recorder from [flathub](https://flathub.org/apps/details/com.dec05eba.gpu_screen_recorder) which includes this UI.
 
 # Dependencies
 GPU Screen Recorder GTK uses meson build system so you need to install `meson` to build GPU Screen Recorder GTK.
