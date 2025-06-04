@@ -1457,11 +1457,79 @@ static void show_bugged_driver_warning() {
     }
 }
 
+static void replace_meta_with_super(std::string &str) {
+    size_t index = str.find("meta");
+    if(index != std::string::npos)
+        str.replace(index, 4, "Super");
+
+    index = str.find("Meta");
+    if(index != std::string::npos)
+        str.replace(index, 4, "Super");
+}
+
+static void shortcut_changed_callback(gsr_shortcut shortcut, void *userdata) {
+    (void)userdata;
+    std::string trigger = shortcut.trigger_description;
+    replace_meta_with_super(trigger);
+    for(int i = 0; i < num_hotkeys; ++i) {
+        if(strcmp(shortcut.id, hotkeys[i]->shortcut_id) == 0) {
+            gtk_entry_set_text(GTK_ENTRY(hotkeys[i]->hotkey_entry), trigger.c_str());
+        }
+    }
+}
+
+static gboolean on_register_hotkeys_button_clicked(GtkButton *button, gpointer userdata) {
+    (void)button;
+    (void)userdata;
+
+    /*
+        Modifier key names are defined here: https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-names.h.
+        Remove the XKB_MOD_NAME_ prefix from the name and use the remaining part.
+        Key names are defined here: https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h.
+        Remove the XKB_KEY_ (or XKB_KEY_KP_) prefix from the name and user the remaining part.
+    */
+    /* Unfortunately global shortcuts cant handle same key for different shortcuts, even though GPU Screen Recorder has page specific hotkeys */
+    const gsr_bind_shortcut shortcuts[3] = {
+        {
+            "Start/stop recording/replay/streaming",
+            { SHORTCUT_ID_START_STOP_RECORDING, "ALT+1" }
+        },
+        {
+            "Pause/unpause recording",
+            { SHORTCUT_ID_PAUSE_UNPAUSE_RECORDING, "ALT+2" }
+        },
+        {
+            "Save replay",
+            { SHORTCUT_ID_SAVE_REPLAY, "ALT+3" }
+        }
+    };
+
+    if(global_shortcuts_initialized) {
+        if(!gsr_global_shortcuts_bind_shortcuts(&global_shortcuts, shortcuts, 3, shortcut_changed_callback, NULL)) {
+            fprintf(stderr, "gsr error: failed to bind shortcuts\n");
+        }
+    }
+
+    return true;
+}
+
+static void register_global_shortcuts_once() {
+    static bool registered = false;
+    // On KDE plasma the shortcut menu popup will show up everytime this is used, so we dont want to call it everytime.
+    // On Hyprland the global shortcut desktop portal is broken on older versions and crashes the desktop portal.
+    // On GNOME this needs to be called everytime to register the shortcuts. The shortcut popup menu will show the first time only.
+    if(wayland_compositor == WaylandCompositor::UNKNOWN && !registered) {
+        registered = true;
+        on_register_hotkeys_button_clicked(nullptr, nullptr);
+    }
+}
+
 static gboolean on_start_replay_click(GtkButton*, gpointer userdata) {
     if(show_pkexec_flatpak_error_if_needed())
         return true;
 
     show_bugged_driver_warning();
+    register_global_shortcuts_once();
 
     PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(_page_navigation_userdata->stack, _page_navigation_userdata->replay_page);
@@ -1478,6 +1546,7 @@ static gboolean on_start_recording_click(GtkButton*, gpointer userdata) {
         return true;
 
     show_bugged_driver_warning();
+    register_global_shortcuts_once();
 
     PageNavigationUserdata *_page_navigation_userdata = (PageNavigationUserdata*)userdata;
     gtk_stack_set_visible_child(_page_navigation_userdata->stack, _page_navigation_userdata->recording_page);
@@ -1500,6 +1569,7 @@ static gboolean on_start_streaming_click(GtkButton*, gpointer userdata) {
         return true;
 
     show_bugged_driver_warning();
+    register_global_shortcuts_once();
 
     int num_audio_tracks = 0;
     gtk_container_foreach(GTK_CONTAINER(audio_devices_items_box), [](GtkWidget *widget, gpointer userdata) {
@@ -3408,27 +3478,6 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     return GTK_WIDGET(main_grid);
 }
 
-static void replace_meta_with_super(std::string &str) {
-    size_t index = str.find("meta");
-    if(index != std::string::npos)
-        str.replace(index, 4, "Super");
-
-    index = str.find("Meta");
-    if(index != std::string::npos)
-        str.replace(index, 4, "Super");
-}
-
-static void shortcut_changed_callback(gsr_shortcut shortcut, void *userdata) {
-    (void)userdata;
-    std::string trigger = shortcut.trigger_description;
-    replace_meta_with_super(trigger);
-    for(int i = 0; i < num_hotkeys; ++i) {
-        if(strcmp(shortcut.id, hotkeys[i]->shortcut_id) == 0) {
-            gtk_entry_set_text(GTK_ENTRY(hotkeys[i]->hotkey_entry), trigger.c_str());
-        }
-    }
-}
-
 static void deactivated_callback(const char *description, void *userdata) {
     (void)userdata;
     const GtkWidget *visible_page = gtk_stack_get_visible_child(page_navigation_userdata.stack);
@@ -3439,41 +3488,6 @@ static void deactivated_callback(const char *description, void *userdata) {
         if(strcmp(description, hotkeys[i]->shortcut_id) == 0)
             hotkeys[i]->trigger_handler(hotkeys[i]->associated_button, page_navigation_userdata.app);
     }
-}
-
-static gboolean on_register_hotkeys_button_clicked(GtkButton *button, gpointer userdata) {
-    (void)button;
-    (void)userdata;
-
-    /*
-        Modifier key names are defined here: https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-names.h.
-        Remove the XKB_MOD_NAME_ prefix from the name and use the remaining part.
-        Key names are defined here: https://github.com/xkbcommon/libxkbcommon/blob/master/include/xkbcommon/xkbcommon-keysyms.h.
-        Remove the XKB_KEY_ (or XKB_KEY_KP_) prefix from the name and user the remaining part.
-    */
-    /* Unfortunately global shortcuts cant handle same key for different shortcuts, even though GPU Screen Recorder has page specific hotkeys */
-    const gsr_bind_shortcut shortcuts[3] = {
-        {
-            "Start/stop recording/replay/streaming",
-            { SHORTCUT_ID_START_STOP_RECORDING, "ALT+1" }
-        },
-        {
-            "Pause/unpause recording",
-            { SHORTCUT_ID_PAUSE_UNPAUSE_RECORDING, "ALT+2" }
-        },
-        {
-            "Save replay",
-            { SHORTCUT_ID_SAVE_REPLAY, "ALT+3" }
-        }
-    };
-
-    if(global_shortcuts_initialized) {
-        if(!gsr_global_shortcuts_bind_shortcuts(&global_shortcuts, shortcuts, 3, shortcut_changed_callback, NULL)) {
-            fprintf(stderr, "gsr error: failed to bind shortcuts\n");
-        }
-    }
-
-    return true;
 }
 
 static void add_wayland_global_hotkeys_ui(GtkGrid *grid, int &row, int width) {
@@ -4294,12 +4308,6 @@ static void init_shortcuts_callback(bool success, void *userdata) {
             fprintf(stderr, "gsr error: failed to list shortcuts\n");
         }
         gsr_global_shortcuts_subscribe_activated_signal(&global_shortcuts, deactivated_callback, shortcut_changed_callback, NULL);
-
-        // On KDE plasma the shortcut menu popup will show up everytime this is used, so we dont want to call it everytime.
-        // On Hyprland the global shortcut desktop portal is broken on older versions and crashes the desktop portal.
-        // On GNOME this needs to be called everytime to register the shortcuts. The shortcut popup menu will show the first time only.
-        if(wayland_compositor == WaylandCompositor::UNKNOWN)
-            on_register_hotkeys_button_clicked(nullptr, nullptr);
     } else {
         gtk_widget_set_visible(GTK_WIDGET(recording_hotkeys_grid), false);
         gtk_widget_set_visible(GTK_WIDGET(replay_hotkeys_grid), false);
