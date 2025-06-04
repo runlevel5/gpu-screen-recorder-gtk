@@ -169,6 +169,7 @@ static AppIndicator *app_indicator;
 
 static gsr_global_shortcuts global_shortcuts;
 static bool global_shortcuts_initialized = false;
+static bool global_shortcuts_received = false;
 
 struct AudioInput {
     std::string name;
@@ -1469,6 +1470,7 @@ static void replace_meta_with_super(std::string &str) {
 
 static void shortcut_changed_callback(gsr_shortcut shortcut, void *userdata) {
     (void)userdata;
+    global_shortcuts_received = true;
     std::string trigger = shortcut.trigger_description;
     replace_meta_with_super(trigger);
     for(int i = 0; i < num_hotkeys; ++i) {
@@ -1518,7 +1520,7 @@ static void register_global_shortcuts_once() {
     // On KDE plasma the shortcut menu popup will show up everytime this is used, so we dont want to call it everytime.
     // On Hyprland the global shortcut desktop portal is broken on older versions and crashes the desktop portal.
     // On GNOME this needs to be called everytime to register the shortcuts. The shortcut popup menu will show the first time only.
-    if(wayland_compositor == WaylandCompositor::UNKNOWN && !registered) {
+    if(wayland_compositor == WaylandCompositor::UNKNOWN && !registered && !global_shortcuts_received) {
         registered = true;
         on_register_hotkeys_button_clicked(nullptr, nullptr);
     }
