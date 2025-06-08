@@ -1401,6 +1401,9 @@ static bool is_monitor_capture_drm() {
 }
 
 static bool show_pkexec_flatpak_error_if_needed() {
+    if(!flatpak)
+        return false;
+
     const std::string window_str = record_area_selection_menu_get_active_id();
     if(is_monitor_capture_drm() && window_str != "window" && window_str != "focused" && window_str != "portal") {
         if(!is_pkexec_installed()) {
@@ -1411,7 +1414,7 @@ static bool show_pkexec_flatpak_error_if_needed() {
             return true;
         }
 
-        if(flatpak && !flatpak_is_installed_as_system()) {
+        if(!flatpak_is_installed_as_system()) {
             if(gsr_info.system_info.display_server == DisplayServer::WAYLAND) {
                 GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
                     "GPU Screen Recorder needs to be installed system-wide to record your monitor on Wayland when not using the portal option. You can run this command to install GPU Screen recorder system-wide:\n"
