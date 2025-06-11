@@ -1679,13 +1679,15 @@ static bool starts_with(const std::string &str, const char *substr) {
 struct AudioTracksUserdata {
     std::vector<std::string> &result;
     bool application_audio_invert;
+    int num_app_audio = 0;
 };
 
 static std::vector<std::string> create_audio_tracks_real_names(std::string &merge_audio_tracks) {
     std::vector<std::string> result;
     AudioTracksUserdata audio_tracks_userdata {
         result,
-        (bool)gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_app_audio_inverted_button))
+        (bool)gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(record_app_audio_inverted_button)),
+        0
     };
 
     gtk_container_foreach(GTK_CONTAINER(audio_devices_items_box), [](GtkWidget *widget, gpointer userdata) {
@@ -1703,6 +1705,7 @@ static std::vector<std::string> create_audio_tracks_real_names(std::string &merg
             std::string audio_input_name = audio_tracks_userdata.application_audio_invert ? "app-inverse:" : "app:";
             audio_input_name += gtk_combo_box_get_active_id(GTK_COMBO_BOX(row_item_widget));
             audio_tracks_userdata.result.push_back(std::move(audio_input_name));
+            ++audio_tracks_userdata.num_app_audio;
         } else if(strcmp(audio_track_type, "app-custom") == 0) {
             if(!gsr_info.system_info.supports_app_audio)
                 return;
@@ -1710,8 +1713,12 @@ static std::vector<std::string> create_audio_tracks_real_names(std::string &merg
             std::string audio_input_name = audio_tracks_userdata.application_audio_invert ? "app-inverse:" : "app:";
             audio_input_name += gtk_entry_get_text(GTK_ENTRY(row_item_widget));
             audio_tracks_userdata.result.push_back(std::move(audio_input_name));
+            ++audio_tracks_userdata.num_app_audio;
         }
     }, &audio_tracks_userdata);
+
+    if(audio_tracks_userdata.num_app_audio == 0 && audio_tracks_userdata.application_audio_invert)
+        audio_tracks_userdata.result.push_back("app-inverse:");
 
     merge_audio_tracks.clear();
     for(size_t i = 0; i < result.size(); ++i) {
