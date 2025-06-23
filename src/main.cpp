@@ -4419,7 +4419,7 @@ static void activate(GtkApplication *app, gpointer) {
 
     page_navigation_userdata.app = app;
 
-    std::string window_title = "GPU Screen Recorder v" + std::string(GSR_VERSION) + " | Running on ";
+    std::string window_title = "GPU Screen Recorder | Running on ";
     window_title += gpu_vendor_to_name(gsr_info.gpu_info.vendor);
 
     window = gtk_application_window_new(app);
