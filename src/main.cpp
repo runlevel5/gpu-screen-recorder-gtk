@@ -2822,7 +2822,7 @@ static void video_codec_set_sensitive(GtkCellLayout *cell_layout, GtkCellRendere
 }
 
 static void launch_gsr_ui(bool launched_by_daemon) {
-    const char *args[] = { "gsr-ui", launched_by_daemon ? "launch-daemon" : "launch-hide", nullptr };
+    const char *args[] = { "gsr-ui", launched_by_daemon ? "launch-daemon" : "launch-show", nullptr };
     execvp(args[0], (char* const*)args);
     // TODO: This is incorrect because window wont be defined here if this is called from startup.
     // This is fine for not because this is only called inside the flatpak where gsr-ui is always available.
@@ -2931,7 +2931,6 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         "flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service \"$data_home/systemd/user/gpu-screen-recorder-ui.service\"") == 0);
     service_install_successful &= (system("flatpak-spawn --host -- systemctl --user daemon-reload") == 0);
     service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --user gpu-screen-recorder-ui") == 0);
-    service_install_successful &= (system("flatpak-spawn --host -- systemctl start --user gpu-screen-recorder-ui") == 0);
     if(!service_install_successful) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need to add this command to system startup:\n"
@@ -2942,7 +2941,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
     }
 
     if(!service_install_successful)
-        launch_gsr_ui(true);
+        launch_gsr_ui(false);
 
     g_application_quit(G_APPLICATION(select_window_userdata.app));
     return true;
@@ -4605,15 +4604,15 @@ static void startup_new_ui(bool launched_by_daemon) {
     if(dpy)
         XCloseDisplay(dpy);
 
-    launch_gsr_ui(!launched_by_daemon);
+    launch_gsr_ui(launched_by_daemon);
     exit(0);
 }
 
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C");
 
-    const bool use_old_ui_opt = argc == 2 && strcmp(argv[1], "use-old-ui") == 0;
-    const bool launched_by_daemon_opt = argc == 2 && strcmp(argv[1], "gsr-ui") == 0;
+    const bool use_old_ui_opt = argc >= 2 && strcmp(argv[1], "use-old-ui") == 0;
+    const bool launched_by_daemon_opt = argc >= 2 && strcmp(argv[1], "gsr-ui") == 0;
     argc = 1;
 
     if(geteuid() == 0) {
@@ -4625,6 +4624,11 @@ int main(int argc, char **argv) {
 
     config_empty = false;
     config = read_config(config_empty);
+
+    if(!dpy && launched_by_daemon_opt && config.main_config.use_new_ui) {
+        fprintf(stderr, "Error: failed to connect to the X11 server, assuming no graphical session has started yet\n");
+        exit(1);
+    }
 
     gsr_info_exit_status = get_gpu_screen_recorder_info(&gsr_info);
     if(gsr_info_exit_status == GsrInfoExitStatus::OK) {
