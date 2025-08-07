@@ -1753,24 +1753,18 @@ static void change_container_if_codec_not_supported(const std::string &video_cod
     }
 }
 
-static bool switch_video_codec_to_usable_hardware_encoder(std::string &video_codec) {
-    if(gsr_info.supported_video_codecs.h264) {
-        video_codec = "h264";
-        return true;
-    } else if(gsr_info.supported_video_codecs.hevc) {
-        video_codec = "hevc";
-        return true;
-    } else if(gsr_info.supported_video_codecs.av1) {
-        video_codec = "av1";
-        return true;
-    } else if(gsr_info.supported_video_codecs.vp8) {
-        video_codec = "vp8";
-        return true;
-    } else if(gsr_info.supported_video_codecs.vp9) {
-        video_codec = "vp9";
-        return true;
-    }
-    return false;
+static const char* get_first_usable_hardware_video_codec_name() {
+    if(gsr_info.supported_video_codecs.h264)
+        return "h264";
+    else if(gsr_info.supported_video_codecs.hevc)
+        return "hevc";
+    else if(gsr_info.supported_video_codecs.av1)
+        return "av1";
+    else if(gsr_info.supported_video_codecs.vp8)
+        return "vp8";
+    else if(gsr_info.supported_video_codecs.vp9)
+        return "vp9";
+    return nullptr;
 }
 
 static void add_quality_command_line_args(std::vector<const char*> &args, const char *quality_input_str, const char *video_bitrate_str) {
@@ -1891,7 +1885,7 @@ static gboolean on_start_replay_button_click(GtkButton *button, gpointer userdat
         video_codec_input_str = "h264";
         encoder = "cpu";
     } else if(video_codec_input_str == "auto") {
-        if(!switch_video_codec_to_usable_hardware_encoder(video_codec_input_str)) {
+        if(!get_first_usable_hardware_video_codec_name()) {
             video_codec_input_str = "h264";
             encoder = "cpu";
         }
@@ -2089,7 +2083,7 @@ static gboolean on_start_recording_button_click(GtkButton *button, gpointer user
         video_codec_input_str = "h264";
         encoder = "cpu";
     } else if(video_codec_input_str == "auto") {
-        if(!switch_video_codec_to_usable_hardware_encoder(video_codec_input_str)) {
+        if(!get_first_usable_hardware_video_codec_name()) {
             video_codec_input_str = "h264";
             encoder = "cpu";
         }
@@ -2281,7 +2275,7 @@ static gboolean on_start_streaming_button_click(GtkButton *button, gpointer user
         video_codec_input_str = "h264";
         encoder = "cpu";
     } else if(video_codec_input_str == "auto") {
-        if(!switch_video_codec_to_usable_hardware_encoder(video_codec_input_str)) {
+        if(!get_first_usable_hardware_video_codec_name()) {
             video_codec_input_str = "h264";
             encoder = "cpu";
         }
@@ -3292,7 +3286,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
         video_codec_selection_model = GTK_TREE_MODEL(store);
 
         gtk_list_store_append(store, &iter);
-        gtk_list_store_set(store, &iter, 0, "Auto (Recommended, H264)", -1);
+        gtk_list_store_set(store, &iter, 0, "Auto (Recommended)", -1);
         gtk_list_store_set(store, &iter, 1, "auto", -1);
 
         gtk_list_store_append(store, &iter);
@@ -4272,8 +4266,7 @@ static void load_config() {
         gtk_widget_set_visible(GTK_WIDGET(record_app_audio_inverted_button), false);
     }
 
-    std::string dummy;
-    if(!config.main_config.software_encoding_warning_shown && !switch_video_codec_to_usable_hardware_encoder(dummy)) {
+    if(!config.main_config.software_encoding_warning_shown && !get_first_usable_hardware_video_codec_name()) {
         GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Unable to find a hardware video encoder on your system, using software video encoder instead (slow!). If you know that your system supports H264/HEVC hardware video encoding and "
             "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
