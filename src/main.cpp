@@ -4270,7 +4270,9 @@ static void load_config() {
         GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
             "Unable to find a hardware video encoder on your system, using software video encoder instead (slow!). If you know that your system supports H264/HEVC hardware video encoding and "
             "you are using the flatpak version of GPU Screen Recorder then try installing mesa-extra freedesktop runtime by running this command:\n"
-            "flatpak install --system org.freedesktop.Platform.GL.default//23.08-extra\n"
+            "flatpak install --system org.freedesktop.Platform.GL.default//24.08extra\n"
+            "If you have an Intel GPU then you might need to run this command as well:\n"
+            "flatpak install --system org.freedesktop.Platform.VAAPI.Intel//24.08\n"
             "and then restart GPU Screen Recorder. If that doesn't work then you may have to install another mesa package for your distro if you are using AMD.\n"
             "If you are using NVIDIA then you might need to run the \"nvidia-smi\" command first before starting GPU Screen Recorder if NVIDIA is incorrectly setup on your distro.\n"
             "If you are using a distro such as manjaro which disables hardware accelerated video encoding then you can also try the <a href=\"https://flathub.org/apps/com.dec05eba.gpu_screen_recorder\">flatpak version of GPU Screen Recorder</a> instead which doesn't have this issue.");
