@@ -2708,7 +2708,7 @@ static void parse_capture_options_line(GsrInfo *_gsr_info, const std::string &li
         _gsr_info->supported_capture_options.focused = true;
     else if(line == "portal")
         _gsr_info->supported_capture_options.portal = true;
-    else if(line != "region") // We dont support region capture in the gtk application
+    else if(line != "region" && !line.empty() && line[0] != '/') // We dont support region capture in the gtk application
         _gsr_info->supported_capture_options.monitors.push_back(capture_option_line_to_monitor(line));
 }
 
@@ -3369,7 +3369,7 @@ static GtkWidget* create_common_settings_page(GtkStack *stack, GtkApplication *a
     GtkGrid *fps_grid = GTK_GRID(gtk_grid_new());
     gtk_grid_attach(video_grid, GTK_WIDGET(fps_grid), 0, video_input_area_row++, 2, 1);
     gtk_grid_attach(fps_grid, gtk_label_new("Frame rate: "), 0, 0, 1, 1);
-    fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 5000.0, 1.0));
+    fps_entry = GTK_SPIN_BUTTON(gtk_spin_button_new_with_range(1.0, 500.0, 1.0));
     g_signal_connect(fps_entry, "scroll-event", G_CALLBACK(scroll_event_ignore), NULL);
     gtk_spin_button_set_value(fps_entry, 60.0);
     gtk_widget_set_hexpand(GTK_WIDGET(fps_entry), true);
