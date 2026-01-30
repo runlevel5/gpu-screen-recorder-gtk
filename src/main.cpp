@@ -2896,6 +2896,7 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
         "This new UI comes with new features, such as being able to automatically launch it on system startup by enabling it in settings, and hotkey support on any Wayland compositor.\n"
         "\n"
         "If you are using keyboard remapping software such as keyd then make sure it ignores \"gsr-ui virtual keyboard\" (dec0:5eba device id), or it will prevent you from using your keyboard.\n"
+        "You can alternatively go into GPU Screen Recorder settings on the right in the UI and change hotkeys to only grab virtual devices or to not grab devices.\n"
         "You can go back to the old UI by pressing (left) ctrl+shift+alt+esc if this happens.\n"
         "\n"
         "If you are using an NVIDIA GPU then you may experience issue with recording/replay if a suspend happens while recording/using replay. This is an NVIDIA driver issue and it also happens in the old UI.\n"
