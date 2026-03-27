@@ -2921,14 +2921,12 @@ static gboolean on_click_switch_to_new_ui(GtkButton*, gpointer) {
     if(!kms_server_setup_finished)
         return true;
 
-    bool service_install_successful = (system(
-        "data_home=$(flatpak-spawn --host -- /bin/sh -c 'echo \"${XDG_DATA_HOME:-$HOME/.local/share}\"') && "
-        "flatpak-spawn --host -- install -Dm644 /var/lib/flatpak/app/com.dec05eba.gpu_screen_recorder/current/active/files/share/gpu-screen-recorder/gpu-screen-recorder-ui.service \"$data_home/systemd/user/gpu-screen-recorder-ui.service\"") == 0);
-    service_install_successful &= (system("flatpak-spawn --host -- systemctl --user daemon-reload") == 0);
-    service_install_successful &= (system("flatpak-spawn --host -- systemctl enable --user gpu-screen-recorder-ui") == 0);
-    if(!service_install_successful) {
+    const bool startup_installed_successfully = (system("gsr-ui install-startup") == 0);
+    if(!startup_installed_successfully) {
         GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
-            "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need to add this command to system startup:\n"
+            "Failed to add GPU Screen Recorder to system startup. If you want the new UI to start on system startup then you need\n"
+            "to either install and configure \"dex\" and go into GPU Screen Recorder settings (the icon on the right)\n"
+            "and enable system startup or add this command to system startup:\n"
             "flatpak run com.dec05eba.gpu_screen_recorder gsr-ui");
         set_dialog_selectable(dialog);
         gtk_dialog_run(GTK_DIALOG(dialog));
@@ -4637,8 +4635,6 @@ int main(int argc, char **argv) {
     nvfbc_installed = gsr_info.system_info.display_server != DisplayServer::WAYLAND && is_nv_fbc_installed();
 
     if(use_old_ui_opt) {
-        system("flatpak-spawn --host -- systemctl disable --user gpu-screen-recorder-ui");
-        system("flatpak-spawn --host -- systemctl stop --user gpu-screen-recorder-ui");
         config.main_config.use_new_ui = false;
         save_config(config);
     }
