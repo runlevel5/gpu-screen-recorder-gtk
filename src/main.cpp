@@ -4283,16 +4283,6 @@ static void load_config() {
         config.main_config.advanced_view = true;
         gtk_combo_box_set_active_id(GTK_COMBO_BOX(view_combo_box), "advanced");
     }
-
-    if(gsr_info.system_info.is_steam_deck && !config.main_config.steam_deck_warning_shown)  {
-        GtkWidget *dialog = gtk_message_dialog_new_with_markup(GTK_WINDOW(window), GTK_DIALOG_MODAL, GTK_MESSAGE_WARNING, GTK_BUTTONS_OK,
-            "Steam deck has multiple driver bugs, some which have been introduced in the last few months. For example one of them has been reported here: "
-            "<a href=\"https://github.com/ValveSoftware/SteamOS/issues/1609\">https://github.com/ValveSoftware/SteamOS/issues/1609</a>.\n"
-            "If you have issues with GPU Screen Recorder on steam deck but not on a desktop computer then report the issue to Valve and/or AMD.");
-        gtk_dialog_run(GTK_DIALOG(dialog));
-        gtk_widget_destroy(dialog);
-        config.main_config.steam_deck_warning_shown = true;
-    }
 }
 
 static void init_shortcuts_callback(bool success, void *userdata) {
