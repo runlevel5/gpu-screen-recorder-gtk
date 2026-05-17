@@ -11,10 +11,11 @@
 #include "../str_util.h"
 
 typedef struct {
-    page_nav_cb nav;
-    void       *user;
-    PageReplay *page;
-    Config     *config;
+    page_nav_cb     nav;
+    page_session_cb session;
+    void           *user;
+    PageReplay     *page;
+    Config         *config;
 } PageCtx;
 
 static const char *k_containers[] = { "mp4", "mkv", "mov", "webm", "flv", "ts", NULL };
@@ -33,18 +34,20 @@ static void start_cb(Widget w, XtPointer client, XtPointer call)
     PageCtx *c = (PageCtx *)client;
     page_replay_commit(c->page, c->config);
     app_state_save(c->config);
-    /* Recorder spawn lands in Pass B; widget action wires up in Phase 5b. */
+    if(c->session) c->session(SESSION_TOGGLE_RUN, PAGE_REPLAY, c->user);
 }
 
 static void save_cb(Widget w, XtPointer client, XtPointer call)
 {
-    (void)w; (void)client; (void)call;
-    /* Sends SIGUSR1 to recorder — wired in Pass B. */
+    (void)w; (void)call;
+    PageCtx *c = (PageCtx *)client;
+    if(c->session) c->session(SESSION_SAVE, PAGE_REPLAY, c->user);
 }
 
 void page_replay_create(Widget parent, PageReplay *out,
                         const Config *config,
-                        page_nav_cb nav, void *user_data)
+                        page_nav_cb nav, page_session_cb session,
+                        void *user_data)
 {
     out->root = XtVaCreateWidget("replay_page",
         xmFormWidgetClass, parent,
@@ -99,10 +102,11 @@ void page_replay_create(Widget parent, PageReplay *out,
     out->save_btn  = gsr_w_button(btn_row, "Save replay");
 
     PageCtx *c = (PageCtx *)malloc(sizeof(*c));
-    c->nav    = nav;
-    c->user   = user_data;
-    c->page   = out;
-    c->config = (Config *)config;
+    c->nav     = nav;
+    c->session = session;
+    c->user    = user_data;
+    c->page    = out;
+    c->config  = (Config *)config;
 
     XtAddCallback(out->back_btn,  XmNactivateCallback, back_cb,  c);
     XtAddCallback(out->start_btn, XmNactivateCallback, start_cb, c);

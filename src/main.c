@@ -18,6 +18,7 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +26,7 @@
 #include "app_state.h"
 #include "audio_devices.h"
 #include "capabilities.h"
+#include "recorder_args.h"
 #include "recorder_process.h"
 #include "ui/page_common_settings.h"
 #include "ui/page_recording.h"
@@ -57,7 +59,32 @@ typedef struct {
     GsrCapabilities caps;
     ConfigHotkey    test_hotkey;       /* Phase 3 demo */
     bool            running;
+
+    /* Recorder session state. */
+    RecorderMode    active_mode;       /* meaningful only when recorder_active */
+    bool            recorder_active;
+    bool            recorder_paused;
 } AppCtx;
+
+static const char *page_id_to_mode_name(PageId p)
+{
+    switch(p) {
+    case PAGE_RECORDING: return "record";
+    case PAGE_REPLAY:    return "replay";
+    case PAGE_STREAMING: return "stream";
+    default:             return "?";
+    }
+}
+
+static bool page_id_to_mode(PageId p, RecorderMode *out)
+{
+    switch(p) {
+    case PAGE_RECORDING: *out = RECORDER_MODE_RECORD; return true;
+    case PAGE_REPLAY:    *out = RECORDER_MODE_REPLAY; return true;
+    case PAGE_STREAMING: *out = RECORDER_MODE_STREAM; return true;
+    default: return false;
+    }
+}
 
 /* --- Page switching + commit --------------------------------------- */
 
@@ -91,6 +118,91 @@ static void on_page_nav(PageId target, void *user_data)
     switch_to_page((AppCtx *)user_data, target);
 }
 
+/* --- Session dispatch (page Start/Save/Pause → subprocess) --------- */
+
+static void session_start(AppCtx *ctx, RecorderMode mode)
+{
+    if(ctx->recorder_active) {
+        fprintf(stderr, "[session] start ignored: recorder already running (mode %d)\n",
+                (int)ctx->active_mode);
+        return;
+    }
+
+    RecorderArgsRequest req;
+    memset(&req, 0, sizeof(req));
+    req.mode = mode;
+    req.config = &ctx->config;
+    req.caps   = &ctx->caps;
+
+    char **argv = NULL;
+    RecorderArgsStatus s = recorder_args_build(&req, &argv, NULL);
+    if(s != RA_BUILD_OK) {
+        fprintf(stderr, "[session] could not build argv: %s\n",
+                recorder_args_status_str(s));
+        return;
+    }
+
+    fprintf(stderr, "[session] spawn:");
+    for(size_t i = 0; argv[i]; ++i) fprintf(stderr, " %s", argv[i]);
+    fprintf(stderr, "\n");
+
+    bool spawned = recorder_process_spawn((const char *const *)argv);
+    recorder_args_free(argv);
+    if(!spawned) {
+        fprintf(stderr, "[session] spawn failed\n");
+        return;
+    }
+    ctx->active_mode     = mode;
+    ctx->recorder_active = true;
+    ctx->recorder_paused = false;
+}
+
+static void session_stop(AppCtx *ctx)
+{
+    if(!ctx->recorder_active) {
+        fprintf(stderr, "[session] stop ignored: no recorder running\n");
+        return;
+    }
+    /* SIGINT — gpu-screen-recorder finalises and exits cleanly. The
+     * polling timer will pick up the exit and clear recorder_active. */
+    recorder_process_send_signal(SIGINT);
+}
+
+static void on_page_session(SessionAction action, PageId source, void *user_data)
+{
+    AppCtx *ctx = (AppCtx *)user_data;
+    RecorderMode mode;
+    bool have_mode = page_id_to_mode(source, &mode);
+
+    switch(action) {
+    case SESSION_TOGGLE_RUN:
+        if(!have_mode) return;
+        if(ctx->recorder_active) {
+            if(ctx->active_mode == mode) {
+                session_stop(ctx);
+            } else {
+                fprintf(stderr, "[session] cannot start %s: %s already running\n",
+                        page_id_to_mode_name(source),
+                        ctx->active_mode == RECORDER_MODE_RECORD ? "record"
+                      : ctx->active_mode == RECORDER_MODE_REPLAY ? "replay" : "stream");
+            }
+        } else {
+            session_start(ctx, mode);
+        }
+        break;
+    case SESSION_PAUSE:
+        if(ctx->recorder_active && ctx->active_mode == RECORDER_MODE_RECORD) {
+            recorder_process_send_signal(SIGUSR2);
+            ctx->recorder_paused = !ctx->recorder_paused;
+        }
+        break;
+    case SESSION_SAVE:
+        if(ctx->recorder_active && ctx->active_mode == RECORDER_MODE_REPLAY)
+            recorder_process_send_signal(SIGUSR1);
+        break;
+    }
+}
+
 /* --- Timers -------------------------------------------------------- */
 
 static void poll_recorder_subprocess(XtPointer client_data, XtIntervalId *id)
@@ -98,8 +210,12 @@ static void poll_recorder_subprocess(XtPointer client_data, XtIntervalId *id)
     (void)id;
     AppCtx *ctx = (AppCtx *)client_data;
     int status = 0;
-    if(recorder_process_poll(&status))
-        fprintf(stderr, "[recorder] subprocess exited, status=%d\n", status);
+    if(recorder_process_poll(&status)) {
+        fprintf(stderr, "[recorder] subprocess exited (mode=%d, status=%d)\n",
+                (int)ctx->active_mode, status);
+        ctx->recorder_active = false;
+        ctx->recorder_paused = false;
+    }
     XtAppAddTimeOut(ctx->app, POLL_RECORDER_INTERVAL_MS,
                     poll_recorder_subprocess, ctx);
 }
@@ -152,9 +268,9 @@ static void log_loaded_config(const Config *c)
 static void build_pages(AppCtx *ctx)
 {
     page_common_settings_create(ctx->page_host, &ctx->common,    &ctx->config, &ctx->caps, on_page_nav, ctx);
-    page_replay_create         (ctx->page_host, &ctx->replay,    &ctx->config, on_page_nav, ctx);
-    page_recording_create      (ctx->page_host, &ctx->recording, &ctx->config, on_page_nav, ctx);
-    page_streaming_create      (ctx->page_host, &ctx->streaming, &ctx->config, on_page_nav, ctx);
+    page_replay_create         (ctx->page_host, &ctx->replay,    &ctx->config, on_page_nav, on_page_session, ctx);
+    page_recording_create      (ctx->page_host, &ctx->recording, &ctx->config, on_page_nav, on_page_session, ctx);
+    page_streaming_create      (ctx->page_host, &ctx->streaming, &ctx->config, on_page_nav, on_page_session, ctx);
 
     ctx->pages[PAGE_COMMON_SETTINGS] = ctx->common.root;
     ctx->pages[PAGE_REPLAY]          = ctx->replay.root;

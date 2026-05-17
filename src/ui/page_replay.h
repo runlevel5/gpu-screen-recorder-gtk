@@ -22,7 +22,8 @@ typedef struct {
 
 void page_replay_create(Widget parent, PageReplay *out,
                         const Config *config,
-                        page_nav_cb nav, void *user_data);
+                        page_nav_cb nav, page_session_cb session,
+                        void *user_data);
 
 /* Pull widget values back into the Config. Called on navigation away
  * and on Start click. */

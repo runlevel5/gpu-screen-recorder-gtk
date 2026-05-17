@@ -21,7 +21,8 @@ typedef struct {
 
 void page_recording_create(Widget parent, PageRecording *out,
                            const Config *config,
-                           page_nav_cb nav, void *user_data);
+                           page_nav_cb nav, page_session_cb session,
+                           void *user_data);
 
 void page_recording_commit(const PageRecording *p, Config *config);
 

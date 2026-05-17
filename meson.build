@@ -15,6 +15,7 @@ src = [
     'src/audio_devices.c',
     'src/capabilities.c',
     'src/notifications.c',
+    'src/recorder_args.c',
     'src/recorder_process.c',
     'src/x11_hotkeys.c',
     'src/ui/widgets.c',

@@ -109,7 +109,7 @@ static const char **build_record_area_list(const GsrCapabilities *caps, size_t *
     const char **out = (const char **)malloc((cap + 1) * sizeof(*out));
     size_t w = 0;
     if(caps->capture_options.window)  out[w++] = "window";
-    if(caps->capture_options.focused) out[w++] = "follow_focused";
+    if(caps->capture_options.focused) out[w++] = "focused";
     if(caps->capture_options.portal)  out[w++] = "portal";
     for(size_t i = 0; i < monitor_count; ++i)
         out[w++] = caps->capture_options.monitors.items[i].name;
@@ -146,7 +146,7 @@ static void apply_view_visibility(PageCommonSettings *p, const GsrCapabilities *
 static void apply_record_area_visibility(PageCommonSettings *p)
 {
     char *area = gsr_w_combo_get_text(p->record_area_combo);
-    bool follow_focused = area && strcmp(area, "follow_focused") == 0;
+    bool follow_focused = area && strcmp(area, "focused") == 0;
     bool portal         = area && strcmp(area, "portal") == 0;
     if(area) XtFree(area);
 

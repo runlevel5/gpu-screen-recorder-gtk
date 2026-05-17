@@ -25,7 +25,8 @@ typedef struct {
 
 void page_streaming_create(Widget parent, PageStreaming *out,
                            const Config *config,
-                           page_nav_cb nav, void *user_data);
+                           page_nav_cb nav, page_session_cb session,
+                           void *user_data);
 
 void page_streaming_commit(const PageStreaming *p, Config *config);
 

@@ -12,6 +12,7 @@
 
 typedef struct {
     page_nav_cb     nav;
+    page_session_cb session;
     void           *user;
     PageStreaming  *page;
     Config         *config;
@@ -82,11 +83,13 @@ static void start_cb(Widget w, XtPointer client, XtPointer call)
     PageCtx *c = (PageCtx *)client;
     page_streaming_commit(c->page, c->config);
     app_state_save(c->config);
+    if(c->session) c->session(SESSION_TOGGLE_RUN, PAGE_STREAMING, c->user);
 }
 
 void page_streaming_create(Widget parent, PageStreaming *out,
                            const Config *config,
-                           page_nav_cb nav, void *user_data)
+                           page_nav_cb nav, page_session_cb session,
+                           void *user_data)
 {
     out->root = XtVaCreateWidget("streaming_page",
         xmFormWidgetClass, parent,
@@ -150,10 +153,11 @@ void page_streaming_create(Widget parent, PageStreaming *out,
     out->start_btn = gsr_w_button(btn_row, "Start streaming");
 
     PageCtx *c = (PageCtx *)malloc(sizeof(*c));
-    c->nav    = nav;
-    c->user   = user_data;
-    c->page   = out;
-    c->config = (Config *)config;
+    c->nav     = nav;
+    c->session = session;
+    c->user    = user_data;
+    c->page    = out;
+    c->config  = (Config *)config;
 
     XtAddCallback(out->back_btn,      XmNactivateCallback,  back_cb,           c);
     XtAddCallback(out->start_btn,     XmNactivateCallback,  start_cb,          c);

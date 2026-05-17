@@ -300,7 +300,7 @@ bool gsr_capabilities_capture_supported(const GsrCapabilities *caps, const char 
     if(!capture_id) return false;
     const GsrCaptureOptions *co = &caps->capture_options;
     if(strcmp(capture_id, "window") == 0)         return co->window;
-    if(strcmp(capture_id, "follow_focused") == 0) return co->focused;
+    if(strcmp(capture_id, "focused") == 0)        return co->focused;
     if(strcmp(capture_id, "portal") == 0)         return co->portal;
     return false;
 }
