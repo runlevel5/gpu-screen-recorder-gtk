@@ -717,16 +717,68 @@ static void apply_cde_palette(AppCtx *ctx)
 }
 #endif
 
+/* Try to load the session's *FontList XLFD as a single XFontStruct
+ * (XmFONT_IS_FONT) rather than a FontSet. This sidesteps the FontSet
+ * charset-coverage check that fails under en_US.UTF-8 because CDE's
+ * bitmap fonts don't ship iso10646 variants — but Xlib will happily
+ * resolve the wildcard XLFD to a concrete iso8859-1 or similar variant
+ * via XLoadQueryFont, which is what every other CDE app on the box is
+ * also doing. Returns true if the font was loaded and applied. */
+static bool install_cde_fonts(AppCtx *ctx)
+{
+    char xlfd[256] = {0};
+    if(!query_resource(ctx->display, "GpuScreenRecorder.fontList",
+                       "GpuScreenRecorder.FontList", xlfd, sizeof(xlfd))) {
+        return false;
+    }
+
+    /* CDE's *FontList resource value is in Motif fontList list syntax:
+     *   "<xlfd1>:<xlfd2>:..."
+     * Even with a single entry it ends with a trailing ':'. Strip the
+     * trailing separator + whitespace so XmFontListEntryLoad sees a clean
+     * XLFD when we load it as XmFONT_IS_FONT. Also stop at the first ':'
+     * to ignore extra specs we don't need for a single XFontStruct. */
+    char *colon = strchr(xlfd, ':');
+    if(colon) *colon = '\0';
+    size_t len = strlen(xlfd);
+    while(len > 0 && (xlfd[len - 1] == ' ' || xlfd[len - 1] == '\t')) {
+        xlfd[--len] = '\0';
+    }
+    if(len == 0)
+        return false;
+
+    /* Resolve the XLFD wildcard explicitly via XLoadQueryFont. If the
+     * wildcard doesn't resolve (no matching font installed), bail out
+     * cleanly so the caller can fall through to Xft. */
+    XFontStruct *fs = XLoadQueryFont(ctx->display, xlfd);
+    if(!fs) {
+        fprintf(stderr, "[cde] no font matched XLFD '%s'\n", xlfd);
+        return false;
+    }
+    /* We don't need the XFontStruct ourselves — XmFontListEntryLoad will
+     * load its own. Free this probe. */
+    XFreeFont(ctx->display, fs);
+
+    XmFontListEntry entry = XmFontListEntryLoad(ctx->display, xlfd,
+        XmFONT_IS_FONT, XmFONTLIST_DEFAULT_TAG);
+    if(!entry) {
+        fprintf(stderr, "[cde] XmFontListEntryLoad failed for '%s'\n", xlfd);
+        return false;
+    }
+    XmFontList fl = XmFontListAppendEntry(NULL, entry);
+    XmFontListEntryFree(&entry);
+    XtVaSetValues(ctx->toplevel, XmNfontList, fl, NULL);
+    XmFontListFree(fl);
+    fprintf(stderr, "[cde] inherited *FontList=%s\n", xlfd);
+    return true;
+}
+
 /* Install an Xft-based render table on the toplevel so all descendant
  * widgets get anti-aliased text instead of Motif's default bitmap fonts.
  * Must be called BEFORE XtRealizeWidget so children inherit.
  *
- * On a CDE session, the session resources push XLFD font names like
- * "-dt-interface system-medium-r-normal-m*-*..." which only work if
- * /usr/dt/config/xfonts/<lang>/ is on the X font path. When it isn't
- * (typical on modern distros where CDE is built from source), Motif's
- * FontSet conversion fails and falls back to an unattractive default.
- * Forcing an Xft rendition sidesteps the conversion entirely. */
+ * Fallback path for non-CDE sessions, or for CDE sessions where the
+ * font wildcard fails to resolve. */
 static void install_xft_fonts(AppCtx *ctx)
 {
     Arg args[4];
@@ -815,13 +867,22 @@ int main(int argc, char **argv)
     apply_cde_palette(&ctx);
 #endif
 
+    /* Font preference order:
+     *   1.  CDE/session *FontList loaded as a single XFontStruct via
+     *       XmFontListEntryLoad(..., XmFONT_IS_FONT). This avoids the
+     *       FontSet charset-coverage check that fails under en_US.UTF-8.
+     *       Picks up exactly what dtsession told other CDE apps to use.
+     *   2.  Xft fallback when no *FontList in the resource DB. */
+#ifdef GSR_CDE_PALETTE
+    bool cde_font_ok = install_cde_fonts(&ctx);
+#else
+    bool cde_font_ok = false;
+#endif
 #ifdef GSR_XFT_FONTS
-    /* Install an Xft fontList. The CDE session pushes XLFD font names that
-     * typically aren't on the X font path on modern distros (the CDE
-     * /usr/dt/config/xfonts/ directories aren't registered), so Motif's
-     * FontSet conversion fails and we get an ugly fallback bitmap font.
-     * Forcing Xft sidesteps the conversion entirely. */
-    install_xft_fonts(&ctx);
+    if(!cde_font_ok)
+        install_xft_fonts(&ctx);
+#else
+    (void)cde_font_ok;
 #endif
 
     apply_saved_geometry(&ctx);
