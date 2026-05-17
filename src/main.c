@@ -29,6 +29,7 @@
 #include "notifications.h"
 #include "recorder_args.h"
 #include "recorder_process.h"
+#include "tray.h"
 #include "ui/page_common_settings.h"
 #include "ui/page_recording.h"
 #include "ui/page_replay.h"
@@ -76,6 +77,9 @@ typedef struct {
         PageId        source;
     } grabbed_hotkeys[GSR_MAX_GRABBED_HOTKEYS];
     size_t grabbed_hotkey_count;
+
+    Tray   *tray;          /* may be NULL if no _NET_SYSTEM_TRAY owner */
+    bool    window_hidden;
 } AppCtx;
 
 static const char *page_id_to_mode_name(PageId p)
@@ -97,6 +101,8 @@ static bool page_id_to_mode(PageId p, RecorderMode *out)
     default: return false;
     }
 }
+
+static void sync_tray_state(AppCtx *ctx);
 
 /* --- Page switching + commit --------------------------------------- */
 
@@ -175,6 +181,7 @@ static void session_start(AppCtx *ctx, RecorderMode mode)
     ctx->active_mode     = mode;
     ctx->recorder_active = true;
     ctx->recorder_paused = false;
+    sync_tray_state(ctx);
 }
 
 static void session_stop(AppCtx *ctx)
@@ -261,6 +268,7 @@ static void on_page_session(SessionAction action, PageId source, void *user_data
         if(ctx->recorder_active && ctx->active_mode == RECORDER_MODE_RECORD) {
             recorder_process_send_signal(SIGUSR2);
             ctx->recorder_paused = !ctx->recorder_paused;
+            sync_tray_state(ctx);
         }
         break;
     case SESSION_SAVE:
@@ -282,6 +290,7 @@ static void poll_recorder_subprocess(XtPointer client_data, XtIntervalId *id)
                 (int)ctx->active_mode, status);
         ctx->recorder_active = false;
         ctx->recorder_paused = false;
+        sync_tray_state(ctx);
     }
     XtAppAddTimeOut(ctx->app, POLL_RECORDER_INTERVAL_MS,
                     poll_recorder_subprocess, ctx);
@@ -321,6 +330,40 @@ static void drain_root_hotkeys(XtPointer client_data, XtIntervalId *id)
     gsr_hotkey_drain_root_events(ctx->display, on_hotkey_fired, ctx);
     XtAppAddTimeOut(ctx->app, HOTKEY_DRAIN_INTERVAL_MS,
                     drain_root_hotkeys, ctx);
+}
+
+/* --- Tray --------------------------------------------------------- */
+
+static TrayState session_to_tray_state(const AppCtx *ctx)
+{
+    if(!ctx->recorder_active) return TRAY_STATE_IDLE;
+    if(ctx->active_mode == RECORDER_MODE_STREAM) return TRAY_STATE_STREAMING;
+    if(ctx->active_mode == RECORDER_MODE_RECORD && ctx->recorder_paused)
+        return TRAY_STATE_PAUSED;
+    return TRAY_STATE_RECORDING;
+}
+
+static void sync_tray_state(AppCtx *ctx)
+{
+    if(ctx->tray)
+        tray_set_state(ctx->tray, session_to_tray_state(ctx));
+}
+
+static void on_tray_click(TrayClick click, void *user_data)
+{
+    AppCtx *ctx = (AppCtx *)user_data;
+    if(click == TRAY_CLICK_LEFT) {
+        /* Toggle main window: if mapped, withdraw it; otherwise map+raise. */
+        if(ctx->window_hidden) {
+            XtMapWidget(ctx->toplevel);
+            XRaiseWindow(ctx->display, XtWindow(ctx->toplevel));
+            ctx->window_hidden = false;
+        } else {
+            XtUnmapWidget(ctx->toplevel);
+            ctx->window_hidden = true;
+        }
+    }
+    /* Right-click menu lands in Pass B. */
 }
 
 /* --- WM_DELETE_WINDOW handler -------------------------------------- */
@@ -449,12 +492,17 @@ int main(int argc, char **argv)
     XtAppAddTimeOut(ctx.app, HOTKEY_DRAIN_INTERVAL_MS,
                     drain_root_hotkeys, &ctx);
 
+    ctx.tray = tray_create(ctx.app, ctx.display,
+                           DefaultScreen(ctx.display),
+                           on_tray_click, &ctx);
+
     XtAppMainLoop(ctx.app);
 
     /* WM_DELETE_WINDOW path: save was already done in on_window_close.
      * Release the demo grab and the child process so ASan stays quiet. */
     (void)gsr_hotkey_grab(ctx.display, ctx.test_hotkey, false);
     ungrab_page_hotkeys(&ctx);
+    if(ctx.tray) tray_destroy(ctx.tray);
     recorder_process_terminate();
     gsr_capabilities_free(&ctx.caps);
     app_state_free(&ctx.config);

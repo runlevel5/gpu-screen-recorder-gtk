@@ -17,6 +17,7 @@ src = [
     'src/notifications.c',
     'src/recorder_args.c',
     'src/recorder_process.c',
+    'src/tray.c',
     'src/x11_hotkeys.c',
     'src/ui/widgets.c',
     'src/ui/dialogs.c',
