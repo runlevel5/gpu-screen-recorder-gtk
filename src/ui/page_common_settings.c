@@ -469,19 +469,38 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
     XmStringFree(about_xms);
     XtAddCallback(out->about_btn, XmNactivateCallback, about_clicked, out);
 
+    /* Wrap the scrolled area in an XmFrame so it has the same etched-in
+     * border dtterm uses for its scrolled terminal area
+     * (TermView.c:1010 — "dtTermScrolledWindowFrame"). */
+    Widget sw_frame = XtVaCreateManagedWidget("sw_frame",
+        xmFrameWidgetClass, out->root,
+        XmNshadowType,        XmSHADOW_ETCHED_IN,
+        XmNtopAttachment,     XmATTACH_FORM,
+        XmNleftAttachment,    XmATTACH_FORM,
+        XmNrightAttachment,   XmATTACH_FORM,
+        XmNbottomAttachment,  XmATTACH_WIDGET,
+        XmNbottomWidget,      btn_strip,
+        XmNtopOffset,         4,
+        XmNleftOffset,        4,
+        XmNrightOffset,       4,
+        XmNbottomOffset,      4,
+        NULL);
+
+    /* Scrolled-window policies mirror dtterm's "dtTermScrolledWindow"
+     * (TermView.c:1018-1027). Notable departures from our previous setup:
+     *   - XmSTATIC scrollbar display: scrollbars are *always* visible,
+     *     matching the CDE convention. Previously XmAS_NEEDED hid them
+     *     when content fit, which feels foreign in a CDE session.
+     *   - XmVARIABLE visualPolicy lets the scrolled window resize to
+     *     fit its child rather than clip aggressively.
+     *   - XmAUTOMATIC scrollingPolicy is retained — dtterm uses
+     *     XmAPPLICATION_DEFINED because the term widget manages its own
+     *     scrolling, which we don't. */
     Widget sw = XtVaCreateManagedWidget("sw",
-        xmScrolledWindowWidgetClass, out->root,
+        xmScrolledWindowWidgetClass, sw_frame,
         XmNscrollingPolicy,        XmAUTOMATIC,
-        XmNscrollBarDisplayPolicy, XmAS_NEEDED,
-        XmNtopAttachment,          XmATTACH_FORM,
-        XmNleftAttachment,         XmATTACH_FORM,
-        XmNrightAttachment,        XmATTACH_FORM,
-        XmNbottomAttachment,       XmATTACH_WIDGET,
-        XmNbottomWidget,           btn_strip,
-        XmNtopOffset,              4,
-        XmNleftOffset,             4,
-        XmNrightOffset,            4,
-        XmNbottomOffset,           4,
+        XmNvisualPolicy,           XmVARIABLE,
+        XmNscrollBarDisplayPolicy, XmSTATIC,
         NULL);
 
     Widget content = XtVaCreateManagedWidget("content",
