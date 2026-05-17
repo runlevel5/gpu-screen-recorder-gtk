@@ -16,6 +16,7 @@ src = [
     'src/notifications.c',
     'src/recorder_process.c',
     'src/x11_hotkeys.c',
+    'src/ui/widgets.c',
     'src/ui/page_common_settings.c',
     'src/ui/page_replay.c',
     'src/ui/page_recording.c',
@@ -34,8 +35,27 @@ if not xt_dep.found()
     xt_dep = cc.find_library('Xt', required : true)
 endif
 
+xm_dep = cc.find_library('Xm', required : true,
+    has_headers : ['Xm/Xm.h', 'Xm/SpinB.h', 'Xm/ComboBox.h', 'Xm/Notebook.h'])
+
+# Hard-require OpenMotif 2.3+. lesstif tops out at 2.1 and is missing
+# XmSpinBox, XmNotebook, and parts of XmComboBox we depend on.
+xm_version_check = '''
+#include <Xm/Xm.h>
+#if !defined(XmVERSION) || !defined(XmREVISION)
+#  error "Cannot determine Motif version"
+#endif
+#if XmVERSION < 2 || (XmVERSION == 2 && XmREVISION < 3)
+#  error "OpenMotif 2.3 or newer required (this port does not support lesstif or older Motif)"
+#endif
+int main(void) { return 0; }
+'''
+if not cc.compiles(xm_version_check, name : 'Motif >= 2.3', dependencies : xm_dep)
+    error('OpenMotif 2.3 or newer is required. Install openmotif-devel / libmotif-dev 2.3+.')
+endif
+
 dep = [
-    cc.find_library('Xm', required : true, has_headers : ['Xm/Xm.h']),
+    xm_dep,
     xt_dep,
     dependency('x11'),
     cc.find_library('Xmu', required : true),

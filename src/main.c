@@ -1,18 +1,20 @@
 /*
  * gpu-screen-recorder-gtk — Motif/X11 frontend (C99).
  *
- * Phase 3 + 4: wires the Xt event loop (subprocess polling timer + root-window
- * hotkey drain timer) and a hub-and-spoke navigation between four page forms.
+ * Orchestrates: config load/save, Xt init, page wiring, subprocess poll +
+ * hotkey drain timers, demo hotkey, clean WM_DELETE_WINDOW handling.
  *
- * The original GTK source remains at src/main.cpp / src/config.hpp on this
- * branch as a porting reference; it is not compiled.
+ * The original GTK src/main.cpp / src/config.hpp remain on disk on this
+ * branch as a porting reference; they are not compiled.
  */
 
 #include <Xm/Form.h>
 #include <Xm/MainW.h>
+#include <Xm/Protocols.h>
 #include <Xm/Xm.h>
 
 #include <X11/Intrinsic.h>
+#include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 
@@ -40,7 +42,8 @@
 typedef struct {
     XtAppContext app;
     Display     *display;
-    Widget       page_host;       /* XmForm containing all four page forms */
+    Widget       toplevel;
+    Widget       page_host;
     Widget       pages[PAGE_COUNT];
     PageId       current_page;
 
@@ -50,16 +53,31 @@ typedef struct {
     PageStreaming      streaming;
 
     Config       config;
-
-    /* Phase 3 demo hotkey: validates the root-window key drain path end-to-end. */
-    ConfigHotkey test_hotkey;
+    ConfigHotkey test_hotkey;          /* Phase 3 demo */
+    bool         running;
 } AppCtx;
+
+/* --- Page switching + commit --------------------------------------- */
+
+static void commit_current_page(AppCtx *ctx)
+{
+    switch(ctx->current_page) {
+    case PAGE_COMMON_SETTINGS:
+        page_common_settings_commit(&ctx->common, &ctx->config); break;
+    case PAGE_REPLAY:
+        page_replay_commit(&ctx->replay, &ctx->config); break;
+    case PAGE_RECORDING:
+        page_recording_commit(&ctx->recording, &ctx->config); break;
+    case PAGE_STREAMING:
+        page_streaming_commit(&ctx->streaming, &ctx->config); break;
+    case PAGE_COUNT:
+        break;
+    }
+}
 
 static void switch_to_page(AppCtx *ctx, PageId target)
 {
-    if(target < 0 || target >= PAGE_COUNT)
-        return;
-    if(target == ctx->current_page)
+    if(target < 0 || target >= PAGE_COUNT || target == ctx->current_page)
         return;
     XtUnmanageChild(ctx->pages[ctx->current_page]);
     XtManageChild(ctx->pages[target]);
@@ -71,17 +89,15 @@ static void on_page_nav(PageId target, void *user_data)
     switch_to_page((AppCtx *)user_data, target);
 }
 
-/* --- Timers ------------------------------------------------------------- */
+/* --- Timers -------------------------------------------------------- */
 
 static void poll_recorder_subprocess(XtPointer client_data, XtIntervalId *id)
 {
     (void)id;
     AppCtx *ctx = (AppCtx *)client_data;
-
     int status = 0;
     if(recorder_process_poll(&status))
         fprintf(stderr, "[recorder] subprocess exited, status=%d\n", status);
-
     XtAppAddTimeOut(ctx->app, POLL_RECORDER_INTERVAL_MS,
                     poll_recorder_subprocess, ctx);
 }
@@ -104,7 +120,19 @@ static void drain_root_hotkeys(XtPointer client_data, XtIntervalId *id)
                     drain_root_hotkeys, ctx);
 }
 
-/* --- Setup -------------------------------------------------------------- */
+/* --- WM_DELETE_WINDOW handler -------------------------------------- */
+
+static void on_window_close(Widget w, XtPointer client_data, XtPointer call)
+{
+    (void)w; (void)call;
+    AppCtx *ctx = (AppCtx *)client_data;
+    commit_current_page(ctx);
+    app_state_save(&ctx->config);
+    ctx->running = false;
+    XtAppSetExitFlag(ctx->app);
+}
+
+/* --- Setup --------------------------------------------------------- */
 
 static void log_loaded_config(const Config *c)
 {
@@ -121,12 +149,10 @@ static void log_loaded_config(const Config *c)
 
 static void build_pages(AppCtx *ctx)
 {
-    /* page_host is an XmForm child of XmMainWindow. Each page is an unmanaged
-     * XmForm; switch_to_page() manages/unmanages to swap visibility. */
-    page_common_settings_create(ctx->page_host, &ctx->common,    on_page_nav, ctx);
-    page_replay_create         (ctx->page_host, &ctx->replay,    on_page_nav, ctx);
-    page_recording_create      (ctx->page_host, &ctx->recording, on_page_nav, ctx);
-    page_streaming_create      (ctx->page_host, &ctx->streaming, on_page_nav, ctx);
+    page_common_settings_create(ctx->page_host, &ctx->common,    &ctx->config, on_page_nav, ctx);
+    page_replay_create         (ctx->page_host, &ctx->replay,    &ctx->config, on_page_nav, ctx);
+    page_recording_create      (ctx->page_host, &ctx->recording, &ctx->config, on_page_nav, ctx);
+    page_streaming_create      (ctx->page_host, &ctx->streaming, &ctx->config, on_page_nav, ctx);
 
     ctx->pages[PAGE_COMMON_SETTINGS] = ctx->common.root;
     ctx->pages[PAGE_REPLAY]          = ctx->replay.root;
@@ -139,13 +165,9 @@ static void build_pages(AppCtx *ctx)
 
 static void register_demo_hotkey(AppCtx *ctx)
 {
-    /* Ctrl+Alt+R — validates the grab+drain pipeline end-to-end.
-     * Modifier bitmap follows the ConfigHotkey convention: bits set per
-     * gsr_modkey_to_mask(XK_*_L). */
     ctx->test_hotkey.keysym    = XK_r;
     ctx->test_hotkey.modifiers = gsr_modkey_to_mask(XK_Control_L) |
                                  gsr_modkey_to_mask(XK_Alt_L);
-
     if(!gsr_hotkey_grab(ctx->display, ctx->test_hotkey, true))
         fprintf(stderr, "[hotkey] WARNING: failed to grab Ctrl+Alt+R "
                         "(another client likely holds it)\n");
@@ -154,10 +176,17 @@ static void register_demo_hotkey(AppCtx *ctx)
                         "Press it to see drain output.\n");
 }
 
+static void register_wm_protocols(AppCtx *ctx)
+{
+    Atom wm_delete = XmInternAtom(ctx->display, (char *)"WM_DELETE_WINDOW", False);
+    XmAddWMProtocolCallback(ctx->toplevel, wm_delete, on_window_close, ctx);
+}
+
 int main(int argc, char **argv)
 {
     AppCtx ctx;
     memset(&ctx, 0, sizeof(ctx));
+    ctx.running = true;
 
     app_state_init(&ctx.config);
     app_state_load(&ctx.config);
@@ -165,7 +194,7 @@ int main(int argc, char **argv)
 
     recorder_process_init();
 
-    Widget toplevel = XtVaAppInitialize(
+    ctx.toplevel = XtVaAppInitialize(
         &ctx.app,
         "GpuScreenRecorder",
         NULL, 0,
@@ -173,30 +202,31 @@ int main(int argc, char **argv)
         NULL,
         XmNtitle,            "GPU Screen Recorder",
         XmNallowShellResize, True,
+        XmNdeleteResponse,   XmDO_NOTHING,   /* WM_DELETE handled via protocol */
         NULL);
 
-    ctx.display = XtDisplay(toplevel);
+    ctx.display = XtDisplay(ctx.toplevel);
 
     Widget main_w = XtVaCreateManagedWidget(
         "main_w",
-        xmMainWindowWidgetClass, toplevel,
+        xmMainWindowWidgetClass, ctx.toplevel,
         NULL);
 
     ctx.page_host = XtVaCreateManagedWidget(
         "page_host",
         xmFormWidgetClass, main_w,
-        XmNwidth,  640,
-        XmNheight, 480,
+        XmNwidth,  720,
+        XmNheight, 600,
         NULL);
 
     build_pages(&ctx);
 
     XmMainWindowSetAreas(main_w, NULL, NULL, NULL, NULL, ctx.page_host);
 
-    XtRealizeWidget(toplevel);
-
-    /* Phase 3 wiring — only meaningful once a Display is realized. */
+    XtRealizeWidget(ctx.toplevel);
+    register_wm_protocols(&ctx);
     register_demo_hotkey(&ctx);
+
     XtAppAddTimeOut(ctx.app, POLL_RECORDER_INTERVAL_MS,
                     poll_recorder_subprocess, &ctx);
     XtAppAddTimeOut(ctx.app, HOTKEY_DRAIN_INTERVAL_MS,
@@ -204,10 +234,9 @@ int main(int argc, char **argv)
 
     XtAppMainLoop(ctx.app);
 
-    /* Unreachable in normal operation; XtAppMainLoop returns only after an
-     * explicit XtAppSetExitFlag. Cleanup left here for ASan happiness. */
-    if(gsr_hotkey_grab(ctx.display, ctx.test_hotkey, false))
-        ; /* silent */
+    /* WM_DELETE_WINDOW path: save was already done in on_window_close.
+     * Release the demo grab and the child process so ASan stays quiet. */
+    (void)gsr_hotkey_grab(ctx.display, ctx.test_hotkey, false);
     recorder_process_terminate();
     app_state_free(&ctx.config);
     return 0;
