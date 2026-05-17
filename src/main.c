@@ -157,6 +157,15 @@ static void switch_to_page(AppCtx *ctx, PageId target)
         XmNwidth,  k_page_sizes[target].w,
         XmNheight, k_page_sizes[target].h,
         NULL);
+    /* If apply_saved_geometry has already given the toplevel an explicit
+     * size, XmNallowShellResize alone won't re-fit it to the new page.
+     * Force the shell size directly. */
+    if(ctx->toplevel) {
+        XtVaSetValues(ctx->toplevel,
+            XmNwidth,  k_page_sizes[target].w,
+            XmNheight, k_page_sizes[target].h,
+            NULL);
+    }
     XtManageChild(ctx->pages[target]);
     ctx->current_page = target;
 
@@ -601,13 +610,11 @@ static void install_xft_fonts(AppCtx *ctx)
 
 static void apply_saved_geometry(AppCtx *ctx)
 {
+    /* Only restore window position, not size. Window size is governed by
+     * per-page k_page_sizes[] now; restoring a saved size would conflict
+     * with the explicit per-page sizing in switch_to_page (and could
+     * pin the toplevel small enough to clip a wider page). */
     const MainConfig *m = &ctx->config.main_config;
-    if(m->window_width > 0 && m->window_height > 0) {
-        XtVaSetValues(ctx->toplevel,
-            XmNwidth,  m->window_width,
-            XmNheight, m->window_height,
-            NULL);
-    }
     if(m->window_x != 0 || m->window_y != 0) {
         XtVaSetValues(ctx->toplevel,
             XmNx, m->window_x,
