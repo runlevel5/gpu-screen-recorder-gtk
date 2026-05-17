@@ -1013,23 +1013,23 @@ int main(int argc, char **argv)
     apply_cde_palette(&ctx);
 #endif
 
-    /* Font preference order:
-     *   1.  CDE/session *FontList loaded as a single XFontStruct via
-     *       XmFontListEntryLoad(..., XmFONT_IS_FONT). This avoids the
-     *       FontSet charset-coverage check that fails under en_US.UTF-8.
-     *       Picks up exactly what dtsession told other CDE apps to use.
-     *   2.  Xft fallback when no *FontList in the resource DB. */
-#ifdef GSR_CDE_PALETTE
-    bool cde_font_ok = install_cde_fonts(&ctx);
-#else
-    bool cde_font_ok = false;
-#endif
-#ifdef GSR_XFT_FONTS
-    if(!cde_font_ok)
-        install_xft_fonts(&ctx);
-#else
-    (void)cde_font_ok;
-#endif
+    /* Font handling: deliberately do nothing.
+     *
+     * Match dtterm/dtcm exactly — they leave fontList resolution entirely
+     * to Motif's String->FontList converter. When CDE's wildcard XLFD
+     * fails to find an iso8859-1/iso10646-1 variant under en_US.UTF-8,
+     * Motif logs "Missing charsets in String to FontSet conversion" and
+     * silently plugs in its built-in default ("fixed" alias →
+     * -misc-fixed-medium-r-semicondensed--13-...-iso8859-1). Every
+     * native CDE app gets the same fallback, so widgets render with the
+     * same bitmap. Our previous Xrm patching / Xft override stood out.
+     *
+     * The install_cde_fonts() and install_xft_fonts() helpers below are
+     * retained (and __attribute__((unused))) for callers who explicitly
+     * want either path. The GSR_CDE_PALETTE option still controls the
+     * palette-inheritance probe; font behaviour is unaffected. */
+    (void)install_cde_fonts;
+    (void)install_xft_fonts;
 
     apply_saved_geometry(&ctx);
 
