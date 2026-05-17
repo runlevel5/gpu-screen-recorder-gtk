@@ -51,6 +51,13 @@ Widget gsr_w_button_m(Widget parent, const char *label, char mnemonic);
 /* Tight horizontal XmRowColumn — useful for "label + control" pairs. */
 Widget gsr_w_hrow(Widget parent);
 
+/* XmFrame with an ETCHED_IN border and a left-aligned title label as the
+ * frame's title child. Returns the inner XmRowColumn (vertical, packed
+ * tight) that should be used as the parent for the frame's content. If
+ * `out_frame` is non-NULL it receives the frame widget itself (useful
+ * for manage/unmanage). */
+Widget gsr_w_titled_frame(Widget parent, const char *title, Widget *out_frame);
+
 #ifdef __cplusplus
 }
 #endif

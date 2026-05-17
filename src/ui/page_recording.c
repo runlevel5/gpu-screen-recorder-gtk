@@ -73,20 +73,21 @@ void page_recording_create(Widget parent, PageRecording *out,
         XmNbottomAttachment, XmATTACH_FORM,
         NULL);
 
-    Widget header = gsr_w_label_at(out->root, "Recording", NULL);
-
-    Widget rc = XtVaCreateManagedWidget("rc",
-        xmRowColumnWidgetClass, out->root,
-        XmNorientation,      XmVERTICAL,
-        XmNpacking,          XmPACK_TIGHT,
-        XmNspacing,          6,
-        XmNtopAttachment,    XmATTACH_WIDGET,
-        XmNtopWidget,        header,
-        XmNtopOffset,        16,
+    /* Wrap the page content in a titled XmFrame ("Recording"). The frame
+     * itself owns the form attachments; its inner RowColumn (returned by
+     * gsr_w_titled_frame) is what page widgets get parented under. */
+    Widget frame = NULL;
+    Widget rc = gsr_w_titled_frame(out->root, "Recording", &frame);
+    XtVaSetValues(frame,
+        XmNtopAttachment,    XmATTACH_FORM,
         XmNleftAttachment,   XmATTACH_FORM,
         XmNrightAttachment,  XmATTACH_FORM,
+        XmNtopOffset,        12,
         XmNleftOffset,       12,
         XmNrightOffset,      12,
+        NULL);
+    XtVaSetValues(rc,
+        XmNspacing,          6,
         NULL);
 
     gsr_w_label(rc, "Where do you want to save the video?");

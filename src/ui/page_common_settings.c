@@ -106,31 +106,11 @@ static const char *k_framerate_mode[] = { "auto", "constant", "variable", NULL }
 
 /* --- titled-frame helper ------------------------------------------- */
 
+/* Titled-frame helper lives in widgets.c as gsr_w_titled_frame now;
+ * keep this thin wrapper so the existing call sites read unchanged. */
 static Widget make_titled_frame(Widget parent, const char *title, Widget *out_frame)
 {
-    Widget frame = XtVaCreateManagedWidget("frame",
-        xmFrameWidgetClass, parent,
-        XmNshadowType, XmSHADOW_ETCHED_IN,
-        NULL);
-    if(out_frame) *out_frame = frame;
-
-    XmString xms = XmStringCreateLocalized((char *)title);
-    XtVaCreateManagedWidget("frame_title",
-        xmLabelWidgetClass, frame,
-        XmNlabelString,              xms,
-        XmNchildType,                XmFRAME_TITLE_CHILD,
-        XmNchildHorizontalAlignment, XmALIGNMENT_BEGINNING,
-        NULL);
-    XmStringFree(xms);
-
-    Widget rc = XtVaCreateManagedWidget("frame_rc",
-        xmRowColumnWidgetClass, frame,
-        XmNorientation, XmVERTICAL,
-        XmNpacking,     XmPACK_TIGHT,
-        XmNspacing,     4,
-        XmNchildType,   XmFRAME_WORKAREA_CHILD,
-        NULL);
-    return rc;
+    return gsr_w_titled_frame(parent, title, out_frame);
 }
 
 static Widget make_hrow(Widget parent)

@@ -1,6 +1,7 @@
 #include "widgets.h"
 
 #include <Xm/ComboBox.h>
+#include <Xm/Frame.h>
 #include <Xm/Label.h>
 #include <Xm/PushB.h>
 #include <Xm/RowColumn.h>
@@ -201,6 +202,32 @@ Widget gsr_w_hrow(Widget parent)
         XmNorientation, XmHORIZONTAL,
         XmNpacking,     XmPACK_TIGHT,
         XmNspacing,     6,
+        NULL);
+}
+
+Widget gsr_w_titled_frame(Widget parent, const char *title, Widget *out_frame)
+{
+    Widget frame = XtVaCreateManagedWidget("frame",
+        xmFrameWidgetClass, parent,
+        XmNshadowType, XmSHADOW_ETCHED_IN,
+        NULL);
+    if(out_frame) *out_frame = frame;
+
+    XmString xms = XmStringCreateLocalized((char *)title);
+    XtVaCreateManagedWidget("frame_title",
+        xmLabelWidgetClass, frame,
+        XmNlabelString,              xms,
+        XmNchildType,                XmFRAME_TITLE_CHILD,
+        XmNchildHorizontalAlignment, XmALIGNMENT_BEGINNING,
+        NULL);
+    XmStringFree(xms);
+
+    return XtVaCreateManagedWidget("frame_rc",
+        xmRowColumnWidgetClass, frame,
+        XmNorientation, XmVERTICAL,
+        XmNpacking,     XmPACK_TIGHT,
+        XmNspacing,     4,
+        XmNchildType,   XmFRAME_WORKAREA_CHILD,
         NULL);
 }
 
