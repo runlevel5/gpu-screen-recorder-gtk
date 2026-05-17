@@ -26,6 +26,10 @@ typedef struct {
     Widget video_height_spin;
     Widget change_video_resolution_toggle;
     Widget restore_portal_session_toggle;
+    Widget select_window_row;        /* visible only when record_area=window */
+    Widget select_window_btn;
+    Widget selected_window_label;
+    unsigned long *selected_window_slot;  /* writable; lives in AppCtx */
 
     /* Audio */
     Widget audio_codec_combo;
@@ -69,6 +73,7 @@ typedef struct {
 void page_common_settings_create(Widget parent, PageCommonSettings *out,
                                  const Config *config,
                                  const GsrCapabilities *caps,
+                                 unsigned long *selected_window_slot,
                                  page_nav_cb nav, void *user_data);
 
 void page_common_settings_commit(const PageCommonSettings *p, Config *config);

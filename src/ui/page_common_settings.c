@@ -1,5 +1,6 @@
 #include "page_common_settings.h"
 #include "widgets.h"
+#include "window_picker.h"
 
 #include <Xm/ComboBox.h>
 #include <Xm/Form.h>
@@ -10,6 +11,7 @@
 #include <Xm/ScrolledW.h>
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -339,10 +341,39 @@ static void apply_record_area_visibility(PageCommonSettings *p)
     char *area = gsr_w_combo_get_text(p->record_area_combo);
     bool follow_focused = area && strcmp(area, "focused") == 0;
     bool portal         = area && strcmp(area, "portal") == 0;
+    bool window         = area && strcmp(area, "window") == 0;
     if(area) XtFree(area);
 
     manage_set(p->area_size_row,                follow_focused);
     manage_set(p->restore_portal_session_toggle, portal);
+    manage_set(p->select_window_row,             window);
+}
+
+static void update_selected_window_label(PageCommonSettings *p)
+{
+    char buf[64];
+    if(p->selected_window_slot && *p->selected_window_slot != 0)
+        snprintf(buf, sizeof(buf), "Selected: 0x%lx", *p->selected_window_slot);
+    else
+        snprintf(buf, sizeof(buf), "(no window selected)");
+    XmString xms = XmStringCreateLocalized(buf);
+    XtVaSetValues(p->selected_window_label, XmNlabelString, xms, NULL);
+    XmStringFree(xms);
+}
+
+static void on_window_picked(unsigned long w, void *user)
+{
+    PageCommonSettings *p = (PageCommonSettings *)user;
+    if(p->selected_window_slot)
+        *p->selected_window_slot = w;
+    update_selected_window_label(p);
+}
+
+static void select_window_clicked(Widget w, XtPointer client, XtPointer call)
+{
+    (void)w; (void)call;
+    PageCommonSettings *p = (PageCommonSettings *)client;
+    window_picker_run(p->root, on_window_picked, p);
 }
 
 static void view_changed_cb(Widget w, XtPointer client, XtPointer call)
@@ -389,8 +420,10 @@ static NavCtx *make_nav_ctx(PageCommonSettings *p, Config *config,
 void page_common_settings_create(Widget parent, PageCommonSettings *out,
                                  const Config *config,
                                  const GsrCapabilities *caps,
+                                 unsigned long *selected_window_slot,
                                  page_nav_cb nav, void *user_data)
 {
+    out->selected_window_slot = selected_window_slot;
     /* Detect audio devices + running apps once. Quiet failures — both
      * lists may be empty if the recorder binary is missing or the
      * pipewire build doesn't support app audio. */
@@ -497,6 +530,14 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
         out->restore_portal_session_toggle = gsr_w_toggle(rc,
             "Restore portal session",
             config->main_config.restore_portal_session);
+
+        /* Visible only when record_area=window. */
+        out->select_window_row    = gsr_w_hrow(rc);
+        out->select_window_btn    = gsr_w_button(out->select_window_row, "Select window...");
+        out->selected_window_label = gsr_w_label(out->select_window_row, "(no window selected)");
+        XtAddCallback(out->select_window_btn, XmNactivateCallback,
+                      select_window_clicked, out);
+        update_selected_window_label(out);
     }
 
     /* --- Audio frame --- */

@@ -22,6 +22,7 @@ src = [
     'src/ui/dialogs.c',
     'src/ui/hotkey_capture.c',
     'src/ui/hotkey_row.c',
+    'src/ui/window_picker.c',
     'src/ui/page_common_settings.c',
     'src/ui/page_replay.c',
     'src/ui/page_recording.c',

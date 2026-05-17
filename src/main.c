@@ -65,6 +65,17 @@ typedef struct {
     RecorderMode    active_mode;       /* meaningful only when recorder_active */
     bool            recorder_active;
     bool            recorder_paused;
+    unsigned long   selected_window;   /* set by the window picker */
+
+    /* Hotkeys currently grabbed for the visible spoke page. Page-change
+     * ungrabs the old set and grabs the new set. */
+#define GSR_MAX_GRABBED_HOTKEYS 6
+    struct {
+        ConfigHotkey  hotkey;
+        SessionAction action;
+        PageId        source;
+    } grabbed_hotkeys[GSR_MAX_GRABBED_HOTKEYS];
+    size_t grabbed_hotkey_count;
 } AppCtx;
 
 static const char *page_id_to_mode_name(PageId p)
@@ -105,6 +116,9 @@ static void commit_current_page(AppCtx *ctx)
     }
 }
 
+static void ungrab_page_hotkeys(AppCtx *ctx);
+static void grab_page_hotkeys(AppCtx *ctx, PageId page);
+
 static void switch_to_page(AppCtx *ctx, PageId target)
 {
     if(target < 0 || target >= PAGE_COUNT || target == ctx->current_page)
@@ -112,6 +126,9 @@ static void switch_to_page(AppCtx *ctx, PageId target)
     XtUnmanageChild(ctx->pages[ctx->current_page]);
     XtManageChild(ctx->pages[target]);
     ctx->current_page = target;
+
+    ungrab_page_hotkeys(ctx);
+    grab_page_hotkeys(ctx, target);
 }
 
 static void on_page_nav(PageId target, void *user_data)
@@ -131,9 +148,10 @@ static void session_start(AppCtx *ctx, RecorderMode mode)
 
     RecorderArgsRequest req;
     memset(&req, 0, sizeof(req));
-    req.mode = mode;
-    req.config = &ctx->config;
-    req.caps   = &ctx->caps;
+    req.mode            = mode;
+    req.config          = &ctx->config;
+    req.caps            = &ctx->caps;
+    req.selected_window = ctx->selected_window;
 
     char **argv = NULL;
     RecorderArgsStatus s = recorder_args_build(&req, &argv, NULL);
@@ -168,6 +186,53 @@ static void session_stop(AppCtx *ctx)
     /* SIGINT — gpu-screen-recorder finalises and exits cleanly. The
      * polling timer will pick up the exit and clear recorder_active. */
     recorder_process_send_signal(SIGINT);
+}
+
+static void ungrab_page_hotkeys(AppCtx *ctx)
+{
+    for(size_t i = 0; i < ctx->grabbed_hotkey_count; ++i)
+        (void)gsr_hotkey_grab(ctx->display, ctx->grabbed_hotkeys[i].hotkey, false);
+    ctx->grabbed_hotkey_count = 0;
+}
+
+static void try_grab(AppCtx *ctx, ConfigHotkey hk, SessionAction action, PageId source)
+{
+    if(hk.keysym == 0 && hk.modifiers == 0) return;
+    if(ctx->grabbed_hotkey_count >= GSR_MAX_GRABBED_HOTKEYS) return;
+    if(!gsr_hotkey_grab(ctx->display, hk, true)) {
+        fprintf(stderr, "[hotkey] grab failed for keysym=0x%lx mods=0x%x — "
+                        "likely held by another client\n",
+                (unsigned long)hk.keysym, (unsigned)hk.modifiers);
+        return;
+    }
+    ctx->grabbed_hotkeys[ctx->grabbed_hotkey_count].hotkey = hk;
+    ctx->grabbed_hotkeys[ctx->grabbed_hotkey_count].action = action;
+    ctx->grabbed_hotkeys[ctx->grabbed_hotkey_count].source = source;
+    ++ctx->grabbed_hotkey_count;
+}
+
+static void grab_page_hotkeys(AppCtx *ctx, PageId page)
+{
+    switch(page) {
+    case PAGE_REPLAY:
+        try_grab(ctx, ctx->config.replay_config.start_stop_recording_hotkey,
+                 SESSION_TOGGLE_RUN, PAGE_REPLAY);
+        try_grab(ctx, ctx->config.replay_config.save_recording_hotkey,
+                 SESSION_SAVE, PAGE_REPLAY);
+        break;
+    case PAGE_RECORDING:
+        try_grab(ctx, ctx->config.record_config.start_stop_recording_hotkey,
+                 SESSION_TOGGLE_RUN, PAGE_RECORDING);
+        try_grab(ctx, ctx->config.record_config.pause_unpause_recording_hotkey,
+                 SESSION_PAUSE, PAGE_RECORDING);
+        break;
+    case PAGE_STREAMING:
+        try_grab(ctx, ctx->config.streaming_config.start_stop_recording_hotkey,
+                 SESSION_TOGGLE_RUN, PAGE_STREAMING);
+        break;
+    default:
+        break;
+    }
 }
 
 static void on_page_session(SessionAction action, PageId source, void *user_data)
@@ -222,13 +287,31 @@ static void poll_recorder_subprocess(XtPointer client_data, XtIntervalId *id)
                     poll_recorder_subprocess, ctx);
 }
 
-static void on_hotkey_fired(KeySym ks, unsigned int mods, void *user_data)
+static void on_hotkey_fired(KeySym ks, unsigned int x11_mods, void *user_data)
 {
-    (void)user_data;
-    fprintf(stderr, "[hotkey] keysym=0x%lx (%s) x11_mods=0x%x\n",
+    AppCtx  *ctx = (AppCtx *)user_data;
+    uint32_t gsr_mods = gsr_x11_mask_to_gsr_mod(x11_mods);
+
+    /* Match against currently-grabbed bindings for the visible page. */
+    for(size_t i = 0; i < ctx->grabbed_hotkey_count; ++i) {
+        const ConfigHotkey *hk = &ctx->grabbed_hotkeys[i].hotkey;
+        if((KeySym)hk->keysym == ks && (uint32_t)hk->modifiers == gsr_mods) {
+            fprintf(stderr, "[hotkey] fire keysym=0x%lx (%s) -> action=%d source=%d\n",
+                    (unsigned long)ks,
+                    XKeysymToString(ks) ? XKeysymToString(ks) : "?",
+                    (int)ctx->grabbed_hotkeys[i].action,
+                    (int)ctx->grabbed_hotkeys[i].source);
+            on_page_session(ctx->grabbed_hotkeys[i].action,
+                            ctx->grabbed_hotkeys[i].source, ctx);
+            return;
+        }
+    }
+
+    /* Demo (Ctrl+Alt+R) or otherwise-grabbed-but-not-matched key — log only. */
+    fprintf(stderr, "[hotkey] unmatched keysym=0x%lx (%s) x11_mods=0x%x\n",
             (unsigned long)ks,
             XKeysymToString(ks) ? XKeysymToString(ks) : "?",
-            mods);
+            x11_mods);
 }
 
 static void drain_root_hotkeys(XtPointer client_data, XtIntervalId *id)
@@ -269,7 +352,7 @@ static void log_loaded_config(const Config *c)
 
 static void build_pages(AppCtx *ctx)
 {
-    page_common_settings_create(ctx->page_host, &ctx->common,    &ctx->config, &ctx->caps, on_page_nav, ctx);
+    page_common_settings_create(ctx->page_host, &ctx->common,    &ctx->config, &ctx->caps, &ctx->selected_window, on_page_nav, ctx);
     page_replay_create         (ctx->page_host, &ctx->replay,    &ctx->config, ctx->display, NULL, on_page_nav, on_page_session, ctx);
     page_recording_create      (ctx->page_host, &ctx->recording, &ctx->config, ctx->display, NULL, on_page_nav, on_page_session, ctx);
     page_streaming_create      (ctx->page_host, &ctx->streaming, &ctx->config, ctx->display, NULL, on_page_nav, on_page_session, ctx);
@@ -371,6 +454,7 @@ int main(int argc, char **argv)
     /* WM_DELETE_WINDOW path: save was already done in on_window_close.
      * Release the demo grab and the child process so ASan stays quiet. */
     (void)gsr_hotkey_grab(ctx.display, ctx.test_hotkey, false);
+    ungrab_page_hotkeys(&ctx);
     recorder_process_terminate();
     gsr_capabilities_free(&ctx.caps);
     app_state_free(&ctx.config);
