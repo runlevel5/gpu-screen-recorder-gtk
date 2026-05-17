@@ -677,6 +677,52 @@ static bool query_resource(Display *d, const char *name, const char *class_,
     return produced;
 }
 
+/* Probe a single resource via XrmGetResource on the user's live
+ * RESOURCE_MANAGER. Logs the result to stderr — used for diagnosing
+ * which class scopes our app's widgets actually inherit from. */
+static void debug_probe_resource(Display *d, const char *name, const char *class_)
+{
+    const char *rms = XResourceManagerString(d);
+    if(!rms) { fprintf(stderr, "[probe] %-50s <no RESOURCE_MANAGER>\n", name); return; }
+    XrmDatabase db = XrmGetStringDatabase(rms);
+    if(!db)   { fprintf(stderr, "[probe] %-50s <db build failed>\n", name); return; }
+    XrmValue val; char *type = NULL;
+    if(XrmGetResource(db, name, class_, &type, &val) && val.addr && val.size > 0)
+        fprintf(stderr, "[probe] %-50s -> %.*s\n", name, (int)val.size, val.addr);
+    else
+        fprintf(stderr, "[probe] %-50s <not in DB>\n", name);
+    XrmDestroyDatabase(db);
+}
+
+static void debug_dump_inheritance(AppCtx *ctx)
+{
+    fprintf(stderr, "[probe] === XrmGetResource probes (live RESOURCE_MANAGER) ===\n");
+    /* Generic loose-bound probes — these match *background, *foreground, *FontList. */
+    debug_probe_resource(ctx->display, "gsr.background",        "Gsr.Background");
+    debug_probe_resource(ctx->display, "gsr.foreground",        "Gsr.Foreground");
+    debug_probe_resource(ctx->display, "gsr.fontList",          "Gsr.FontList");
+    /* Dt-scoped probes — only match if RESOURCE_MANAGER actually has
+     * "Dt*Foo: ..." rules. If these come back <not in DB>, the user's
+     * CDE session simply isn't pushing theme resources at that scope. */
+    debug_probe_resource(ctx->display, "Dt.background",         "Dt.Background");
+    debug_probe_resource(ctx->display, "Dt.foreground",         "Dt.Foreground");
+    debug_probe_resource(ctx->display, "Dt.shadowThickness",    "Dt.ShadowThickness");
+    debug_probe_resource(ctx->display, "Dt.XmScrollBar.background",
+                                       "Dt.XmScrollBar.Background");
+    debug_probe_resource(ctx->display, "Dt.XmScrollBar.troughColor",
+                                       "Dt.XmScrollBar.TroughColor");
+    debug_probe_resource(ctx->display, "Dt.XmPushButton.background",
+                                       "Dt.XmPushButton.Background");
+    debug_probe_resource(ctx->display, "Dt.XmList.background",
+                                       "Dt.XmList.Background");
+    /* What the toplevel itself actually has for class + name. */
+    String name = NULL, class_name = NULL;
+    XtGetApplicationNameAndClass(ctx->display, &name, &class_name);
+    fprintf(stderr, "[probe] application name='%s'  class='%s'\n",
+            name ? name : "(null)", class_name ? class_name : "(null)");
+    fprintf(stderr, "[probe] === end probes ===\n");
+}
+
 static void apply_cde_palette(AppCtx *ctx)
 {
     char bg[64] = {0};
@@ -1050,6 +1096,8 @@ int main(int argc, char **argv)
         NULL);
 
     ctx.display = XtDisplay(ctx.toplevel);
+
+    debug_dump_inheritance(&ctx);
 
 #ifdef GSR_CDE_PALETTE
     apply_cde_palette(&ctx);
