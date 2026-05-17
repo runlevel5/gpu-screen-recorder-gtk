@@ -2,10 +2,9 @@
 #define GSR_NOTIFICATIONS_H
 
 /*
- * Toolkit-agnostic notifications facade.
- *
- * Phase 2 ships header-only stubs that just log to stderr. Phase 6 replaces
- * the implementations with XmMessageDialog popups (error/warning/info).
+ * Toolkit-agnostic notifications facade. Backed by XmMessageDialog
+ * popups (error/warning/info); falls back to stderr if no parent
+ * widget is supplied (early-startup paths).
  */
 
 #ifdef __cplusplus

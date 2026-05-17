@@ -22,7 +22,7 @@ typedef struct {
 typedef enum { SVC_TWITCH = 0, SVC_YOUTUBE, SVC_CUSTOM } ServiceIdx;
 
 static const char *k_services[] = { "twitch", "youtube", "custom", NULL };
-/* Custom-stream container choices — full list; sensitivity gating in Pass B. */
+/* Custom-stream container choices. */
 static const char *k_containers[] = { "flv", "mkv", "ts", "mp4", "mov", "webm", NULL };
 
 static const char *service_id_from_index(int idx)

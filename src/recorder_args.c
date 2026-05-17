@@ -66,7 +66,7 @@ const char *recorder_args_status_str(RecorderArgsStatus s)
 {
     switch(s) {
     case RA_BUILD_OK:                return "ok";
-    case RA_BUILD_WINDOW_REQUIRED:   return "record_area=window but no window picked (Phase 6)";
+    case RA_BUILD_WINDOW_REQUIRED:   return "record_area=window but no window picked";
     case RA_BUILD_NO_CAPABLE_CODEC:  return "no hardware video codec available; software fallback also unavailable";
     case RA_BUILD_OUTPUT_DIR_FAILED: return "could not create output directory";
     case RA_BUILD_OUTPUT_MISSING:    return "output directory or stream URL is unset";

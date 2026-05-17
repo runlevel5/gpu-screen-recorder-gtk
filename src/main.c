@@ -64,7 +64,7 @@ typedef struct {
 
     Config          config;
     GsrCapabilities caps;
-    ConfigHotkey    test_hotkey;       /* Phase 3 demo */
+    ConfigHotkey    test_hotkey;       /* Ctrl+Alt+R demo — validates root-window key drain */
     bool            running;
 
     /* Recorder session state. */
@@ -613,7 +613,7 @@ static void register_demo_hotkey(AppCtx *ctx)
         fprintf(stderr, "[hotkey] WARNING: failed to grab Ctrl+Alt+R "
                         "(another client likely holds it)\n");
     else
-        fprintf(stderr, "[hotkey] grabbed Ctrl+Alt+R as a Phase 3 demo. "
+        fprintf(stderr, "[hotkey] grabbed Ctrl+Alt+R as a demo. "
                         "Press it to see drain output.\n");
 }
 

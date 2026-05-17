@@ -6,9 +6,9 @@
  * desktop's system tray (KDE/XFCE/MATE/etc.), paints a coloured-square
  * icon reflecting current recorder state, and dispatches user clicks.
  *
- * Real PNG icons land in Pass B; for now a state-coloured 22x22 square
- * is drawn so the visual feedback is functional without an image-loading
- * dependency.
+ * The icon is a state-coloured 22x22 square — visual feedback without
+ * an image-loading dependency. Real PNG icon loading can be wired in
+ * later via libpng or a pre-converted XPM if desired.
  *
  * Graceful fallback: if no _NET_SYSTEM_TRAY selection owner is found,
  * tray_create() returns NULL with an stderr warning and the caller

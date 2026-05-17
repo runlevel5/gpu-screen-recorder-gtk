@@ -5,8 +5,8 @@
  * Detected capabilities of the installed `gpu-screen-recorder` binary
  * and the host system. Populated by parsing `gpu-screen-recorder --info`.
  *
- * Pages query this struct to filter combo-box items, control visibility,
- * and (Pass B2) shape the spawned argv.
+ * Pages query this struct to filter combo-box items, control widget
+ * visibility, and shape the spawned recorder argv.
  */
 
 #include <stdbool.h>
