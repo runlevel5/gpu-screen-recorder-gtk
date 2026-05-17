@@ -291,28 +291,46 @@ RecorderArgsStatus recorder_args_build(const RecorderArgsRequest *req,
         argv_push(&b, "-fm"); argv_push(&b, mc->framerate_mode);
     }
 
-    /* Audio: -a per StringArray entry; if merge, join with '|' and pass once. */
+    /* Audio: -a per StringArray entry; if merge, join with '|' and pass once.
+     * If record_app_audio_inverted is set, rewrite the "app:" prefix to
+     * "app-inverse:" so gpu-screen-recorder captures everything except the
+     * named apps. Devices ("device:") pass through unchanged. */
     if(mc->audio_input.len > 0) {
+        /* Pre-resolve transformed strings into a temporary array. */
+        char **xforms = (char **)malloc(mc->audio_input.len * sizeof(*xforms));
+        assert(xforms);
+        for(size_t i = 0; i < mc->audio_input.len; ++i) {
+            const char *e = mc->audio_input.items[i];
+            if(mc->record_app_audio_inverted && strncmp(e, "app:", 4) == 0)
+                xforms[i] = xasprintf("app-inverse:%s", e + 4);
+            else
+                xforms[i] = xstrdup(e);
+        }
+
         if(mc->merge_audio_tracks) {
             size_t total = 0;
             for(size_t i = 0; i < mc->audio_input.len; ++i)
-                total += strlen(mc->audio_input.items[i]) + 1;
+                total += strlen(xforms[i]) + 1;
             char *joined = (char *)malloc(total + 1);
             assert(joined);
-            char *p = joined;
+            char *pp = joined;
             for(size_t i = 0; i < mc->audio_input.len; ++i) {
-                if(i) *p++ = '|';
-                size_t n = strlen(mc->audio_input.items[i]);
-                memcpy(p, mc->audio_input.items[i], n);
-                p += n;
+                if(i) *pp++ = '|';
+                size_t n = strlen(xforms[i]);
+                memcpy(pp, xforms[i], n);
+                pp += n;
             }
-            *p = '\0';
+            *pp = '\0';
             argv_push(&b, "-a"); argv_push_owned(&b, joined);
         } else {
             for(size_t i = 0; i < mc->audio_input.len; ++i) {
-                argv_push(&b, "-a"); argv_push(&b, mc->audio_input.items[i]);
+                argv_push(&b, "-a"); argv_push(&b, xforms[i]);
             }
         }
+
+        for(size_t i = 0; i < mc->audio_input.len; ++i)
+            free(xforms[i]);
+        free(xforms);
     }
 
     /* -s <WxH> only if follow_focused or change_video_resolution. */

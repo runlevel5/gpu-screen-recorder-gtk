@@ -5,12 +5,15 @@
 #include <Xm/Form.h>
 #include <Xm/Frame.h>
 #include <Xm/Label.h>
+#include <Xm/PushB.h>
 #include <Xm/RowColumn.h>
 #include <Xm/ScrolledW.h>
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "../audio_devices.h"
 #include "../str_util.h"
 
 typedef struct {
@@ -26,6 +29,65 @@ typedef struct {
     PageCommonSettings    *page;
     const GsrCapabilities *caps;
 } VisCtx;
+
+/* --- dynamic audio rows ----------------------------------------------
+ *
+ * Each row in the audio frame represents one entry in
+ * config.main_config.audio_input. The page tracks rows in a dynamic
+ * AudioRow array; commit walks them and writes the StringArray. The
+ * encoding matches the GTK port:
+ *   AUDIO_ROW_DEVICE     -> "device:<pulse device name>"
+ *   AUDIO_ROW_APP        -> "app:<application name>"
+ *   AUDIO_ROW_APP_CUSTOM -> "app:<user-typed text>"
+ */
+typedef enum {
+    AUDIO_ROW_DEVICE = 0,
+    AUDIO_ROW_APP,
+    AUDIO_ROW_APP_CUSTOM,
+} AudioRowKind;
+
+typedef struct {
+    AudioRowKind kind;
+    Widget       row;        /* XmRowColumn parent of value + remove */
+    Widget       value;      /* combo or text field */
+    Widget       remove_btn;
+    PageCommonSettings *owner;
+} AudioRow;
+
+typedef struct {
+    AudioRow **items;
+    size_t     len;
+    size_t     cap;
+} AudioRowList;
+
+static AudioRowList *rows_get(PageCommonSettings *p)
+{
+    return (AudioRowList *)p->audio_rows;
+}
+
+static void rows_push(AudioRowList *list, AudioRow *r)
+{
+    if(list->len == list->cap) {
+        size_t cap = list->cap ? list->cap * 2 : 4;
+        AudioRow **n = (AudioRow **)realloc(list->items, cap * sizeof(*n));
+        assert(n);
+        list->items = n;
+        list->cap = cap;
+    }
+    list->items[list->len++] = r;
+}
+
+static void rows_erase(AudioRowList *list, AudioRow *r)
+{
+    for(size_t i = 0; i < list->len; ++i) {
+        if(list->items[i] == r) {
+            memmove(list->items + i, list->items + i + 1,
+                    (list->len - i - 1) * sizeof(*list->items));
+            --list->len;
+            return;
+        }
+    }
+}
 
 /* --- static option tables (filtered against caps at build time) ---- */
 static const char *k_view_items[]     = { "simple", "advanced", NULL };
@@ -118,6 +180,135 @@ static const char **build_record_area_list(const GsrCapabilities *caps, size_t *
     return out;
 }
 
+/* --- audio row helpers ---------------------------------------------- */
+
+static void audio_row_remove_cb(Widget w, XtPointer client, XtPointer call)
+{
+    (void)w; (void)call;
+    AudioRow *r = (AudioRow *)client;
+    rows_erase(rows_get(r->owner), r);
+    XtDestroyWidget(r->row);
+    free(r);
+}
+
+/* `device_names` and `app_names` are NULL-terminated arrays of C strings
+ * (caller owns; not copied — must outlive the combo). */
+static AudioRow *audio_row_create(PageCommonSettings *p, AudioRowKind kind,
+                                  const char *initial_value,
+                                  const char *const *device_names,
+                                  const char *const *app_names)
+{
+    AudioRow *r = (AudioRow *)calloc(1, sizeof(*r));
+    r->kind  = kind;
+    r->owner = p;
+
+    r->row = XtVaCreateManagedWidget("audio_row",
+        xmRowColumnWidgetClass, p->audio_rows_box,
+        XmNorientation, XmHORIZONTAL,
+        XmNpacking,     XmPACK_TIGHT,
+        XmNspacing,     6,
+        NULL);
+
+    const char *kind_label = (kind == AUDIO_ROW_DEVICE)     ? "Device:"
+                            : (kind == AUDIO_ROW_APP)       ? "App:"
+                                                            : "Custom app:";
+    gsr_w_label(r->row, kind_label);
+
+    switch(kind) {
+    case AUDIO_ROW_DEVICE:
+        r->value = gsr_w_combo(r->row, device_names, initial_value);
+        break;
+    case AUDIO_ROW_APP:
+        r->value = gsr_w_combo(r->row, app_names, initial_value);
+        break;
+    case AUDIO_ROW_APP_CUSTOM:
+        r->value = gsr_w_text(r->row, initial_value);
+        break;
+    }
+
+    r->remove_btn = gsr_w_button(r->row, "Remove");
+    XtAddCallback(r->remove_btn, XmNactivateCallback, audio_row_remove_cb, r);
+
+    rows_push(rows_get(p), r);
+    return r;
+}
+
+/* Build a NULL-terminated const char** view over an AudioDeviceList.
+ * Caller frees the array (not the names — owned by the AudioDeviceList). */
+static const char **device_names_view(const AudioDeviceList *list)
+{
+    const char **out = (const char **)malloc((list->len + 1) * sizeof(*out));
+    for(size_t i = 0; i < list->len; ++i)
+        out[i] = list->items[i].name ? list->items[i].name : "";
+    out[list->len] = NULL;
+    return out;
+}
+
+static const char **string_array_view(const StringArray *list)
+{
+    const char **out = (const char **)malloc((list->len + 1) * sizeof(*out));
+    for(size_t i = 0; i < list->len; ++i)
+        out[i] = list->items[i] ? list->items[i] : "";
+    out[list->len] = NULL;
+    return out;
+}
+
+static void add_device_clicked(Widget w, XtPointer client, XtPointer call)
+{
+    (void)w; (void)call;
+    PageCommonSettings *p = (PageCommonSettings *)client;
+    const char **names = device_names_view(&p->detected_devices);
+    audio_row_create(p, AUDIO_ROW_DEVICE, NULL, names, NULL);
+    free(names);
+}
+
+static void add_app_clicked(Widget w, XtPointer client, XtPointer call)
+{
+    (void)w; (void)call;
+    PageCommonSettings *p = (PageCommonSettings *)client;
+    const char **names = string_array_view(&p->detected_apps);
+    audio_row_create(p, AUDIO_ROW_APP, NULL, NULL, names);
+    free(names);
+}
+
+static void add_custom_app_clicked(Widget w, XtPointer client, XtPointer call)
+{
+    (void)w; (void)call;
+    PageCommonSettings *p = (PageCommonSettings *)client;
+    audio_row_create(p, AUDIO_ROW_APP_CUSTOM, NULL, NULL, NULL);
+}
+
+/* Populate rows from existing config (config.main_config.audio_input is
+ * a StringArray of "device:NAME" / "app:NAME" entries). */
+static void rebuild_audio_rows_from_config(PageCommonSettings *p, const Config *config)
+{
+    const char **dev_names = device_names_view(&p->detected_devices);
+    const char **app_names = string_array_view(&p->detected_apps);
+    for(size_t i = 0; i < config->main_config.audio_input.len; ++i) {
+        const char *entry = config->main_config.audio_input.items[i];
+        if(strncmp(entry, "device:", 7) == 0) {
+            audio_row_create(p, AUDIO_ROW_DEVICE, entry + 7, dev_names, NULL);
+        } else if(strncmp(entry, "app:", 4) == 0) {
+            /* Choose APP vs APP_CUSTOM by whether the name matches a
+             * detected app. Otherwise treat as a custom entry. */
+            const char *value = entry + 4;
+            bool found = false;
+            for(size_t j = 0; j < p->detected_apps.len; ++j) {
+                if(p->detected_apps.items[j] && strcmp(p->detected_apps.items[j], value) == 0) {
+                    found = true;
+                    break;
+                }
+            }
+            audio_row_create(p, found ? AUDIO_ROW_APP : AUDIO_ROW_APP_CUSTOM,
+                             value,
+                             found ? NULL : NULL,
+                             found ? app_names : NULL);
+        }
+    }
+    free(dev_names);
+    free(app_names);
+}
+
 /* --- conditional visibility ---------------------------------------- */
 
 static void manage_set(Widget w, bool visible)
@@ -200,6 +391,16 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
                                  const GsrCapabilities *caps,
                                  page_nav_cb nav, void *user_data)
 {
+    /* Detect audio devices + running apps once. Quiet failures — both
+     * lists may be empty if the recorder binary is missing or the
+     * pipewire build doesn't support app audio. */
+    audio_device_list_init(&out->detected_devices);
+    string_array_init(&out->detected_apps);
+    out->audio_rows = calloc(1, sizeof(AudioRowList));
+    (void)audio_devices_query_inputs(&out->detected_devices);
+    if(caps && caps->supports_app_audio)
+        (void)audio_devices_query_applications(&out->detected_apps);
+
     out->root = XtVaCreateWidget("common_settings_page",
         xmFormWidgetClass, parent,
         XmNtopAttachment,    XmATTACH_FORM,
@@ -316,7 +517,30 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
         if(caps && !caps->supports_app_audio)
             XtSetSensitive(out->record_app_audio_inverted_toggle, False);
 
-        gsr_w_label(rc, "(Audio devices list — Pass B2)");
+        /* Audio devices list — populated below from config; rows
+         * added/removed dynamically via the three Add buttons. */
+        Widget add_row = make_hrow(rc);
+        out->add_device_btn     = gsr_w_button(add_row, "Add audio device");
+        out->add_app_btn        = gsr_w_button(add_row, "Add application audio");
+        out->add_custom_app_btn = gsr_w_button(add_row, "Add custom application audio");
+
+        out->audio_rows_box = XtVaCreateManagedWidget("audio_rows_box",
+            xmRowColumnWidgetClass, rc,
+            XmNorientation, XmVERTICAL,
+            XmNpacking,     XmPACK_TIGHT,
+            XmNspacing,     2,
+            NULL);
+
+        if(caps && !caps->supports_app_audio) {
+            XtSetSensitive(out->add_app_btn, False);
+            XtSetSensitive(out->add_custom_app_btn, False);
+        }
+
+        XtAddCallback(out->add_device_btn,     XmNactivateCallback, add_device_clicked,     out);
+        XtAddCallback(out->add_app_btn,        XmNactivateCallback, add_app_clicked,        out);
+        XtAddCallback(out->add_custom_app_btn, XmNactivateCallback, add_custom_app_clicked, out);
+
+        rebuild_audio_rows_from_config(out, config);
     }
 
     /* --- Video frame --- */
@@ -429,6 +653,24 @@ void page_common_settings_commit(const PageCommonSettings *p, Config *config)
     commit_combo_str(p->audio_codec_combo, &config->main_config.audio_codec);
     config->main_config.merge_audio_tracks        = gsr_w_toggle_get(p->merge_audio_toggle);
     config->main_config.record_app_audio_inverted = gsr_w_toggle_get(p->record_app_audio_inverted_toggle);
+
+    /* Rebuild audio_input from rows. */
+    string_array_clear(&config->main_config.audio_input);
+    AudioRowList *rows = (AudioRowList *)p->audio_rows;
+    for(size_t i = 0; rows && i < rows->len; ++i) {
+        AudioRow *r = rows->items[i];
+        char *raw = NULL;
+        if(r->kind == AUDIO_ROW_APP_CUSTOM)
+            raw = gsr_w_text_get(r->value);
+        else
+            raw = gsr_w_combo_get_text(r->value);
+        if(raw && raw[0]) {
+            const char *prefix = (r->kind == AUDIO_ROW_DEVICE) ? "device:" : "app:";
+            string_array_push(&config->main_config.audio_input,
+                              xasprintf("%s%s", prefix, raw));
+        }
+        if(raw) XtFree(raw);
+    }
 
     commit_combo_str(p->quality_combo,        &config->main_config.quality);
     config->main_config.video_bitrate = gsr_w_spin_get(p->bitrate_spin);

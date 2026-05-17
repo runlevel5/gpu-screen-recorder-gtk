@@ -4,6 +4,7 @@
 #include <Xm/Xm.h>
 
 #include "../app_state.h"
+#include "../audio_devices.h"
 #include "../capabilities.h"
 #include "ui_nav.h"
 
@@ -30,6 +31,16 @@ typedef struct {
     Widget audio_codec_combo;
     Widget merge_audio_toggle;          /* inverted: ON => merge=true */
     Widget record_app_audio_inverted_toggle;
+
+    /* Dynamic audio rows — see page_common_settings.c. Opaque to callers. */
+    Widget           audio_rows_box;     /* vertical RowColumn parent of rows */
+    Widget           add_device_btn;
+    Widget           add_app_btn;
+    Widget           add_custom_app_btn;
+    AudioDeviceList  detected_devices;   /* `pgr --list-audio-devices` */
+    StringArray      detected_apps;      /* `pgr --list-application-audio` */
+    /* Rows stored as void* to keep the internal AudioRow type opaque. */
+    void            *audio_rows;
 
     /* Video */
     Widget quality_combo;
