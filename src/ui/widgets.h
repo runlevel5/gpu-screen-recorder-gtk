@@ -44,6 +44,10 @@ void   gsr_w_combo_select_text(Widget combo, const char *value);
 
 Widget gsr_w_button  (Widget parent, const char *label);
 
+/* Same, but also installs an Alt-mnemonic. `mnemonic` should appear in
+ * `label` (case-insensitive) and is set as XmNmnemonic. */
+Widget gsr_w_button_m(Widget parent, const char *label, char mnemonic);
+
 /* Tight horizontal XmRowColumn — useful for "label + control" pairs. */
 Widget gsr_w_hrow(Widget parent);
 

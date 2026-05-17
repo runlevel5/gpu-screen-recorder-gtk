@@ -154,8 +154,8 @@ void page_streaming_create(Widget parent, PageStreaming *out,
         XmNbottomOffset,     12,
         XmNleftOffset,       12,
         NULL);
-    out->back_btn  = gsr_w_button(btn_row, "Back");
-    out->start_btn = gsr_w_button(btn_row, "Start streaming");
+    out->back_btn  = gsr_w_button_m(btn_row, "Back",            'B');
+    out->start_btn = gsr_w_button_m(btn_row, "Start streaming", 'S');
 
     PageCtx *c = (PageCtx *)malloc(sizeof(*c));
     c->nav     = nav;

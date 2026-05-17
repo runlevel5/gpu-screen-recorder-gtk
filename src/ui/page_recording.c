@@ -116,9 +116,9 @@ void page_recording_create(Widget parent, PageRecording *out,
         XmNleftOffset,       12,
         NULL);
 
-    out->back_btn  = gsr_w_button(btn_row, "Back");
-    out->start_btn = gsr_w_button(btn_row, "Start recording");
-    out->pause_btn = gsr_w_button(btn_row, "Pause recording");
+    out->back_btn  = gsr_w_button_m(btn_row, "Back",            'B');
+    out->start_btn = gsr_w_button_m(btn_row, "Start recording", 'S');
+    out->pause_btn = gsr_w_button_m(btn_row, "Pause recording", 'P');
 
     PageCtx *c = (PageCtx *)malloc(sizeof(*c));
     c->nav     = nav;

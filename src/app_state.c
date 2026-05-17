@@ -62,6 +62,10 @@ static size_t build_options(Config *c, ConfigOption *out)
     out[i++] = (ConfigOption){"main.restore_portal_session",                CONFIG_TYPE_BOOL,         &c->main_config.restore_portal_session};
     out[i++] = (ConfigOption){"main.use_new_ui",                            CONFIG_TYPE_BOOL,         &c->main_config.use_new_ui};
     out[i++] = (ConfigOption){"main.installed_gsr_global_hotkeys_version",  CONFIG_TYPE_I32,          &c->main_config.installed_gsr_global_hotkeys_version};
+    out[i++] = (ConfigOption){"main.window_x",                              CONFIG_TYPE_I32,          &c->main_config.window_x};
+    out[i++] = (ConfigOption){"main.window_y",                              CONFIG_TYPE_I32,          &c->main_config.window_y};
+    out[i++] = (ConfigOption){"main.window_width",                          CONFIG_TYPE_I32,          &c->main_config.window_width};
+    out[i++] = (ConfigOption){"main.window_height",                         CONFIG_TYPE_I32,          &c->main_config.window_height};
 
     /* streaming.* */
     out[i++] = (ConfigOption){"streaming.service",                          CONFIG_TYPE_STRING,       &c->streaming_config.streaming_service};

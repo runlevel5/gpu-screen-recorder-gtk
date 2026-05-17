@@ -124,9 +124,9 @@ void page_replay_create(Widget parent, PageReplay *out,
         XmNleftOffset,       12,
         NULL);
 
-    out->back_btn  = gsr_w_button(btn_row, "Back");
-    out->start_btn = gsr_w_button(btn_row, "Start replay");
-    out->save_btn  = gsr_w_button(btn_row, "Save replay");
+    out->back_btn  = gsr_w_button_m(btn_row, "Back",         'B');
+    out->start_btn = gsr_w_button_m(btn_row, "Start replay", 'S');
+    out->save_btn  = gsr_w_button_m(btn_row, "Save replay",  'a');
 
     PageCtx *c = (PageCtx *)malloc(sizeof(*c));
     c->nav     = nav;

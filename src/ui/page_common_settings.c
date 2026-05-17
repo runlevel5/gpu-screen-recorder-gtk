@@ -454,9 +454,11 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
         XmNleftOffset,       12,
         XmNrightOffset,      12,
         NULL);
-    out->stream_btn = gsr_w_button(btn_row, "Stream");
-    out->record_btn = gsr_w_button(btn_row, "Record");
-    out->replay_btn = gsr_w_button(btn_row, "Replay");
+    /* Mnemonics: Alt+S Stream, Alt+R Record, Alt+P Replay (P avoids
+     * conflict with R; Replay's R is already used as Record's mnemonic). */
+    out->stream_btn = gsr_w_button_m(btn_row, "Stream", 'S');
+    out->record_btn = gsr_w_button_m(btn_row, "Record", 'R');
+    out->replay_btn = gsr_w_button_m(btn_row, "Replay", 'p');
 
     Widget sw = XtVaCreateManagedWidget("sw",
         xmScrolledWindowWidgetClass, out->root,

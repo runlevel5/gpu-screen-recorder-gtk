@@ -13,6 +13,7 @@
 #include <Xm/Protocols.h>
 #include <Xm/PushB.h>
 #include <Xm/RowColumn.h>
+#include <Xm/RenderT.h>
 #include <Xm/SeparatoG.h>
 #include <Xm/Xm.h>
 
@@ -371,9 +372,12 @@ static void toggle_main_window(AppCtx *ctx)
     }
 }
 
+static void capture_geometry(AppCtx *ctx);  /* fwd-decl, defined below */
+
 static void exit_app(AppCtx *ctx)
 {
     commit_current_page(ctx);
+    capture_geometry(ctx);
     app_state_save(&ctx->config);
     ctx->running = false;
     XtAppSetExitFlag(ctx->app);
@@ -503,11 +507,7 @@ static void build_tray_menu(AppCtx *ctx)
 static void on_window_close(Widget w, XtPointer client_data, XtPointer call)
 {
     (void)w; (void)call;
-    AppCtx *ctx = (AppCtx *)client_data;
-    commit_current_page(ctx);
-    app_state_save(&ctx->config);
-    ctx->running = false;
-    XtAppSetExitFlag(ctx->app);
+    exit_app((AppCtx *)client_data);
 }
 
 /* --- Setup --------------------------------------------------------- */
@@ -560,6 +560,56 @@ static void register_wm_protocols(AppCtx *ctx)
     XmAddWMProtocolCallback(ctx->toplevel, wm_delete, on_window_close, ctx);
 }
 
+/* Install an Xft-based render table on the toplevel so all descendant
+ * widgets get anti-aliased text instead of Motif's default bitmap fonts.
+ * Must be called BEFORE XtRealizeWidget so children inherit. */
+static void install_xft_fonts(AppCtx *ctx)
+{
+    Arg args[4];
+    int n = 0;
+    XtSetArg(args[n], XmNfontName, (XtPointer)"Sans:size=10"); ++n;
+    XtSetArg(args[n], XmNfontType, XmFONT_IS_XFT);             ++n;
+    XmRendition r = XmRenditionCreate(ctx->toplevel, (XmStringTag)"", args, n);
+    if(!r) {
+        fprintf(stderr, "[fonts] XmRenditionCreate failed; using Motif defaults\n");
+        return;
+    }
+    XmRenderTable rt = XmRenderTableAddRenditions(NULL, &r, 1, XmMERGE_REPLACE);
+    XmRenditionFree(r);
+    XtVaSetValues(ctx->toplevel, XmNrenderTable, rt, NULL);
+    /* RenderTable is now owned by the shell. */
+}
+
+static void apply_saved_geometry(AppCtx *ctx)
+{
+    const MainConfig *m = &ctx->config.main_config;
+    if(m->window_width > 0 && m->window_height > 0) {
+        XtVaSetValues(ctx->toplevel,
+            XmNwidth,  m->window_width,
+            XmNheight, m->window_height,
+            NULL);
+    }
+    if(m->window_x != 0 || m->window_y != 0) {
+        XtVaSetValues(ctx->toplevel,
+            XmNx, m->window_x,
+            XmNy, m->window_y,
+            NULL);
+    }
+}
+
+static void capture_geometry(AppCtx *ctx)
+{
+    if(!ctx->toplevel) return;
+    Position  x = 0, y = 0;
+    Dimension w = 0, h = 0;
+    XtVaGetValues(ctx->toplevel,
+        XmNx, &x, XmNy, &y, XmNwidth, &w, XmNheight, &h, NULL);
+    ctx->config.main_config.window_x      = (int32_t)x;
+    ctx->config.main_config.window_y      = (int32_t)y;
+    ctx->config.main_config.window_width  = (int32_t)w;
+    ctx->config.main_config.window_height = (int32_t)h;
+}
+
 int main(int argc, char **argv)
 {
     AppCtx ctx;
@@ -598,6 +648,9 @@ int main(int argc, char **argv)
         NULL);
 
     ctx.display = XtDisplay(ctx.toplevel);
+
+    install_xft_fonts(&ctx);
+    apply_saved_geometry(&ctx);
 
     Widget main_w = XtVaCreateManagedWidget(
         "main_w",

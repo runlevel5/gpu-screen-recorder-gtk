@@ -56,6 +56,13 @@ typedef struct {
     bool     restore_portal_session;
     bool     use_new_ui;
     int32_t  installed_gsr_global_hotkeys_version;
+
+    /* Window geometry — restored on next launch. Zero means "let the WM
+     * decide" (first launch / never persisted). */
+    int32_t  window_x;
+    int32_t  window_y;
+    int32_t  window_width;
+    int32_t  window_height;
 } MainConfig;
 
 typedef struct { char *stream_key; } YoutubeStreamConfig;

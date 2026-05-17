@@ -201,3 +201,15 @@ Widget gsr_w_hrow(Widget parent)
         XmNspacing,     6,
         NULL);
 }
+
+Widget gsr_w_button_m(Widget parent, const char *label, char mnemonic)
+{
+    XmString xms = XmStringCreateLocalized((char *)label);
+    Widget w = XtVaCreateManagedWidget("btn",
+        xmPushButtonWidgetClass, parent,
+        XmNlabelString, xms,
+        XmNmnemonic,    (KeySym)mnemonic,
+        NULL);
+    XmStringFree(xms);
+    return w;
+}
