@@ -40,6 +40,16 @@ unsigned int gsr_key_state_without_locks(unsigned int key_state)
     return key_state & ~(Mod2Mask | LockMask);
 }
 
+uint32_t gsr_x11_mask_to_gsr_mod(unsigned int x11_mask)
+{
+    uint32_t m = 0;
+    if(x11_mask & ControlMask) m |= gsr_modkey_to_mask(XK_Control_L);
+    if(x11_mask & Mod1Mask)    m |= gsr_modkey_to_mask(XK_Alt_L);
+    if(x11_mask & ShiftMask)   m |= gsr_modkey_to_mask(XK_Shift_L);
+    if(x11_mask & Mod4Mask)    m |= gsr_modkey_to_mask(XK_Super_L);
+    return m;
+}
+
 typedef struct {
     KeySym      key_sym;
     const char *name;

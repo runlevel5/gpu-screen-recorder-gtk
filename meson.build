@@ -20,6 +20,8 @@ src = [
     'src/x11_hotkeys.c',
     'src/ui/widgets.c',
     'src/ui/dialogs.c',
+    'src/ui/hotkey_capture.c',
+    'src/ui/hotkey_row.c',
     'src/ui/page_common_settings.c',
     'src/ui/page_replay.c',
     'src/ui/page_recording.c',

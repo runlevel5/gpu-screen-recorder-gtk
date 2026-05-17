@@ -1,9 +1,11 @@
 #ifndef GSR_UI_PAGE_RECORDING_H
 #define GSR_UI_PAGE_RECORDING_H
 
+#include <X11/Xlib.h>
 #include <Xm/Xm.h>
 
 #include "../app_state.h"
+#include "hotkey_row.h"
 #include "ui_nav.h"
 
 #ifdef __cplusplus
@@ -11,17 +13,20 @@ extern "C" {
 #endif
 
 typedef struct {
-    Widget root;
-    Widget save_dir_text;
-    Widget save_dir_browse_btn;
-    Widget container_combo;
-    Widget back_btn;
-    Widget start_btn;
-    Widget pause_btn;
+    Widget    root;
+    Widget    save_dir_text;
+    Widget    save_dir_browse_btn;
+    Widget    container_combo;
+    HotkeyRow start_stop_hotkey;
+    HotkeyRow pause_hotkey;
+    Widget    back_btn;
+    Widget    start_btn;
+    Widget    pause_btn;
 } PageRecording;
 
 void page_recording_create(Widget parent, PageRecording *out,
-                           const Config *config,
+                           Config *config,
+                           Display *display, XIC xic,
                            page_nav_cb nav, page_session_cb session,
                            void *user_data);
 

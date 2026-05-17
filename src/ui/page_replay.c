@@ -61,7 +61,8 @@ static void browse_cb(Widget w, XtPointer client, XtPointer call)
 }
 
 void page_replay_create(Widget parent, PageReplay *out,
-                        const Config *config,
+                        Config *config,
+                        Display *display, XIC xic,
                         page_nav_cb nav, page_session_cb session,
                         void *user_data)
 {
@@ -102,6 +103,14 @@ void page_replay_create(Widget parent, PageReplay *out,
     gsr_w_label(rc, "Replay time (seconds):");
     out->replay_time_spin = gsr_w_spin_int(rc, 5, 1200,
                                            config->replay_config.replay_time);
+
+    /* Hotkey rows. */
+    hotkey_row_create(rc, &out->start_stop_hotkey, "Start/stop hotkey:",
+                      &config->replay_config.start_stop_recording_hotkey,
+                      display, xic);
+    hotkey_row_create(rc, &out->save_hotkey, "Save replay hotkey:",
+                      &config->replay_config.save_recording_hotkey,
+                      display, xic);
 
     /* Bottom button row. */
     Widget btn_row = XtVaCreateManagedWidget("btn_row",

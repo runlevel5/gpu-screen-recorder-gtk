@@ -270,9 +270,9 @@ static void log_loaded_config(const Config *c)
 static void build_pages(AppCtx *ctx)
 {
     page_common_settings_create(ctx->page_host, &ctx->common,    &ctx->config, &ctx->caps, on_page_nav, ctx);
-    page_replay_create         (ctx->page_host, &ctx->replay,    &ctx->config, on_page_nav, on_page_session, ctx);
-    page_recording_create      (ctx->page_host, &ctx->recording, &ctx->config, on_page_nav, on_page_session, ctx);
-    page_streaming_create      (ctx->page_host, &ctx->streaming, &ctx->config, on_page_nav, on_page_session, ctx);
+    page_replay_create         (ctx->page_host, &ctx->replay,    &ctx->config, ctx->display, NULL, on_page_nav, on_page_session, ctx);
+    page_recording_create      (ctx->page_host, &ctx->recording, &ctx->config, ctx->display, NULL, on_page_nav, on_page_session, ctx);
+    page_streaming_create      (ctx->page_host, &ctx->streaming, &ctx->config, ctx->display, NULL, on_page_nav, on_page_session, ctx);
 
     ctx->pages[PAGE_COMMON_SETTINGS] = ctx->common.root;
     ctx->pages[PAGE_REPLAY]          = ctx->replay.root;

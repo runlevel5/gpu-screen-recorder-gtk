@@ -24,6 +24,7 @@ extern "C" {
 bool     gsr_key_is_modifier   (KeySym key_sym);
 uint32_t gsr_modkey_to_mask    (KeySym key_sym);   /* requires gsr_key_is_modifier(key_sym) */
 uint32_t gsr_key_mod_mask_to_x11(uint32_t mask);   /* internal bitmap -> X11 ModXMask */
+uint32_t gsr_x11_mask_to_gsr_mod(unsigned int x11_mask);  /* reverse of above */
 unsigned int gsr_key_state_without_locks(unsigned int key_state);
 
 /* Look up a human-readable name for `key_sym` into `buffer`. Returns bytes

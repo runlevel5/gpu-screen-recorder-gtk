@@ -60,7 +60,8 @@ static void browse_cb(Widget w, XtPointer client, XtPointer call)
 }
 
 void page_recording_create(Widget parent, PageRecording *out,
-                           const Config *config,
+                           Config *config,
+                           Display *display, XIC xic,
                            page_nav_cb nav, page_session_cb session,
                            void *user_data)
 {
@@ -96,6 +97,13 @@ void page_recording_create(Widget parent, PageRecording *out,
     gsr_w_label(rc, "Container:");
     out->container_combo = gsr_w_combo(rc, k_containers,
                                        config->record_config.container);
+
+    hotkey_row_create(rc, &out->start_stop_hotkey, "Start/stop hotkey:",
+                      &config->record_config.start_stop_recording_hotkey,
+                      display, xic);
+    hotkey_row_create(rc, &out->pause_hotkey, "Pause/unpause hotkey:",
+                      &config->record_config.pause_unpause_recording_hotkey,
+                      display, xic);
 
     Widget btn_row = XtVaCreateManagedWidget("btn_row",
         xmRowColumnWidgetClass, out->root,

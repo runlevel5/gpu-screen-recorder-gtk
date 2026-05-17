@@ -87,7 +87,8 @@ static void start_cb(Widget w, XtPointer client, XtPointer call)
 }
 
 void page_streaming_create(Widget parent, PageStreaming *out,
-                           const Config *config,
+                           Config *config,
+                           Display *display, XIC xic,
                            page_nav_cb nav, page_session_cb session,
                            void *user_data)
 {
@@ -127,6 +128,10 @@ void page_streaming_create(Widget parent, PageStreaming *out,
     out->youtube_key_text = gsr_w_text(rc, config->streaming_config.youtube.stream_key);
     out->twitch_key_text  = gsr_w_text(rc, config->streaming_config.twitch.stream_key);
     out->custom_url_text  = gsr_w_text(rc, config->streaming_config.custom.url);
+
+    hotkey_row_create(rc, &out->start_stop_hotkey, "Start/stop hotkey:",
+                      &config->streaming_config.start_stop_recording_hotkey,
+                      display, xic);
 
     out->custom_container_row = XtVaCreateWidget("custom_row",
         xmRowColumnWidgetClass, rc,
