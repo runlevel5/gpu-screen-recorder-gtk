@@ -724,6 +724,64 @@ static void apply_cde_palette(AppCtx *ctx)
  * resolve the wildcard XLFD to a concrete iso8859-1 or similar variant
  * via XLoadQueryFont, which is what every other CDE app on the box is
  * also doing. Returns true if the font was loaded and applied. */
+/* Rewrite the trailing "-CHARSET-ENCODING" of an XLFD to a specific pair
+ * (e.g. "iso10646-1"). Output is written to `dst`. Returns false if the
+ * source doesn't have at least two trailing '-' fields. */
+static bool xlfd_replace_encoding(const char *src, const char *encoding,
+                                  char *dst, size_t dst_size)
+{
+    int len = (int)strlen(src);
+    int dash_count = 0;
+    int cut = -1;
+    for(int i = len - 1; i >= 0; --i) {
+        if(src[i] == '-') {
+            ++dash_count;
+            if(dash_count == 2) { cut = i; break; }
+        }
+    }
+    if(cut < 0) return false;
+    snprintf(dst, dst_size, "%.*s-%s", cut, src, encoding);
+    return true;
+}
+
+/* Try to load XLFD as a single XFontStruct; if it resolves, install as
+ * the toplevel's XmNfontList. Returns true on success. */
+static bool try_load_xlfd_into_fontlist(AppCtx *ctx, const char *xlfd)
+{
+    XFontStruct *fs = XLoadQueryFont(ctx->display, xlfd);
+    if(!fs) return false;
+    XFreeFont(ctx->display, fs);
+
+    XmFontListEntry entry = XmFontListEntryLoad(ctx->display, (char *)xlfd,
+        XmFONT_IS_FONT, XmFONTLIST_DEFAULT_TAG);
+    if(!entry) return false;
+    XmFontList fl = XmFontListAppendEntry(NULL, entry);
+    XmFontListEntryFree(&entry);
+    XtVaSetValues(ctx->toplevel, XmNfontList, fl, NULL);
+    XmFontListFree(fl);
+    fprintf(stderr, "[cde] inherited *FontList=%s\n", xlfd);
+    return true;
+}
+
+/* Parse the pixel-size field (8th XLFD position, 0-based: 7) out of an
+ * XLFD. Returns 0 if not found / wildcarded. */
+static int xlfd_pixel_size(const char *xlfd)
+{
+    int dash_count = 0;
+    const char *p = xlfd;
+    while(*p) {
+        if(*p == '-') {
+            ++dash_count;
+            if(dash_count == 7) {
+                int v = atoi(p + 1);
+                return v > 0 ? v : 0;
+            }
+        }
+        ++p;
+    }
+    return 0;
+}
+
 static bool install_cde_fonts(AppCtx *ctx)
 {
     char xlfd[256] = {0};
@@ -732,45 +790,39 @@ static bool install_cde_fonts(AppCtx *ctx)
         return false;
     }
 
-    /* CDE's *FontList resource value is in Motif fontList list syntax:
-     *   "<xlfd1>:<xlfd2>:..."
-     * Even with a single entry it ends with a trailing ':'. Strip the
-     * trailing separator + whitespace so XmFontListEntryLoad sees a clean
-     * XLFD when we load it as XmFONT_IS_FONT. Also stop at the first ':'
-     * to ignore extra specs we don't need for a single XFontStruct. */
+    /* CDE's *FontList value is in Motif fontList list syntax — colon-
+     * separated XLFDs with a trailing colon even for a single entry.
+     * Strip the trailing separator + whitespace. */
     char *colon = strchr(xlfd, ':');
     if(colon) *colon = '\0';
     size_t len = strlen(xlfd);
-    while(len > 0 && (xlfd[len - 1] == ' ' || xlfd[len - 1] == '\t')) {
+    while(len > 0 && (xlfd[len - 1] == ' ' || xlfd[len - 1] == '\t'))
         xlfd[--len] = '\0';
-    }
     if(len == 0)
         return false;
 
-    /* Resolve the XLFD wildcard explicitly via XLoadQueryFont. If the
-     * wildcard doesn't resolve (no matching font installed), bail out
-     * cleanly so the caller can fall through to Xft. */
-    XFontStruct *fs = XLoadQueryFont(ctx->display, xlfd);
-    if(!fs) {
-        fprintf(stderr, "[cde] no font matched XLFD '%s'\n", xlfd);
-        return false;
-    }
-    /* We don't need the XFontStruct ourselves — XmFontListEntryLoad will
-     * load its own. Free this probe. */
-    XFreeFont(ctx->display, fs);
+    /* CDE wildcards the charset/encoding fields ("...-*-*"). XLoadQueryFont
+     * picks the first match alphabetically, which on many boxes is a CJK
+     * encoding (gb2312/jisx/koi8) without ASCII coverage — that's how we
+     * ended up rendering Latin text in a tiny bitmap CJK font.
+     *
+     * Prefer iso10646-1 (UTF-8) first, then iso8859-1 (Latin-1). Only fall
+     * through to the raw wildcard if neither exists. */
+    char attempt[320];
+    if(xlfd_replace_encoding(xlfd, "iso10646-1", attempt, sizeof(attempt))
+       && try_load_xlfd_into_fontlist(ctx, attempt))
+        return true;
+    if(xlfd_replace_encoding(xlfd, "iso8859-1", attempt, sizeof(attempt))
+       && try_load_xlfd_into_fontlist(ctx, attempt))
+        return true;
 
-    XmFontListEntry entry = XmFontListEntryLoad(ctx->display, xlfd,
-        XmFONT_IS_FONT, XmFONTLIST_DEFAULT_TAG);
-    if(!entry) {
-        fprintf(stderr, "[cde] XmFontListEntryLoad failed for '%s'\n", xlfd);
-        return false;
-    }
-    XmFontList fl = XmFontListAppendEntry(NULL, entry);
-    XmFontListEntryFree(&entry);
-    XtVaSetValues(ctx->toplevel, XmNfontList, fl, NULL);
-    XmFontListFree(fl);
-    fprintf(stderr, "[cde] inherited *FontList=%s\n", xlfd);
-    return true;
+    /* Deliberately do NOT fall back to the raw wildcard. On boxes where the
+     * CDE family only ships gb2312/jisx/koi8 variants, XLoadQueryFont
+     * happily resolves the wildcard to a CJK font that renders Latin text
+     * in tiny, oddly-spaced bitmap glyphs. Better to let Xft take over. */
+    fprintf(stderr, "[cde] *FontList='%s' has no usable Latin/UTF-8 encoding; "
+                    "falling back to Xft\n", xlfd);
+    return false;
 }
 
 /* Install an Xft-based render table on the toplevel so all descendant
@@ -781,10 +833,30 @@ static bool install_cde_fonts(AppCtx *ctx)
  * font wildcard fails to resolve. */
 static void install_xft_fonts(AppCtx *ctx)
 {
+    /* If the session pushed a *FontList XLFD, parse its pixel-size and use
+     * the same target size for Xft so the fallback visually matches what
+     * the user's CDE setup asked for. The CDE *FontList on a typical
+     * dtsession is "...-medium-r-normal-m sans-14-130-75-75-m-70-..." —
+     * pixel size 14. Without a hint, default to size 11pt. */
+    char xlfd[256] = {0};
+    char fontname[96];
+    if(query_resource(ctx->display, "GpuScreenRecorder.fontList",
+                      "GpuScreenRecorder.FontList", xlfd, sizeof(xlfd))) {
+        char *colon = strchr(xlfd, ':');
+        if(colon) *colon = '\0';
+        int px = xlfd_pixel_size(xlfd);
+        if(px > 0)
+            snprintf(fontname, sizeof(fontname), "Sans:pixelsize=%d", px);
+        else
+            snprintf(fontname, sizeof(fontname), "Sans:size=11");
+    } else {
+        snprintf(fontname, sizeof(fontname), "Sans:size=11");
+    }
+
     Arg args[4];
     int n = 0;
-    XtSetArg(args[n], XmNfontName, (XtPointer)"Sans:size=10"); ++n;
-    XtSetArg(args[n], XmNfontType, XmFONT_IS_XFT);             ++n;
+    XtSetArg(args[n], XmNfontName, (XtPointer)fontname); ++n;
+    XtSetArg(args[n], XmNfontType, XmFONT_IS_XFT);       ++n;
     XmRendition r = XmRenditionCreate(ctx->toplevel, (XmStringTag)"", args, n);
     if(!r) {
         fprintf(stderr, "[fonts] XmRenditionCreate failed; using Motif defaults\n");
@@ -793,6 +865,7 @@ static void install_xft_fonts(AppCtx *ctx)
     XmRenderTable rt = XmRenderTableAddRenditions(NULL, &r, 1, XmMERGE_REPLACE);
     XmRenditionFree(r);
     XtVaSetValues(ctx->toplevel, XmNrenderTable, rt, NULL);
+    fprintf(stderr, "[fonts] using Xft fontList '%s'\n", fontname);
     /* RenderTable is now owned by the shell. */
 }
 
