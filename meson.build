@@ -83,6 +83,9 @@ c_args = [
 if get_option('cde_palette')
     c_args += '-DGSR_CDE_PALETTE=1'
 endif
+if get_option('xft_fonts')
+    c_args += '-DGSR_XFT_FONTS=1'
+endif
 
 executable('gpu-screen-recorder-motif',
     src,

@@ -624,41 +624,81 @@ static void register_wm_protocols(AppCtx *ctx)
 }
 
 #ifdef GSR_CDE_PALETTE
-/* CDE's dtstyle pushes palette colours scoped to the Dt class wildcard
- * (Dt*background, Dt*foreground, etc.) via session Xresources. Our app
- * class is "GpuScreenRecorder", so those resources don't auto-match.
- * Query the Dt scope explicitly and propagate via XmChangeColor —
- * Motif then computes top/bottom shadow + arm + select shades from the
- * base background and cascades to every descendant widget.
+/* Resolve the user's CDE palette and apply it to the toplevel.
  *
- * No-op when no Dt resources are loaded (non-CDE sessions). */
+ * CDE's session resources contain two parallel forms:
+ *   1.  Dt*background: ~c      <- palette indirection scoped to the Dt
+ *                                  class (only resolves for CDE apps that
+ *                                  register the Dt color converter)
+ *   2.  *background: #63637e...  <- resolved RGB written by dtsession,
+ *                                  applies to any app via loose binding
+ *
+ * Query the loose-bound form via XrmGetResource against our own class
+ * hierarchy ("GpuScreenRecorder.background"). That walks the resource
+ * rules and picks up "*background" without colliding with "Dt*"-only
+ * indirections we can't resolve.
+ *
+ * Propagate the result via XmChangeColor — Motif computes top/bottom
+ * shadow + arm + select shades from the base background and cascades
+ * to every descendant widget. */
+static bool query_resource(Display *d, const char *name, const char *class_,
+                           char *out, size_t out_size)
+{
+    XrmDatabase db = XtDatabase(d);
+    if(!db) return false;
+    XrmValue val;
+    char    *type = NULL;
+    if(!XrmGetResource(db, name, class_, &type, &val) || !val.addr)
+        return false;
+    if(val.size == 0)
+        return false;
+    /* Indirection sentinel — CDE palette references like "~c" can't be
+     * resolved without the Dt color converter; treat as missing. */
+    if(val.addr[0] == '~')
+        return false;
+    size_t n = val.size < out_size - 1 ? val.size : out_size - 1;
+    memcpy(out, val.addr, n);
+    out[n] = '\0';
+    /* Strip a trailing NUL if size included it. */
+    while(n > 0 && out[n - 1] == '\0') --n;
+    return out[0] != '\0';
+}
+
 static void apply_cde_palette(AppCtx *ctx)
 {
-    char *bg = XGetDefault(ctx->display, "Dt", "background");
-    char *fg = XGetDefault(ctx->display, "Dt", "foreground");
-    if(!bg && !fg) {
-        fprintf(stderr, "[cde] no Dt palette in resource DB; using Motif defaults\n");
+    char bg[64] = {0};
+    char fg[64] = {0};
+    bool have_bg = query_resource(ctx->display,
+        "GpuScreenRecorder.background", "GpuScreenRecorder.Background",
+        bg, sizeof(bg));
+    bool have_fg = query_resource(ctx->display,
+        "GpuScreenRecorder.foreground", "GpuScreenRecorder.Foreground",
+        fg, sizeof(fg));
+
+    if(!have_bg && !have_fg) {
+        fprintf(stderr, "[cde] no usable *background/*foreground in resource DB; "
+                        "using Motif defaults\n");
         return;
     }
 
     Colormap cmap = DefaultColormap(ctx->display, DefaultScreen(ctx->display));
 
-    if(bg && *bg) {
+    if(have_bg) {
         XColor col, exact;
         if(XAllocNamedColor(ctx->display, cmap, bg, &col, &exact)) {
             XmChangeColor(ctx->toplevel, col.pixel);
-            fprintf(stderr, "[cde] inherited Dt*background=%s\n", bg);
+            fprintf(stderr, "[cde] inherited *background=%s\n", bg);
         } else {
-            fprintf(stderr, "[cde] could not allocate Dt*background='%s'\n", bg);
+            fprintf(stderr, "[cde] could not allocate *background='%s'\n", bg);
         }
     }
-    if(fg && *fg) {
+    if(have_fg) {
         XColor col, exact;
         if(XAllocNamedColor(ctx->display, cmap, fg, &col, &exact)) {
             XtVaSetValues(ctx->toplevel, XmNforeground, col.pixel, NULL);
-            fprintf(stderr, "[cde] inherited Dt*foreground=%s\n", fg);
+            fprintf(stderr, "[cde] inherited *foreground=%s\n", fg);
         } else {
-            fprintf(stderr, "[cde] could not allocate Dt*foreground='%s'\n", fg);
+            fprintf(stderr, "[cde] could not allocate *foreground='%s'\n", fg);
         }
     }
 }
@@ -667,9 +707,13 @@ static void apply_cde_palette(AppCtx *ctx)
 /* Install an Xft-based render table on the toplevel so all descendant
  * widgets get anti-aliased text instead of Motif's default bitmap fonts.
  * Must be called BEFORE XtRealizeWidget so children inherit.
- * Currently unused: under CDE we want the session's font config to win;
- * kept available for non-CDE deployments. */
-__attribute__((unused))
+ *
+ * On a CDE session, the session resources push XLFD font names like
+ * "-dt-interface system-medium-r-normal-m*-*..." which only work if
+ * /usr/dt/config/xfonts/<lang>/ is on the X font path. When it isn't
+ * (typical on modern distros where CDE is built from source), Motif's
+ * FontSet conversion fails and falls back to an unattractive default.
+ * Forcing an Xft rendition sidesteps the conversion entirely. */
 static void install_xft_fonts(AppCtx *ctx)
 {
     Arg args[4];
@@ -758,12 +802,15 @@ int main(int argc, char **argv)
     apply_cde_palette(&ctx);
 #endif
 
-    /* Note: install_xft_fonts() is intentionally NOT called here. Under CDE
-     * (and any session that configures Motif fonts via Xresources), we want
-     * Motif's normal XmNfontList lookup to flow through unmolested. Forcing
-     * an Xft rendition with a hardcoded family name overrides the session's
-     * font config and looks foreign. The helper stays in the file so a
-     * non-CDE deployment can call it from a wrapper if desired. */
+#ifdef GSR_XFT_FONTS
+    /* Install an Xft fontList. The CDE session pushes XLFD font names that
+     * typically aren't on the X font path on modern distros (the CDE
+     * /usr/dt/config/xfonts/ directories aren't registered), so Motif's
+     * FontSet conversion fails and we get an ugly fallback bitmap font.
+     * Forcing Xft sidesteps the conversion entirely. */
+    install_xft_fonts(&ctx);
+#endif
+
     apply_saved_geometry(&ctx);
 
     Widget main_w = XtVaCreateManagedWidget(

@@ -1,4 +1,9 @@
 option('cde_palette',
     type : 'boolean',
     value : true,
-    description : 'Inherit CDE/dtstyle palette colours (Dt*background/foreground) at startup. Safe to leave on outside CDE: when no Dt resources are loaded the probe is a no-op and the app uses plain Motif defaults.')
+    description : 'Inherit CDE/dtstyle palette colours (*background/*foreground from the user\'s session resources) at startup. Safe to leave on outside CDE: when no matching resources are loaded the probe is a no-op and the app uses plain Motif defaults.')
+
+option('xft_fonts',
+    type : 'boolean',
+    value : true,
+    description : 'Install an Xft-based render table on the toplevel before realization, so descendant widgets get anti-aliased text. Disable for purist pure-Motif rendering (will use whatever fontList resources the session pushes; on systems where the CDE XLFD bitmap fonts aren\'t on the X font path, Motif then falls back to an unattractive built-in).')
