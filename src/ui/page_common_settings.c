@@ -363,17 +363,17 @@ static void about_clicked(Widget w, XtPointer client, XtPointer call)
     dialogs_show_about(w);
 }
 
-static void view_changed_cb(Widget w, XtPointer client, XtPointer call)
+static void view_changed_cb(Widget combo, int index, void *user_data)
 {
-    (void)w; (void)call;
-    VisCtx *vc = (VisCtx *)client;
+    (void)combo; (void)index;
+    VisCtx *vc = (VisCtx *)user_data;
     apply_view_visibility(vc->page, vc->caps);
 }
 
-static void record_area_changed_cb(Widget w, XtPointer client, XtPointer call)
+static void record_area_changed_cb(Widget combo, int index, void *user_data)
 {
-    (void)w; (void)call;
-    VisCtx *vc = (VisCtx *)client;
+    (void)combo; (void)index;
+    VisCtx *vc = (VisCtx *)user_data;
     apply_record_area_visibility(vc->page);
 }
 
@@ -658,8 +658,8 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
     VisCtx *vc = (VisCtx *)malloc(sizeof(*vc));
     vc->page = out;
     vc->caps = caps;
-    XtAddCallback(out->view_combo,        XmNselectionCallback, view_changed_cb,        vc);
-    XtAddCallback(out->record_area_combo, XmNselectionCallback, record_area_changed_cb, vc);
+    gsr_w_combo_on_change(out->view_combo,        view_changed_cb,        vc);
+    gsr_w_combo_on_change(out->record_area_combo, record_area_changed_cb, vc);
 
     apply_view_visibility(out, caps);
     apply_record_area_visibility(out);

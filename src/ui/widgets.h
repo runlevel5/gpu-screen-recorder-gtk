@@ -31,16 +31,22 @@ Widget gsr_w_spin_int(Widget parent, int min, int max, int initial);
 int    gsr_w_spin_get(Widget spin);
 void   gsr_w_spin_set(Widget spin, int value);
 
-/* Drop-down combo populated with `items` (NULL-terminated). Selected index
- * defaults to 0 unless `initial_value` matches an item. */
+/* XmOptionMenu-backed dropdown (matches the classic CDE/dtterm/dtcm look:
+ * label + click-to-pop-menu, no text entry). Items are NULL-terminated.
+ * Initial selection defaults to index 0 unless `initial_value` matches.
+ *
+ * The returned widget is the XmOptionMenu itself. Get/set helpers use
+ * its XmNmenuHistory resource under the hood. */
 Widget gsr_w_combo   (Widget parent, const char *const *items, const char *initial_value);
 int    gsr_w_combo_get_index(Widget combo);
 void   gsr_w_combo_set_index(Widget combo, int index);
-
-/* Returns the text of the currently selected item, or NULL if none.
- * Caller frees with XtFree. */
-char  *gsr_w_combo_get_text(Widget combo);
+char  *gsr_w_combo_get_text(Widget combo);   /* XtFree to release */
 void   gsr_w_combo_select_text(Widget combo, const char *value);
+
+/* Register a change callback. Invoked when the user selects an item.
+ * `index` is the 0-based item position. */
+typedef void (*gsr_combo_change_cb)(Widget combo, int index, void *user_data);
+void gsr_w_combo_on_change(Widget combo, gsr_combo_change_cb cb, void *user_data);
 
 Widget gsr_w_button  (Widget parent, const char *label);
 

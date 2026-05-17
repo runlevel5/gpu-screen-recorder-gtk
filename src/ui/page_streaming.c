@@ -62,11 +62,11 @@ static void apply_service_visibility(PageStreaming *p, int service_idx)
     }
 }
 
-static void service_changed_cb(Widget w, XtPointer client, XtPointer call)
+static void service_changed_cb(Widget combo, int index, void *user_data)
 {
-    (void)w; (void)call;
-    PageCtx *c = (PageCtx *)client;
-    apply_service_visibility(c->page, gsr_w_combo_get_index(c->page->service_combo));
+    (void)combo;
+    PageCtx *c = (PageCtx *)user_data;
+    apply_service_visibility(c->page, index);
 }
 
 static void back_cb(Widget w, XtPointer client, XtPointer call)
@@ -166,7 +166,7 @@ void page_streaming_create(Widget parent, PageStreaming *out,
 
     XtAddCallback(out->back_btn,      XmNactivateCallback,  back_cb,           c);
     XtAddCallback(out->start_btn,     XmNactivateCallback,  start_cb,          c);
-    XtAddCallback(out->service_combo, XmNselectionCallback, service_changed_cb, c);
+    gsr_w_combo_on_change(out->service_combo, service_changed_cb, c);
 
     apply_service_visibility(out,
         service_index_from_id(config->streaming_config.streaming_service));
