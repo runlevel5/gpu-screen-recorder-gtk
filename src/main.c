@@ -641,27 +641,40 @@ static void register_wm_protocols(AppCtx *ctx)
  * Propagate the result via XmChangeColor — Motif computes top/bottom
  * shadow + arm + select shades from the base background and cascades
  * to every descendant widget. */
+/* Parse the live RESOURCE_MANAGER property each time. XtDatabase() returns
+ * Xt's snapshot taken at XtVaAppInitialize, which on a CDE session can be
+ * out of sync with what dtsession later wrote to the root window — and
+ * Xt's snapshot stores some values as binary blobs rather than strings,
+ * which is what gave us the "\xXX~c" garbage prefix. Reading the live
+ * string property and parsing it via XrmGetStringDatabase matches what
+ * xrdb -query reports. */
 static bool query_resource(Display *d, const char *name, const char *class_,
                            char *out, size_t out_size)
 {
-    XrmDatabase db = XtDatabase(d);
+    const char *rms = XResourceManagerString(d);
+    if(!rms) return false;
+    XrmDatabase db = XrmGetStringDatabase(rms);
     if(!db) return false;
+
     XrmValue val;
     char    *type = NULL;
-    if(!XrmGetResource(db, name, class_, &type, &val) || !val.addr)
-        return false;
-    if(val.size == 0)
-        return false;
-    /* Indirection sentinel — CDE palette references like "~c" can't be
-     * resolved without the Dt color converter; treat as missing. */
-    if(val.addr[0] == '~')
-        return false;
-    size_t n = val.size < out_size - 1 ? val.size : out_size - 1;
-    memcpy(out, val.addr, n);
-    out[n] = '\0';
-    /* Strip a trailing NUL if size included it. */
-    while(n > 0 && out[n - 1] == '\0') --n;
-    return out[0] != '\0';
+    bool     ok   = XrmGetResource(db, name, class_, &type, &val)
+                 && val.addr && val.size > 0;
+    bool     produced = false;
+    if(ok) {
+        /* CDE palette indirection — can't resolve without the Dt converter. */
+        if(val.addr[0] != '~') {
+            size_t n = val.size < out_size - 1 ? val.size : out_size - 1;
+            /* val.size from XrmGetStringDatabase usually excludes the
+             * trailing NUL but defensively trim any embedded NULs. */
+            while(n > 0 && ((unsigned char *)val.addr)[n - 1] == '\0') --n;
+            memcpy(out, val.addr, n);
+            out[n] = '\0';
+            produced = out[0] != '\0';
+        }
+    }
+    XrmDestroyDatabase(db);
+    return produced;
 }
 
 static void apply_cde_palette(AppCtx *ctx)
