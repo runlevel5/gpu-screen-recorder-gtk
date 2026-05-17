@@ -36,7 +36,7 @@ typedef enum {
     TRAY_CLICK_RIGHT,
 } TrayClick;
 
-typedef void (*tray_click_cb)(TrayClick click, void *user_data);
+typedef void (*tray_click_cb)(TrayClick click, int x_root, int y_root, void *user_data);
 
 typedef struct Tray Tray;
 

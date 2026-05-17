@@ -160,7 +160,7 @@ static void handle_event(Tray *t, XEvent *ev)
         if(!t->click_cb) break;
         TrayClick which = (ev->xbutton.button == Button3 || ev->xbutton.button == Button2)
             ? TRAY_CLICK_RIGHT : TRAY_CLICK_LEFT;
-        t->click_cb(which, t->user);
+        t->click_cb(which, ev->xbutton.x_root, ev->xbutton.y_root, t->user);
         break;
     }
     case ClientMessage:

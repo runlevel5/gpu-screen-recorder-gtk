@@ -11,6 +11,9 @@
 #include <Xm/Form.h>
 #include <Xm/MainW.h>
 #include <Xm/Protocols.h>
+#include <Xm/PushB.h>
+#include <Xm/RowColumn.h>
+#include <Xm/SeparatoG.h>
 #include <Xm/Xm.h>
 
 #include <X11/Intrinsic.h>
@@ -80,6 +83,13 @@ typedef struct {
 
     Tray   *tray;          /* may be NULL if no _NET_SYSTEM_TRAY owner */
     bool    window_hidden;
+
+    Widget  tray_menu;
+    Widget  menu_show_hide_btn;
+    Widget  menu_stop_btn;
+    Widget  menu_pause_btn;
+    Widget  menu_save_btn;
+    Widget  menu_exit_btn;
 } AppCtx;
 
 static const char *page_id_to_mode_name(PageId p)
@@ -349,21 +359,143 @@ static void sync_tray_state(AppCtx *ctx)
         tray_set_state(ctx->tray, session_to_tray_state(ctx));
 }
 
-static void on_tray_click(TrayClick click, void *user_data)
+static void toggle_main_window(AppCtx *ctx)
+{
+    if(ctx->window_hidden) {
+        XtMapWidget(ctx->toplevel);
+        XRaiseWindow(ctx->display, XtWindow(ctx->toplevel));
+        ctx->window_hidden = false;
+    } else {
+        XtUnmapWidget(ctx->toplevel);
+        ctx->window_hidden = true;
+    }
+}
+
+static void exit_app(AppCtx *ctx)
+{
+    commit_current_page(ctx);
+    app_state_save(&ctx->config);
+    ctx->running = false;
+    XtAppSetExitFlag(ctx->app);
+}
+
+/* Menu item callbacks. */
+static void menu_show_hide_cb(Widget w, XtPointer client, XtPointer call)
+{ (void)w; (void)call; toggle_main_window((AppCtx *)client); }
+static void menu_stop_cb(Widget w, XtPointer client, XtPointer call)
+{ (void)w; (void)call; AppCtx *c = (AppCtx *)client; if(c->recorder_active) session_stop(c); }
+static void menu_pause_cb(Widget w, XtPointer client, XtPointer call)
+{ (void)w; (void)call; on_page_session(SESSION_PAUSE, PAGE_RECORDING, client); }
+static void menu_save_cb(Widget w, XtPointer client, XtPointer call)
+{ (void)w; (void)call; on_page_session(SESSION_SAVE, PAGE_REPLAY, client); }
+static void menu_exit_cb(Widget w, XtPointer client, XtPointer call)
+{ (void)w; (void)call; exit_app((AppCtx *)client); }
+
+static void set_btn_label(Widget btn, const char *text)
+{
+    XmString xms = XmStringCreateLocalized((char *)text);
+    XtVaSetValues(btn, XmNlabelString, xms, NULL);
+    XmStringFree(xms);
+}
+
+static void manage_set_w(Widget w, bool visible)
+{
+    if(!w) return;
+    if(visible) XtManageChild(w);
+    else        XtUnmanageChild(w);
+}
+
+static void show_tray_menu(AppCtx *ctx, int x_root, int y_root)
+{
+    if(!ctx->tray_menu) return;
+
+    set_btn_label(ctx->menu_show_hide_btn,
+                  ctx->window_hidden ? "Show window" : "Hide window");
+
+    /* Stop / Pause / Save only when relevant. */
+    bool stop_avail  = ctx->recorder_active;
+    bool pause_avail = ctx->recorder_active && ctx->active_mode == RECORDER_MODE_RECORD;
+    bool save_avail  = ctx->recorder_active && ctx->active_mode == RECORDER_MODE_REPLAY;
+
+    if(stop_avail) {
+        const char *label =
+            ctx->active_mode == RECORDER_MODE_RECORD ? "Stop recording"
+          : ctx->active_mode == RECORDER_MODE_REPLAY ? "Stop replay"
+                                                     : "Stop streaming";
+        set_btn_label(ctx->menu_stop_btn, label);
+    }
+    if(pause_avail) {
+        set_btn_label(ctx->menu_pause_btn,
+                      ctx->recorder_paused ? "Unpause recording" : "Pause recording");
+    }
+
+    manage_set_w(ctx->menu_stop_btn,  stop_avail);
+    manage_set_w(ctx->menu_pause_btn, pause_avail);
+    manage_set_w(ctx->menu_save_btn,  save_avail);
+
+    /* Fabricate a button event for XmMenuPosition. */
+    XButtonPressedEvent ev;
+    memset(&ev, 0, sizeof(ev));
+    ev.type    = ButtonPress;
+    ev.display = ctx->display;
+    ev.window  = XtWindow(ctx->toplevel);
+    ev.x_root  = x_root;
+    ev.y_root  = y_root;
+    ev.button  = Button3;
+    ev.time    = CurrentTime;
+    XmMenuPosition(ctx->tray_menu, &ev);
+    XtManageChild(ctx->tray_menu);
+}
+
+static void on_tray_click(TrayClick click, int x_root, int y_root, void *user_data)
 {
     AppCtx *ctx = (AppCtx *)user_data;
-    if(click == TRAY_CLICK_LEFT) {
-        /* Toggle main window: if mapped, withdraw it; otherwise map+raise. */
-        if(ctx->window_hidden) {
-            XtMapWidget(ctx->toplevel);
-            XRaiseWindow(ctx->display, XtWindow(ctx->toplevel));
-            ctx->window_hidden = false;
-        } else {
-            XtUnmapWidget(ctx->toplevel);
-            ctx->window_hidden = true;
-        }
-    }
-    /* Right-click menu lands in Pass B. */
+    if(click == TRAY_CLICK_LEFT)
+        toggle_main_window(ctx);
+    else
+        show_tray_menu(ctx, x_root, y_root);
+}
+
+static void build_tray_menu(AppCtx *ctx)
+{
+    ctx->tray_menu = XmCreatePopupMenu(ctx->toplevel, (char *)"tray_menu", NULL, 0);
+
+    XmString xms = XmStringCreateLocalized((char *)"Show window");
+    ctx->menu_show_hide_btn = XtVaCreateManagedWidget("show_hide",
+        xmPushButtonWidgetClass, ctx->tray_menu, XmNlabelString, xms, NULL);
+    XmStringFree(xms);
+
+    XtVaCreateManagedWidget("sep1",
+        xmSeparatorGadgetClass, ctx->tray_menu, NULL);
+
+    xms = XmStringCreateLocalized((char *)"Stop");
+    ctx->menu_stop_btn = XtVaCreateWidget("stop",
+        xmPushButtonWidgetClass, ctx->tray_menu, XmNlabelString, xms, NULL);
+    XmStringFree(xms);
+
+    xms = XmStringCreateLocalized((char *)"Pause recording");
+    ctx->menu_pause_btn = XtVaCreateWidget("pause",
+        xmPushButtonWidgetClass, ctx->tray_menu, XmNlabelString, xms, NULL);
+    XmStringFree(xms);
+
+    xms = XmStringCreateLocalized((char *)"Save replay");
+    ctx->menu_save_btn = XtVaCreateWidget("save",
+        xmPushButtonWidgetClass, ctx->tray_menu, XmNlabelString, xms, NULL);
+    XmStringFree(xms);
+
+    XtVaCreateManagedWidget("sep2",
+        xmSeparatorGadgetClass, ctx->tray_menu, NULL);
+
+    xms = XmStringCreateLocalized((char *)"Exit");
+    ctx->menu_exit_btn = XtVaCreateManagedWidget("exit",
+        xmPushButtonWidgetClass, ctx->tray_menu, XmNlabelString, xms, NULL);
+    XmStringFree(xms);
+
+    XtAddCallback(ctx->menu_show_hide_btn, XmNactivateCallback, menu_show_hide_cb, ctx);
+    XtAddCallback(ctx->menu_stop_btn,      XmNactivateCallback, menu_stop_cb,      ctx);
+    XtAddCallback(ctx->menu_pause_btn,     XmNactivateCallback, menu_pause_cb,     ctx);
+    XtAddCallback(ctx->menu_save_btn,      XmNactivateCallback, menu_save_cb,      ctx);
+    XtAddCallback(ctx->menu_exit_btn,      XmNactivateCallback, menu_exit_cb,      ctx);
 }
 
 /* --- WM_DELETE_WINDOW handler -------------------------------------- */
@@ -492,6 +624,7 @@ int main(int argc, char **argv)
     XtAppAddTimeOut(ctx.app, HOTKEY_DRAIN_INTERVAL_MS,
                     drain_root_hotkeys, &ctx);
 
+    build_tray_menu(&ctx);
     ctx.tray = tray_create(ctx.app, ctx.display,
                            DefaultScreen(ctx.display),
                            on_tray_click, &ctx);
