@@ -782,47 +782,112 @@ static int xlfd_pixel_size(const char *xlfd)
     return 0;
 }
 
+/* Curated list of fallback XLFDs to try when the user's session *FontList
+ * doesn't resolve to a usable Latin/UTF-8 encoding. Sans-proportional first
+ * (matches dtcm's `applicationFontFamily: application` preference), then
+ * the misc-fixed CDE bold bitmap (always present where CDE is installed),
+ * then plain misc-fixed. Each entry is probed with XLoadQueryFont so we
+ * never install one that won't load. */
+static const char *const k_cde_font_fallbacks[] = {
+    "-dt-application-medium-r-normal-sans-12-*-*-*-p-*-iso8859-1",
+    "-dt-application-medium-r-normal-sans-10-*-*-*-p-*-iso8859-1",
+    "-dt-interface system-bold-r-normal-m sans-14-130-75-75-m-70-iso8859-1",
+    "-dt-interface system-bold-r-normal-s sans-13-120-75-75-m-70-iso8859-1",
+    "-misc-fixed-medium-r-normal--13-120-75-75-c-70-iso8859-1",
+    NULL,
+};
+
+/* Once we know which XLFD actually loads on this box, push it through
+ * every fontList resource our widgets care about so XmTextField (combo
+ * text), XmText, push buttons, and labels all match. We do this by
+ * merging a patch Xrm database BEFORE main_w / page widgets are created,
+ * so widget construction picks the patched value directly. */
+static void patch_font_resources(AppCtx *ctx, const char *xlfd)
+{
+    char patch[1536];
+    int n = snprintf(patch, sizeof(patch),
+        "*FontList: %s:\n"
+        "*XmText*FontList: %s:\n"
+        "*XmTextField*FontList: %s:\n"
+        "*XmList*FontList: %s:\n"
+        "*XmComboBox*FontList: %s:\n"
+        "*buttonFontList: %s:\n"
+        "*labelFontList: %s:\n"
+        "*textFontList: %s:\n"
+        "*systemFont: %s:\n"
+        "*userFont: %s:\n",
+        xlfd, xlfd, xlfd, xlfd, xlfd, xlfd, xlfd, xlfd, xlfd, xlfd);
+    if(n <= 0 || (size_t)n >= sizeof(patch))
+        return;
+
+    XrmDatabase patch_db = XrmGetStringDatabase(patch);
+    if(!patch_db)
+        return;
+    XrmDatabase target = XtScreenDatabase(XtScreen(ctx->toplevel));
+    XrmMergeDatabases(patch_db, &target);
+    /* XrmMergeDatabases consumes patch_db. */
+}
+
+static bool resolve_cde_xlfd(AppCtx *ctx, char *out, size_t out_size)
+{
+    char user_xlfd[256] = {0};
+    if(query_resource(ctx->display, "GpuScreenRecorder.fontList",
+                      "GpuScreenRecorder.FontList", user_xlfd, sizeof(user_xlfd))) {
+        /* Strip trailing list separator + whitespace. */
+        char *colon = strchr(user_xlfd, ':');
+        if(colon) *colon = '\0';
+        size_t len = strlen(user_xlfd);
+        while(len > 0 && (user_xlfd[len - 1] == ' ' || user_xlfd[len - 1] == '\t'))
+            user_xlfd[--len] = '\0';
+
+        if(len > 0) {
+            char attempt[320];
+            /* Try the user's XLFD with iso10646 / iso8859 substitution first. */
+            if(xlfd_replace_encoding(user_xlfd, "iso10646-1", attempt, sizeof(attempt))) {
+                XFontStruct *fs = XLoadQueryFont(ctx->display, attempt);
+                if(fs) { XFreeFont(ctx->display, fs);
+                    snprintf(out, out_size, "%s", attempt); return true; }
+            }
+            if(xlfd_replace_encoding(user_xlfd, "iso8859-1", attempt, sizeof(attempt))) {
+                XFontStruct *fs = XLoadQueryFont(ctx->display, attempt);
+                if(fs) { XFreeFont(ctx->display, fs);
+                    snprintf(out, out_size, "%s", attempt); return true; }
+            }
+        }
+    }
+
+    /* User's *FontList didn't resolve to Latin. Try the curated fallbacks. */
+    for(int i = 0; k_cde_font_fallbacks[i]; ++i) {
+        XFontStruct *fs = XLoadQueryFont(ctx->display, k_cde_font_fallbacks[i]);
+        if(fs) {
+            XFreeFont(ctx->display, fs);
+            snprintf(out, out_size, "%s", k_cde_font_fallbacks[i]);
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool install_cde_fonts(AppCtx *ctx)
 {
-    char xlfd[256] = {0};
-    if(!query_resource(ctx->display, "GpuScreenRecorder.fontList",
-                       "GpuScreenRecorder.FontList", xlfd, sizeof(xlfd))) {
+    char xlfd[320];
+    if(!resolve_cde_xlfd(ctx, xlfd, sizeof(xlfd))) {
+        fprintf(stderr, "[cde] no CDE/X11 font loaded; falling back to Xft\n");
         return false;
     }
 
-    /* CDE's *FontList value is in Motif fontList list syntax — colon-
-     * separated XLFDs with a trailing colon even for a single entry.
-     * Strip the trailing separator + whitespace. */
-    char *colon = strchr(xlfd, ':');
-    if(colon) *colon = '\0';
-    size_t len = strlen(xlfd);
-    while(len > 0 && (xlfd[len - 1] == ' ' || xlfd[len - 1] == '\t'))
-        xlfd[--len] = '\0';
-    if(len == 0)
+    /* Push the resolved XLFD into all font resources via Xrm BEFORE the
+     * remaining widgets are created. This is what makes combo text fields
+     * (XmComboBox.Text) and list popups inherit the same font without
+     * needing ~/.Xdefaults overrides. */
+    patch_font_resources(ctx, xlfd);
+
+    /* Also apply directly to the toplevel via XmFontList so the shell
+     * itself (and any widgets that ignore resource lookups) picks it up. */
+    if(!try_load_xlfd_into_fontlist(ctx, xlfd))
         return false;
 
-    /* CDE wildcards the charset/encoding fields ("...-*-*"). XLoadQueryFont
-     * picks the first match alphabetically, which on many boxes is a CJK
-     * encoding (gb2312/jisx/koi8) without ASCII coverage — that's how we
-     * ended up rendering Latin text in a tiny bitmap CJK font.
-     *
-     * Prefer iso10646-1 (UTF-8) first, then iso8859-1 (Latin-1). Only fall
-     * through to the raw wildcard if neither exists. */
-    char attempt[320];
-    if(xlfd_replace_encoding(xlfd, "iso10646-1", attempt, sizeof(attempt))
-       && try_load_xlfd_into_fontlist(ctx, attempt))
-        return true;
-    if(xlfd_replace_encoding(xlfd, "iso8859-1", attempt, sizeof(attempt))
-       && try_load_xlfd_into_fontlist(ctx, attempt))
-        return true;
-
-    /* Deliberately do NOT fall back to the raw wildcard. On boxes where the
-     * CDE family only ships gb2312/jisx/koi8 variants, XLoadQueryFont
-     * happily resolves the wildcard to a CJK font that renders Latin text
-     * in tiny, oddly-spaced bitmap glyphs. Better to let Xft take over. */
-    fprintf(stderr, "[cde] *FontList='%s' has no usable Latin/UTF-8 encoding; "
-                    "falling back to Xft\n", xlfd);
-    return false;
+    return true;
 }
 
 /* Install an Xft-based render table on the toplevel so all descendant
