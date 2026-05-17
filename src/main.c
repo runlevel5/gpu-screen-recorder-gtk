@@ -152,22 +152,32 @@ static void switch_to_page(AppCtx *ctx, PageId target)
 {
     if(target < 0 || target >= PAGE_COUNT || target == ctx->current_page)
         return;
+
+    /* Order matters: unmanage old, manage new FIRST so the new page's
+     * widgets are realised. Then force the size — if we set sizes before
+     * managing, XtManageChild's geometry pass re-queries the new page's
+     * natural width and (with XmNallowShellResize=True) shrinks the shell
+     * down to it, which is how the user saw the Recording page collapse
+     * to ~214px instead of 337px. */
     XtUnmanageChild(ctx->pages[ctx->current_page]);
-    XtVaSetValues(ctx->page_host,
-        XmNwidth,  k_page_sizes[target].w,
-        XmNheight, k_page_sizes[target].h,
-        NULL);
-    /* If apply_saved_geometry has already given the toplevel an explicit
-     * size, XmNallowShellResize alone won't re-fit it to the new page.
-     * Force the shell size directly. */
-    if(ctx->toplevel) {
-        XtVaSetValues(ctx->toplevel,
-            XmNwidth,  k_page_sizes[target].w,
-            XmNheight, k_page_sizes[target].h,
-            NULL);
-    }
-    XtManageChild(ctx->pages[target]);
+    XtManageChild  (ctx->pages[target]);
     ctx->current_page = target;
+
+    const Dimension w = (Dimension)k_page_sizes[target].w;
+    const Dimension h = (Dimension)k_page_sizes[target].h;
+
+    XtVaSetValues(ctx->page_host, XmNwidth, w, XmNheight, h, NULL);
+    if(ctx->toplevel) {
+        XtVaSetValues(ctx->toplevel, XmNwidth, w, XmNheight, h, NULL);
+        /* Belt and braces: tell X directly. Motif's geometry layer can
+         * decline a shell resize after-the-fact; XResizeWindow can't be
+         * vetoed by the toolkit. The WM may still clamp, but a sane WM
+         * will honour any size above its minimum. */
+        if(XtIsRealized(ctx->toplevel)) {
+            XResizeWindow(ctx->display, XtWindow(ctx->toplevel), w, h);
+            XFlush(ctx->display);
+        }
+    }
 
     ungrab_page_hotkeys(ctx);
     grab_page_hotkeys(ctx, target);
