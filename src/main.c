@@ -724,24 +724,50 @@ static void apply_cde_palette(AppCtx *ctx)
  * resolve the wildcard XLFD to a concrete iso8859-1 or similar variant
  * via XLoadQueryFont, which is what every other CDE app on the box is
  * also doing. Returns true if the font was loaded and applied. */
-/* Rewrite the trailing "-CHARSET-ENCODING" of an XLFD to a specific pair
- * (e.g. "iso10646-1"). Output is written to `dst`. Returns false if the
- * source doesn't have at least two trailing '-' fields. */
-static bool xlfd_replace_encoding(const char *src, const char *encoding,
-                                  char *dst, size_t dst_size)
+/* Mirrors dtterm's "force iso8859-1 single-font" transform from
+ * cde/lib/DtTerm/TermView/TermViewMenu.c:484-494:
+ *
+ *   - strip the trailing ':' (Motif fontList separator)
+ *   - strip a trailing '-' if present
+ *   - append '-iso8859-1'
+ *
+ * Additionally handles our case where the input is a fully-populated
+ * 14-field XLFD with the last two fields wildcarded ('...-*-*'): drops
+ * those two fields before appending so the result is still a valid XLFD
+ * (14 fields) rather than 16-field nonsense. Returns true on a clean
+ * normalization. */
+static bool xlfd_to_iso8859_1(const char *src, char *dst, size_t dst_size)
 {
-    int len = (int)strlen(src);
-    int dash_count = 0;
-    int cut = -1;
-    for(int i = len - 1; i >= 0; --i) {
-        if(src[i] == '-') {
-            ++dash_count;
-            if(dash_count == 2) { cut = i; break; }
+    if(!src) return false;
+    char buf[320];
+    snprintf(buf, sizeof(buf), "%s", src);
+    size_t len = strlen(buf);
+
+    /* strip trailing list-separator / whitespace */
+    while(len > 0 && (buf[len - 1] == ':' || buf[len - 1] == ' ' ||
+                      buf[len - 1] == '\t' || buf[len - 1] == '\n'))
+        buf[--len] = '\0';
+    if(len == 0) return false;
+
+    /* count fields (one per '-' for a well-formed XLFD starting with '-') */
+    int dashes = 0;
+    for(size_t i = 0; i < len; ++i) if(buf[i] == '-') ++dashes;
+
+    if(dashes >= 14) {
+        /* Full 14-field XLFD — last two fields are charset_reg / encoding.
+         * Drop them so we can append our own. */
+        int dc = 0;
+        for(int i = (int)len - 1; i >= 0; --i) {
+            if(buf[i] == '-' && ++dc == 2) { buf[i] = '\0'; len = (size_t)i; break; }
         }
+    } else {
+        /* Shorter XLFD (dtterm's *userFontList style — 12 fields). Just
+         * strip a trailing '-' if present. */
+        if(len > 0 && buf[len - 1] == '-') buf[--len] = '\0';
     }
-    if(cut < 0) return false;
-    snprintf(dst, dst_size, "%.*s-%s", cut, src, encoding);
-    return true;
+
+    int n = snprintf(dst, dst_size, "%s-iso8859-1", buf);
+    return n > 0 && (size_t)n < dst_size;
 }
 
 /* Try to load XLFD as a single XFontStruct; if it resolves, install as
@@ -836,35 +862,41 @@ static void patch_font_resources(AppCtx *ctx, const char *xlfd)
     /* XrmMergeDatabases consumes patch_db. */
 }
 
+/* Resolve a *FontList wildcard into a concrete XLFD using dtterm's
+ * approach: rewrite the FontSet (':') form into a single-font iso8859-1
+ * XLFD, then XListFonts to find the first concrete name that matches.
+ * Writes the resolved XLFD into `out` on success. */
+static bool resolve_via_dtterm_transform(Display *d, const char *pattern,
+                                         char *out, size_t out_size)
+{
+    char normalized[320];
+    if(!xlfd_to_iso8859_1(pattern, normalized, sizeof(normalized)))
+        return false;
+
+    int    count = 0;
+    char **names = XListFonts(d, normalized, 32, &count);
+    if(!names || count <= 0) {
+        if(names) XFreeFontNames(names);
+        return false;
+    }
+    /* Pick the first match. dtterm does the same when populating its
+     * font-size menu. */
+    snprintf(out, out_size, "%s", names[0]);
+    XFreeFontNames(names);
+    return true;
+}
+
 static bool resolve_cde_xlfd(AppCtx *ctx, char *out, size_t out_size)
 {
     char user_xlfd[256] = {0};
     if(query_resource(ctx->display, "GpuScreenRecorder.fontList",
                       "GpuScreenRecorder.FontList", user_xlfd, sizeof(user_xlfd))) {
-        /* Strip trailing list separator + whitespace. */
-        char *colon = strchr(user_xlfd, ':');
-        if(colon) *colon = '\0';
-        size_t len = strlen(user_xlfd);
-        while(len > 0 && (user_xlfd[len - 1] == ' ' || user_xlfd[len - 1] == '\t'))
-            user_xlfd[--len] = '\0';
-
-        if(len > 0) {
-            char attempt[320];
-            /* Try the user's XLFD with iso10646 / iso8859 substitution first. */
-            if(xlfd_replace_encoding(user_xlfd, "iso10646-1", attempt, sizeof(attempt))) {
-                XFontStruct *fs = XLoadQueryFont(ctx->display, attempt);
-                if(fs) { XFreeFont(ctx->display, fs);
-                    snprintf(out, out_size, "%s", attempt); return true; }
-            }
-            if(xlfd_replace_encoding(user_xlfd, "iso8859-1", attempt, sizeof(attempt))) {
-                XFontStruct *fs = XLoadQueryFont(ctx->display, attempt);
-                if(fs) { XFreeFont(ctx->display, fs);
-                    snprintf(out, out_size, "%s", attempt); return true; }
-            }
-        }
+        if(resolve_via_dtterm_transform(ctx->display, user_xlfd, out, out_size))
+            return true;
     }
 
-    /* User's *FontList didn't resolve to Latin. Try the curated fallbacks. */
+    /* User's *FontList didn't resolve. Try curated fallback XLFDs known to
+     * exist on a standard CDE install. */
     for(int i = 0; k_cde_font_fallbacks[i]; ++i) {
         XFontStruct *fs = XLoadQueryFont(ctx->display, k_cde_font_fallbacks[i]);
         if(fs) {
@@ -880,18 +912,19 @@ static bool install_cde_fonts(AppCtx *ctx)
 {
     char xlfd[320];
     if(!resolve_cde_xlfd(ctx, xlfd, sizeof(xlfd))) {
-        fprintf(stderr, "[cde] no CDE/X11 font loaded; falling back to Xft\n");
+        fprintf(stderr, "[cde] no CDE/X11 font resolved; leaving Motif defaults\n");
         return false;
     }
 
-    /* Push the resolved XLFD into all font resources via Xrm BEFORE the
-     * remaining widgets are created. This is what makes combo text fields
-     * (XmComboBox.Text) and list popups inherit the same font without
-     * needing ~/.Xdefaults overrides. */
+    /* Patch every per-class fontList resource with our resolved XLFD so
+     * XmTextField (inside XmComboBox), XmText, push buttons, labels, and
+     * lists all use the same font. Must happen BEFORE child widgets are
+     * created — XrmMergeDatabases here, real widget construction later. */
     patch_font_resources(ctx, xlfd);
 
-    /* Also apply directly to the toplevel via XmFontList so the shell
-     * itself (and any widgets that ignore resource lookups) picks it up. */
+    /* Set XmNfontList on the toplevel as well so the shell itself picks
+     * the font up (and as a belt-and-braces in case Motif consults the
+     * shell's resource instead of the screen DB for some widget class). */
     if(!try_load_xlfd_into_fontlist(ctx, xlfd))
         return false;
 
@@ -1013,23 +1046,22 @@ int main(int argc, char **argv)
     apply_cde_palette(&ctx);
 #endif
 
-    /* Font handling: deliberately do nothing.
+    /* Font resolution: mirror dtterm's "Font Size" menu code path
+     * (TermViewMenu.c:484-494). dtterm rewrites the FontSet (':') form
+     * of *userFontList into a single-font iso8859-1 XLFD, then resolves
+     * it via XListFonts and loads the first match as XmFONT_IS_FONT.
+     * That dodges Motif's String->FontSet converter — which would fail
+     * under en_US.UTF-8 because CDE's font tree doesn't ship iso10646
+     * variants — and is why dtterm's chrome looks "right" on this box
+     * while ours did not.
      *
-     * Match dtterm/dtcm exactly — they leave fontList resolution entirely
-     * to Motif's String->FontList converter. When CDE's wildcard XLFD
-     * fails to find an iso8859-1/iso10646-1 variant under en_US.UTF-8,
-     * Motif logs "Missing charsets in String to FontSet conversion" and
-     * silently plugs in its built-in default ("fixed" alias →
-     * -misc-fixed-medium-r-semicondensed--13-...-iso8859-1). Every
-     * native CDE app gets the same fallback, so widgets render with the
-     * same bitmap. Our previous Xrm patching / Xft override stood out.
-     *
-     * The install_cde_fonts() and install_xft_fonts() helpers below are
-     * retained (and __attribute__((unused))) for callers who explicitly
-     * want either path. The GSR_CDE_PALETTE option still controls the
-     * palette-inheritance probe; font behaviour is unaffected. */
-    (void)install_cde_fonts;
-    (void)install_xft_fonts;
+     * install_cde_fonts() applies the same transform, picks the same
+     * iso8859-1 XLFD, and patches every per-class fontList resource so
+     * XmComboBox's text field cascades correctly too. */
+#ifdef GSR_CDE_PALETTE
+    install_cde_fonts(&ctx);
+#endif
+    (void)install_xft_fonts;   /* still available for non-CDE deployments */
 
     apply_saved_geometry(&ctx);
 
