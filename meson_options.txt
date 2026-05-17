@@ -1,0 +1,4 @@
+option('cde_palette',
+    type : 'boolean',
+    value : true,
+    description : 'Inherit CDE/dtstyle palette colours (Dt*background/foreground) at startup. Safe to leave on outside CDE: when no Dt resources are loaded the probe is a no-op and the app uses plain Motif defaults.')

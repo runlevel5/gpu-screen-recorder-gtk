@@ -623,6 +623,47 @@ static void register_wm_protocols(AppCtx *ctx)
     XmAddWMProtocolCallback(ctx->toplevel, wm_delete, on_window_close, ctx);
 }
 
+#ifdef GSR_CDE_PALETTE
+/* CDE's dtstyle pushes palette colours scoped to the Dt class wildcard
+ * (Dt*background, Dt*foreground, etc.) via session Xresources. Our app
+ * class is "GpuScreenRecorder", so those resources don't auto-match.
+ * Query the Dt scope explicitly and propagate via XmChangeColor —
+ * Motif then computes top/bottom shadow + arm + select shades from the
+ * base background and cascades to every descendant widget.
+ *
+ * No-op when no Dt resources are loaded (non-CDE sessions). */
+static void apply_cde_palette(AppCtx *ctx)
+{
+    char *bg = XGetDefault(ctx->display, "Dt", "background");
+    char *fg = XGetDefault(ctx->display, "Dt", "foreground");
+    if(!bg && !fg) {
+        fprintf(stderr, "[cde] no Dt palette in resource DB; using Motif defaults\n");
+        return;
+    }
+
+    Colormap cmap = DefaultColormap(ctx->display, DefaultScreen(ctx->display));
+
+    if(bg && *bg) {
+        XColor col, exact;
+        if(XAllocNamedColor(ctx->display, cmap, bg, &col, &exact)) {
+            XmChangeColor(ctx->toplevel, col.pixel);
+            fprintf(stderr, "[cde] inherited Dt*background=%s\n", bg);
+        } else {
+            fprintf(stderr, "[cde] could not allocate Dt*background='%s'\n", bg);
+        }
+    }
+    if(fg && *fg) {
+        XColor col, exact;
+        if(XAllocNamedColor(ctx->display, cmap, fg, &col, &exact)) {
+            XtVaSetValues(ctx->toplevel, XmNforeground, col.pixel, NULL);
+            fprintf(stderr, "[cde] inherited Dt*foreground=%s\n", fg);
+        } else {
+            fprintf(stderr, "[cde] could not allocate Dt*foreground='%s'\n", fg);
+        }
+    }
+}
+#endif
+
 /* Install an Xft-based render table on the toplevel so all descendant
  * widgets get anti-aliased text instead of Motif's default bitmap fonts.
  * Must be called BEFORE XtRealizeWidget so children inherit.
@@ -712,6 +753,10 @@ int main(int argc, char **argv)
         NULL);
 
     ctx.display = XtDisplay(ctx.toplevel);
+
+#ifdef GSR_CDE_PALETTE
+    apply_cde_palette(&ctx);
+#endif
 
     /* Note: install_xft_fonts() is intentionally NOT called here. Under CDE
      * (and any session that configures Motif fonts via Xresources), we want

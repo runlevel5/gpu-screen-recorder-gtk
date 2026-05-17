@@ -74,17 +74,22 @@ prefix = get_option('prefix')
 datadir = get_option('datadir')
 icons_path = join_paths(prefix, datadir, 'icons')
 
+c_args = [
+    '-DGSR_ICONS_PATH="' + icons_path + '"',
+    '-DGSR_VERSION="' + meson.project_version() + '"',
+    '-D_XOPEN_SOURCE=700',
+    '-D_DEFAULT_SOURCE',
+]
+if get_option('cde_palette')
+    c_args += '-DGSR_CDE_PALETTE=1'
+endif
+
 executable('gpu-screen-recorder-motif',
     src,
     dependencies : dep,
     include_directories : inc,
     install : true,
-    c_args : [
-        '-DGSR_ICONS_PATH="' + icons_path + '"',
-        '-DGSR_VERSION="' + meson.project_version() + '"',
-        '-D_XOPEN_SOURCE=700',
-        '-D_DEFAULT_SOURCE',
-    ]
+    c_args : c_args,
 )
 
 install_data(files('com.dec05eba.gpu_screen_recorder.desktop'), install_dir : join_paths(prefix, datadir, 'applications'))
