@@ -783,17 +783,25 @@ static int xlfd_pixel_size(const char *xlfd)
 }
 
 /* Curated list of fallback XLFDs to try when the user's session *FontList
- * doesn't resolve to a usable Latin/UTF-8 encoding. Sans-proportional first
- * (matches dtcm's `applicationFontFamily: application` preference), then
- * the misc-fixed CDE bold bitmap (always present where CDE is installed),
- * then plain misc-fixed. Each entry is probed with XLoadQueryFont so we
- * never install one that won't load. */
+ * doesn't resolve to a usable Latin/UTF-8 encoding.
+ *
+ * Order is intentional: misc-fixed first. That's the same font Motif itself
+ * falls back to under the hood when a *FontList conversion fails ("fixed"
+ * alias → -misc-fixed-medium-r-semicondensed--13-...-iso8859-1), so it's
+ * what every other CDE app on a system without proper Adobe Helvetica /
+ * Courier aliases (dtterm, dtcm, dtfile, ...) actually ends up rendering.
+ * Picking it explicitly here makes our app look like its CDE neighbours
+ * instead of standing out with a proportional sans font.
+ *
+ * Each entry is probed with XLoadQueryFont so we never install one that
+ * won't render. */
 static const char *const k_cde_font_fallbacks[] = {
-    "-dt-application-medium-r-normal-sans-12-*-*-*-p-*-iso8859-1",
-    "-dt-application-medium-r-normal-sans-10-*-*-*-p-*-iso8859-1",
+    "-misc-fixed-medium-r-semicondensed--13-120-75-75-c-60-iso8859-1",
+    "-misc-fixed-medium-r-normal--13-120-75-75-c-70-iso8859-1",
     "-dt-interface system-bold-r-normal-m sans-14-130-75-75-m-70-iso8859-1",
     "-dt-interface system-bold-r-normal-s sans-13-120-75-75-m-70-iso8859-1",
-    "-misc-fixed-medium-r-normal--13-120-75-75-c-70-iso8859-1",
+    "-dt-application-medium-r-normal-sans-12-*-*-*-p-*-iso8859-1",
+    "-dt-application-medium-r-normal-sans-10-*-*-*-p-*-iso8859-1",
     NULL,
 };
 
