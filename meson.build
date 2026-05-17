@@ -1,4 +1,4 @@
-project('gpu-screen-recorder-gtk', 'c', version : '5.7.9', default_options : ['warning_level=2', 'c_std=c11'])
+project('gpu-screen-recorder-motif', 'c', version : '5.7.9', default_options : ['warning_level=2', 'c_std=c11'])
 
 add_project_arguments('-Wshadow', language : 'c')
 if get_option('buildtype') == 'debug'
@@ -74,7 +74,7 @@ prefix = get_option('prefix')
 datadir = get_option('datadir')
 icons_path = join_paths(prefix, datadir, 'icons')
 
-executable('gpu-screen-recorder-gtk',
+executable('gpu-screen-recorder-motif',
     src,
     dependencies : dep,
     include_directories : inc,

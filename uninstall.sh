@@ -7,4 +7,4 @@ cd "$script_dir"
 
 ninja -C build uninstall
 
-echo "Successfully uninstalled gpu-screen-recorder-gtk"
+echo "Successfully uninstalled gpu-screen-recorder-motif"

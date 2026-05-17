@@ -1,5 +1,5 @@
 /*
- * gpu-screen-recorder-gtk — Motif/X11 frontend (C99).
+ * gpu-screen-recorder-motif — Motif/X11 frontend (C99).
  *
  * Orchestrates: config load/save, Xt init, page wiring, subprocess poll +
  * hotkey drain timers, demo hotkey, clean WM_DELETE_WINDOW handling.
