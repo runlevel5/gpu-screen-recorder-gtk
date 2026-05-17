@@ -115,6 +115,8 @@ static bool page_id_to_mode(PageId p, RecorderMode *out)
 }
 
 static void sync_tray_state(AppCtx *ctx);
+static void sync_button_labels(AppCtx *ctx);
+static void set_btn_label(Widget btn, const char *text);
 
 /* --- Page switching + commit --------------------------------------- */
 
@@ -228,6 +230,7 @@ static void session_start(AppCtx *ctx, RecorderMode mode)
     ctx->recorder_active = true;
     ctx->recorder_paused = false;
     sync_tray_state(ctx);
+    sync_button_labels(ctx);
 }
 
 static void session_stop(AppCtx *ctx)
@@ -315,6 +318,7 @@ static void on_page_session(SessionAction action, PageId source, void *user_data
             recorder_process_send_signal(SIGUSR2);
             ctx->recorder_paused = !ctx->recorder_paused;
             sync_tray_state(ctx);
+            sync_button_labels(ctx);
         }
         break;
     case SESSION_SAVE:
@@ -337,6 +341,7 @@ static void poll_recorder_subprocess(XtPointer client_data, XtIntervalId *id)
         ctx->recorder_active = false;
         ctx->recorder_paused = false;
         sync_tray_state(ctx);
+        sync_button_labels(ctx);
     }
     XtAppAddTimeOut(ctx->app, POLL_RECORDER_INTERVAL_MS,
                     poll_recorder_subprocess, ctx);
@@ -393,6 +398,29 @@ static void sync_tray_state(AppCtx *ctx)
 {
     if(ctx->tray)
         tray_set_state(ctx->tray, session_to_tray_state(ctx));
+}
+
+/* Update each spoke page's Start/Pause button labels to reflect the
+ * current recorder state. Matches the GTK port's behaviour: "Start
+ * recording" flips to "Stop recording" while running, and the pause
+ * button flips between "Pause recording" and "Unpause recording". */
+static void sync_button_labels(AppCtx *ctx)
+{
+    bool rec_active    = ctx->recorder_active && ctx->active_mode == RECORDER_MODE_RECORD;
+    bool replay_active = ctx->recorder_active && ctx->active_mode == RECORDER_MODE_REPLAY;
+    bool strm_active   = ctx->recorder_active && ctx->active_mode == RECORDER_MODE_STREAM;
+
+    set_btn_label(ctx->recording.start_btn,
+                  rec_active ? "Stop recording" : "Start recording");
+    set_btn_label(ctx->recording.pause_btn,
+                  (rec_active && ctx->recorder_paused) ? "Unpause recording"
+                                                       : "Pause recording");
+
+    set_btn_label(ctx->replay.start_btn,
+                  replay_active ? "Stop replay" : "Start replay");
+
+    set_btn_label(ctx->streaming.start_btn,
+                  strm_active ? "Stop streaming" : "Start streaming");
 }
 
 static void toggle_main_window(AppCtx *ctx)
