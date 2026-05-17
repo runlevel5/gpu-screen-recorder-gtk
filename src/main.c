@@ -563,7 +563,10 @@ static void register_wm_protocols(AppCtx *ctx)
 
 /* Install an Xft-based render table on the toplevel so all descendant
  * widgets get anti-aliased text instead of Motif's default bitmap fonts.
- * Must be called BEFORE XtRealizeWidget so children inherit. */
+ * Must be called BEFORE XtRealizeWidget so children inherit.
+ * Currently unused: under CDE we want the session's font config to win;
+ * kept available for non-CDE deployments. */
+__attribute__((unused))
 static void install_xft_fonts(AppCtx *ctx)
 {
     Arg args[4];
@@ -650,7 +653,12 @@ int main(int argc, char **argv)
 
     ctx.display = XtDisplay(ctx.toplevel);
 
-    install_xft_fonts(&ctx);
+    /* Note: install_xft_fonts() is intentionally NOT called here. Under CDE
+     * (and any session that configures Motif fonts via Xresources), we want
+     * Motif's normal XmNfontList lookup to flow through unmolested. Forcing
+     * an Xft rendition with a hardcoded family name overrides the session's
+     * font config and looks foreign. The helper stays in the file so a
+     * non-CDE deployment can call it from a wrapper if desired. */
     apply_saved_geometry(&ctx);
 
     Widget main_w = XtVaCreateManagedWidget(
@@ -661,7 +669,7 @@ int main(int argc, char **argv)
     ctx.page_host = XtVaCreateManagedWidget(
         "page_host",
         xmFormWidgetClass, main_w,
-        XmNwidth,  720,
+        XmNwidth,  500,
         XmNheight, 600,
         NULL);
 
