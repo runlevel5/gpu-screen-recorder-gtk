@@ -13,9 +13,10 @@
 #include <Xm/Protocols.h>
 #include <Xm/PushB.h>
 #include <Xm/RowColumn.h>
-#include <Xm/RenderT.h>
 #include <Xm/SeparatoG.h>
 #include <Xm/Xm.h>
+/* XmRendition*, XmRenderTable*, XmFONT_IS_XFT are declared by <Xm/Xm.h>;
+ * OpenMotif does not ship a separate Xm/RenderT.h. */
 
 #include <X11/Intrinsic.h>
 #include <X11/Xatom.h>

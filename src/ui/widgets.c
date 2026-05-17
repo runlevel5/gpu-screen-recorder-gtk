@@ -3,6 +3,8 @@
 #include <Xm/ComboBox.h>
 #include <Xm/Label.h>
 #include <Xm/PushB.h>
+#include <Xm/RowColumn.h>
+#include <Xm/SSpinB.h>     /* XmSimpleSpinBox — has its own header in OpenMotif */
 #include <Xm/SpinB.h>
 #include <Xm/TextF.h>
 #include <Xm/ToggleB.h>

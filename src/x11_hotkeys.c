@@ -178,7 +178,6 @@ size_t gsr_hotkey_format(Display *display, XIC xic, ConfigHotkey hotkey, char *b
 
 /* --- Grab implementation ------------------------------------------------- */
 
-static int   s_xerror_dummy(Display *d, XErrorEvent *e) { (void)d; (void)e; return 0; }
 static int   s_x_failed = 0;
 static int   s_xerror_grab(Display *d, XErrorEvent *e)  { (void)d; (void)e; s_x_failed = 1; return 0; }
 
