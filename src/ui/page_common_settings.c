@@ -1,4 +1,5 @@
 #include "page_common_settings.h"
+#include "dialogs.h"
 #include "widgets.h"
 #include "window_picker.h"
 
@@ -376,6 +377,12 @@ static void select_window_clicked(Widget w, XtPointer client, XtPointer call)
     window_picker_run(p->root, on_window_picked, p);
 }
 
+static void about_clicked(Widget w, XtPointer client, XtPointer call)
+{
+    (void)client; (void)call;
+    dialogs_show_about(w);
+}
+
 static void view_changed_cb(Widget w, XtPointer client, XtPointer call)
 {
     (void)w; (void)call;
@@ -442,11 +449,10 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
         XmNbottomAttachment, XmATTACH_FORM,
         NULL);
 
-    Widget btn_row = XtVaCreateManagedWidget("btn_row",
-        xmRowColumnWidgetClass, out->root,
-        XmNorientation,      XmHORIZONTAL,
-        XmNpacking,          XmPACK_TIGHT,
-        XmNspacing,          12,
+    /* Bottom button strip: hub buttons (Stream/Record/Replay) left-anchored
+     * in a tight RowColumn; About button right-anchored in the same strip. */
+    Widget btn_strip = XtVaCreateManagedWidget("btn_strip",
+        xmFormWidgetClass, out->root,
         XmNbottomAttachment, XmATTACH_FORM,
         XmNleftAttachment,   XmATTACH_FORM,
         XmNrightAttachment,  XmATTACH_FORM,
@@ -454,11 +460,34 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
         XmNleftOffset,       12,
         XmNrightOffset,      12,
         NULL);
+
+    Widget hub_group = XtVaCreateManagedWidget("hub_group",
+        xmRowColumnWidgetClass, btn_strip,
+        XmNorientation,      XmHORIZONTAL,
+        XmNpacking,          XmPACK_TIGHT,
+        XmNspacing,          12,
+        XmNtopAttachment,    XmATTACH_FORM,
+        XmNbottomAttachment, XmATTACH_FORM,
+        XmNleftAttachment,   XmATTACH_FORM,
+        NULL);
     /* Mnemonics: Alt+S Stream, Alt+R Record, Alt+P Replay (P avoids
      * conflict with R; Replay's R is already used as Record's mnemonic). */
-    out->stream_btn = gsr_w_button_m(btn_row, "Stream", 'S');
-    out->record_btn = gsr_w_button_m(btn_row, "Record", 'R');
-    out->replay_btn = gsr_w_button_m(btn_row, "Replay", 'p');
+    out->stream_btn = gsr_w_button_m(hub_group, "Stream", 'S');
+    out->record_btn = gsr_w_button_m(hub_group, "Record", 'R');
+    out->replay_btn = gsr_w_button_m(hub_group, "Replay", 'p');
+
+    /* About button: same strip, right-aligned. */
+    XmString about_xms = XmStringCreateLocalized((char *)"About");
+    out->about_btn = XtVaCreateManagedWidget("about",
+        xmPushButtonWidgetClass, btn_strip,
+        XmNlabelString,      about_xms,
+        XmNtopAttachment,    XmATTACH_FORM,
+        XmNbottomAttachment, XmATTACH_FORM,
+        XmNrightAttachment,  XmATTACH_FORM,
+        XmNmnemonic,         (KeySym)'A',
+        NULL);
+    XmStringFree(about_xms);
+    XtAddCallback(out->about_btn, XmNactivateCallback, about_clicked, out);
 
     Widget sw = XtVaCreateManagedWidget("sw",
         xmScrolledWindowWidgetClass, out->root,
@@ -468,7 +497,7 @@ void page_common_settings_create(Widget parent, PageCommonSettings *out,
         XmNleftAttachment,         XmATTACH_FORM,
         XmNrightAttachment,        XmATTACH_FORM,
         XmNbottomAttachment,       XmATTACH_WIDGET,
-        XmNbottomWidget,           btn_row,
+        XmNbottomWidget,           btn_strip,
         XmNtopOffset,              4,
         XmNleftOffset,             4,
         XmNrightOffset,            4,

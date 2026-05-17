@@ -22,6 +22,10 @@ typedef void (*directory_chosen_cb)(const char *path, void *user_data);
 void dialogs_pick_directory(Widget parent, const char *initial_dir,
                             directory_chosen_cb cb, void *user_data);
 
+/* Modal About dialog modeled after CDE Calendar (dtcm)'s About — centered
+ * title, version line, divider, credits, OK button at the bottom. */
+void dialogs_show_about(Widget parent);
+
 #ifdef __cplusplus
 }
 #endif

@@ -68,6 +68,8 @@ typedef struct {
     Widget stream_btn;
     Widget record_btn;
     Widget replay_btn;
+
+    Widget about_btn;
 } PageCommonSettings;
 
 void page_common_settings_create(Widget parent, PageCommonSettings *out,

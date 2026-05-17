@@ -137,11 +137,26 @@ static void commit_current_page(AppCtx *ctx)
 static void ungrab_page_hotkeys(AppCtx *ctx);
 static void grab_page_hotkeys(AppCtx *ctx, PageId page);
 
+/* Per-page preferred dimensions. The shell has XmNallowShellResize=True,
+ * so resizing page_host while a new page is being managed will cause the
+ * toplevel to follow. Common settings is denser; spoke pages are tight. */
+typedef struct { int w, h; } PageSize;
+static const PageSize k_page_sizes[PAGE_COUNT] = {
+    [PAGE_COMMON_SETTINGS] = { 545, 600 },
+    [PAGE_REPLAY]          = { 313, 348 },
+    [PAGE_RECORDING]       = { 313, 348 },
+    [PAGE_STREAMING]       = { 313, 348 },
+};
+
 static void switch_to_page(AppCtx *ctx, PageId target)
 {
     if(target < 0 || target >= PAGE_COUNT || target == ctx->current_page)
         return;
     XtUnmanageChild(ctx->pages[ctx->current_page]);
+    XtVaSetValues(ctx->page_host,
+        XmNwidth,  k_page_sizes[target].w,
+        XmNheight, k_page_sizes[target].h,
+        NULL);
     XtManageChild(ctx->pages[target]);
     ctx->current_page = target;
 
@@ -669,7 +684,7 @@ int main(int argc, char **argv)
     ctx.page_host = XtVaCreateManagedWidget(
         "page_host",
         xmFormWidgetClass, main_w,
-        XmNwidth,  500,
+        XmNwidth,  545,
         XmNheight, 600,
         NULL);
 
