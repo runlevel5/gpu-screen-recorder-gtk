@@ -634,7 +634,7 @@ static void register_wm_protocols(AppCtx *ctx)
  *                                  applies to any app via loose binding
  *
  * Query the loose-bound form via XrmGetResource against our own class
- * hierarchy ("GpuScreenRecorder.background"). That walks the resource
+ * hierarchy ("gsr.background"). That walks the resource
  * rules and picks up "*background" without colliding with "Dt*"-only
  * indirections we can't resolve.
  *
@@ -682,10 +682,10 @@ static void apply_cde_palette(AppCtx *ctx)
     char bg[64] = {0};
     char fg[64] = {0};
     bool have_bg = query_resource(ctx->display,
-        "GpuScreenRecorder.background", "GpuScreenRecorder.Background",
+        "gsr.background", "Gsr.Background",
         bg, sizeof(bg));
     bool have_fg = query_resource(ctx->display,
-        "GpuScreenRecorder.foreground", "GpuScreenRecorder.Foreground",
+        "gsr.foreground", "Gsr.Foreground",
         fg, sizeof(fg));
 
     if(!have_bg && !have_fg) {
@@ -889,8 +889,8 @@ static bool resolve_via_dtterm_transform(Display *d, const char *pattern,
 static bool resolve_cde_xlfd(AppCtx *ctx, char *out, size_t out_size)
 {
     char user_xlfd[256] = {0};
-    if(query_resource(ctx->display, "GpuScreenRecorder.fontList",
-                      "GpuScreenRecorder.FontList", user_xlfd, sizeof(user_xlfd))) {
+    if(query_resource(ctx->display, "gsr.fontList",
+                      "Gsr.FontList", user_xlfd, sizeof(user_xlfd))) {
         if(resolve_via_dtterm_transform(ctx->display, user_xlfd, out, out_size))
             return true;
     }
@@ -946,8 +946,8 @@ static void install_xft_fonts(AppCtx *ctx)
      * pixel size 14. Without a hint, default to size 11pt. */
     char xlfd[256] = {0};
     char fontname[96];
-    if(query_resource(ctx->display, "GpuScreenRecorder.fontList",
-                      "GpuScreenRecorder.FontList", xlfd, sizeof(xlfd))) {
+    if(query_resource(ctx->display, "gsr.fontList",
+                      "Gsr.FontList", xlfd, sizeof(xlfd))) {
         char *colon = strchr(xlfd, ':');
         if(colon) *colon = '\0';
         int px = xlfd_pixel_size(xlfd);
@@ -1029,9 +1029,18 @@ int main(int argc, char **argv)
 
     recorder_process_init();
 
+    /* App class is "Dt" rather than "GpuScreenRecorder" so we inherit
+     * CDE's session theme. CDE pushes its palette / shadowThickness /
+     * per-widget styling via resources scoped to the Dt class wildcard
+     * (Dt*XmScrollBar.troughColor, Dt*XmPushButton.armColor, etc.). An
+     * app class of "GpuScreenRecorder" never matches those, so we'd
+     * end up with default Motif colour/shadow choices for everything
+     * past the loose-bound background and foreground we did pick up.
+     * Class "Dt" also means we no longer collide with the per-CDE-app
+     * scopes (Dtcm*, Dtterm*, ...) — those stay narrower than ours. */
     ctx.toplevel = XtVaAppInitialize(
         &ctx.app,
-        "GpuScreenRecorder",
+        "Dt",
         NULL, 0,
         &argc, argv,
         NULL,
