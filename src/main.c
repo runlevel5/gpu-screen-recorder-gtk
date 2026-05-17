@@ -144,7 +144,7 @@ typedef struct { int w, h; } PageSize;
 static const PageSize k_page_sizes[PAGE_COUNT] = {
     [PAGE_COMMON_SETTINGS] = { 540, 650 },
     [PAGE_REPLAY]          = { 313, 348 },
-    [PAGE_RECORDING]       = { 313, 348 },
+    [PAGE_RECORDING]       = { 337, 347 },
     [PAGE_STREAMING]       = { 313, 348 },
 };
 
