@@ -142,7 +142,7 @@ static void grab_page_hotkeys(AppCtx *ctx, PageId page);
  * toplevel to follow. Common settings is denser; spoke pages are tight. */
 typedef struct { int w, h; } PageSize;
 static const PageSize k_page_sizes[PAGE_COUNT] = {
-    [PAGE_COMMON_SETTINGS] = { 545, 600 },
+    [PAGE_COMMON_SETTINGS] = { 540, 650 },
     [PAGE_REPLAY]          = { 313, 348 },
     [PAGE_RECORDING]       = { 313, 348 },
     [PAGE_STREAMING]       = { 313, 348 },
@@ -684,8 +684,8 @@ int main(int argc, char **argv)
     ctx.page_host = XtVaCreateManagedWidget(
         "page_host",
         xmFormWidgetClass, main_w,
-        XmNwidth,  545,
-        XmNheight, 600,
+        XmNwidth,  540,
+        XmNheight, 650,
         NULL);
 
     build_pages(&ctx);

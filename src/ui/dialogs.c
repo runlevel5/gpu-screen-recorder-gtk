@@ -149,11 +149,9 @@ void dialogs_show_about(Widget parent)
     about_line(rc, "Motif/X11 port (C99)");
 
     about_line(rc, " ");   /* visual gap */
-    about_line(rc, "Original GTK port:");
+    about_line(rc, "Authors:");
     about_line(rc, "dec05eba");
-    about_line(rc, " ");
-    about_line(rc, "Motif port:");
-    about_line(rc, "Trung Lê");
+    about_line(rc, "Trung Le");
 
     XtAddCallback(ok_btn, XmNactivateCallback, about_ok_cb, (XtPointer)shell);
 
