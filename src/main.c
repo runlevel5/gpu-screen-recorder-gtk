@@ -26,6 +26,7 @@
 #include "app_state.h"
 #include "audio_devices.h"
 #include "capabilities.h"
+#include "notifications.h"
 #include "recorder_args.h"
 #include "recorder_process.h"
 #include "ui/page_common_settings.h"
@@ -123,8 +124,8 @@ static void on_page_nav(PageId target, void *user_data)
 static void session_start(AppCtx *ctx, RecorderMode mode)
 {
     if(ctx->recorder_active) {
-        fprintf(stderr, "[session] start ignored: recorder already running (mode %d)\n",
-                (int)ctx->active_mode);
+        notifications_show_warning(ctx->toplevel, "Already recording",
+            "Another mode is already running. Stop it first.");
         return;
     }
 
@@ -137,8 +138,8 @@ static void session_start(AppCtx *ctx, RecorderMode mode)
     char **argv = NULL;
     RecorderArgsStatus s = recorder_args_build(&req, &argv, NULL);
     if(s != RA_BUILD_OK) {
-        fprintf(stderr, "[session] could not build argv: %s\n",
-                recorder_args_status_str(s));
+        notifications_show_error(ctx->toplevel, "Could not start recorder",
+            recorder_args_status_str(s));
         return;
     }
 
@@ -149,7 +150,8 @@ static void session_start(AppCtx *ctx, RecorderMode mode)
     bool spawned = recorder_process_spawn((const char *const *)argv);
     recorder_args_free(argv);
     if(!spawned) {
-        fprintf(stderr, "[session] spawn failed\n");
+        notifications_show_error(ctx->toplevel, "Could not start recorder",
+            "fork/exec failed. Is gpu-screen-recorder installed and on $PATH?");
         return;
     }
     ctx->active_mode     = mode;
@@ -312,10 +314,11 @@ int main(int argc, char **argv)
 
     gsr_capabilities_init(&ctx.caps);
     GsrInfoStatus info_status = gsr_capabilities_detect(&ctx.caps);
-    if(info_status != GSR_INFO_OK)
+    if(info_status != GSR_INFO_OK) {
+        /* Defer the popup until the toplevel exists. */
         fprintf(stderr, "[caps] WARNING: gpu-screen-recorder --info failed (status %d); "
                         "running with empty capabilities\n", (int)info_status);
-    else
+    } else
         fprintf(stderr, "[caps] display_server=%d gpu_vendor=%d monitors=%zu "
                         "codecs(h264=%d hevc=%d av1=%d vp9=%d)\n",
                         (int)ctx.caps.display_server, (int)ctx.caps.gpu_vendor,

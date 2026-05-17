@@ -13,6 +13,7 @@ extern "C" {
 typedef struct {
     Widget root;
     Widget save_dir_text;
+    Widget save_dir_browse_btn;
     Widget container_combo;
     Widget replay_time_spin;
     Widget back_btn;

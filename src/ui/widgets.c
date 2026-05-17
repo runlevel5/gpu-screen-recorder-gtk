@@ -191,3 +191,13 @@ Widget gsr_w_button(Widget parent, const char *label)
     XmStringFree(xms);
     return w;
 }
+
+Widget gsr_w_hrow(Widget parent)
+{
+    return XtVaCreateManagedWidget("hrow",
+        xmRowColumnWidgetClass, parent,
+        XmNorientation, XmHORIZONTAL,
+        XmNpacking,     XmPACK_TIGHT,
+        XmNspacing,     6,
+        NULL);
+}

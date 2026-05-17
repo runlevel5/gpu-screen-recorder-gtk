@@ -44,6 +44,9 @@ void   gsr_w_combo_select_text(Widget combo, const char *value);
 
 Widget gsr_w_button  (Widget parent, const char *label);
 
+/* Tight horizontal XmRowColumn — useful for "label + control" pairs. */
+Widget gsr_w_hrow(Widget parent);
+
 #ifdef __cplusplus
 }
 #endif

@@ -19,6 +19,7 @@ src = [
     'src/recorder_process.c',
     'src/x11_hotkeys.c',
     'src/ui/widgets.c',
+    'src/ui/dialogs.c',
     'src/ui/page_common_settings.c',
     'src/ui/page_replay.c',
     'src/ui/page_recording.c',

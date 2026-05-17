@@ -1,4 +1,5 @@
 #include "page_replay.h"
+#include "dialogs.h"
 #include "widgets.h"
 
 #include <Xm/Form.h>
@@ -44,6 +45,21 @@ static void save_cb(Widget w, XtPointer client, XtPointer call)
     if(c->session) c->session(SESSION_SAVE, PAGE_REPLAY, c->user);
 }
 
+static void on_dir_chosen(const char *path, void *user)
+{
+    PageCtx *c = (PageCtx *)user;
+    gsr_w_text_set(c->page->save_dir_text, path);
+}
+
+static void browse_cb(Widget w, XtPointer client, XtPointer call)
+{
+    (void)w; (void)call;
+    PageCtx *c = (PageCtx *)client;
+    char *current = gsr_w_text_get(c->page->save_dir_text);
+    dialogs_pick_directory(c->page->root, current, on_dir_chosen, c);
+    if(current) XtFree(current);
+}
+
 void page_replay_create(Widget parent, PageReplay *out,
                         const Config *config,
                         page_nav_cb nav, page_session_cb session,
@@ -75,7 +91,9 @@ void page_replay_create(Widget parent, PageReplay *out,
         NULL);
 
     gsr_w_label(rc, "Where do you want to save the replays?");
-    out->save_dir_text = gsr_w_text(rc, config->replay_config.save_directory);
+    Widget dir_row = gsr_w_hrow(rc);
+    out->save_dir_text       = gsr_w_text(dir_row, config->replay_config.save_directory);
+    out->save_dir_browse_btn = gsr_w_button(dir_row, "Browse...");
 
     gsr_w_label(rc, "Container:");
     out->container_combo = gsr_w_combo(rc, k_containers,
@@ -108,9 +126,10 @@ void page_replay_create(Widget parent, PageReplay *out,
     c->page    = out;
     c->config  = (Config *)config;
 
-    XtAddCallback(out->back_btn,  XmNactivateCallback, back_cb,  c);
-    XtAddCallback(out->start_btn, XmNactivateCallback, start_cb, c);
-    XtAddCallback(out->save_btn,  XmNactivateCallback, save_cb,  c);
+    XtAddCallback(out->back_btn,            XmNactivateCallback, back_cb,   c);
+    XtAddCallback(out->start_btn,           XmNactivateCallback, start_cb,  c);
+    XtAddCallback(out->save_btn,            XmNactivateCallback, save_cb,   c);
+    XtAddCallback(out->save_dir_browse_btn, XmNactivateCallback, browse_cb, c);
 }
 
 void page_replay_commit(const PageReplay *p, Config *config)
