@@ -4,6 +4,7 @@
 #include <Xm/Xm.h>
 
 #include "../app_state.h"
+#include "../capabilities.h"
 #include "ui_nav.h"
 
 #ifdef __cplusplus
@@ -17,6 +18,7 @@ typedef struct {
 
     /* Capture target */
     Widget record_area_combo;
+    Widget area_size_row;     /* parent of area_width_spin + area_height_spin */
     Widget area_width_spin;
     Widget area_height_spin;
     Widget video_width_spin;
@@ -33,13 +35,16 @@ typedef struct {
     Widget quality_combo;
     Widget bitrate_spin;
     Widget codec_combo;
+    Widget color_range_row;        /* advanced-only */
     Widget color_range_combo;
     Widget fps_spin;
+    Widget framerate_mode_row;     /* advanced-only */
     Widget framerate_mode_combo;
     Widget record_cursor_toggle;
-    Widget overclock_toggle;
+    Widget overclock_toggle;       /* advanced + NVIDIA + X11 only */
 
     /* Notifications */
+    Widget notifications_frame;    /* advanced-only */
     Widget notif_started_toggle;
     Widget notif_stopped_toggle;
     Widget notif_saved_toggle;
@@ -52,6 +57,7 @@ typedef struct {
 
 void page_common_settings_create(Widget parent, PageCommonSettings *out,
                                  const Config *config,
+                                 const GsrCapabilities *caps,
                                  page_nav_cb nav, void *user_data);
 
 void page_common_settings_commit(const PageCommonSettings *p, Config *config);

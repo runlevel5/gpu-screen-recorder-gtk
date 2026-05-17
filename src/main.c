@@ -24,6 +24,7 @@
 
 #include "app_state.h"
 #include "audio_devices.h"
+#include "capabilities.h"
 #include "recorder_process.h"
 #include "ui/page_common_settings.h"
 #include "ui/page_recording.h"
@@ -52,9 +53,10 @@ typedef struct {
     PageRecording      recording;
     PageStreaming      streaming;
 
-    Config       config;
-    ConfigHotkey test_hotkey;          /* Phase 3 demo */
-    bool         running;
+    Config          config;
+    GsrCapabilities caps;
+    ConfigHotkey    test_hotkey;       /* Phase 3 demo */
+    bool            running;
 } AppCtx;
 
 /* --- Page switching + commit --------------------------------------- */
@@ -149,7 +151,7 @@ static void log_loaded_config(const Config *c)
 
 static void build_pages(AppCtx *ctx)
 {
-    page_common_settings_create(ctx->page_host, &ctx->common,    &ctx->config, on_page_nav, ctx);
+    page_common_settings_create(ctx->page_host, &ctx->common,    &ctx->config, &ctx->caps, on_page_nav, ctx);
     page_replay_create         (ctx->page_host, &ctx->replay,    &ctx->config, on_page_nav, ctx);
     page_recording_create      (ctx->page_host, &ctx->recording, &ctx->config, on_page_nav, ctx);
     page_streaming_create      (ctx->page_host, &ctx->streaming, &ctx->config, on_page_nav, ctx);
@@ -191,6 +193,19 @@ int main(int argc, char **argv)
     app_state_init(&ctx.config);
     app_state_load(&ctx.config);
     log_loaded_config(&ctx.config);
+
+    gsr_capabilities_init(&ctx.caps);
+    GsrInfoStatus info_status = gsr_capabilities_detect(&ctx.caps);
+    if(info_status != GSR_INFO_OK)
+        fprintf(stderr, "[caps] WARNING: gpu-screen-recorder --info failed (status %d); "
+                        "running with empty capabilities\n", (int)info_status);
+    else
+        fprintf(stderr, "[caps] display_server=%d gpu_vendor=%d monitors=%zu "
+                        "codecs(h264=%d hevc=%d av1=%d vp9=%d)\n",
+                        (int)ctx.caps.display_server, (int)ctx.caps.gpu_vendor,
+                        ctx.caps.capture_options.monitors.len,
+                        ctx.caps.video_codecs.h264, ctx.caps.video_codecs.hevc,
+                        ctx.caps.video_codecs.av1, ctx.caps.video_codecs.vp9);
 
     recorder_process_init();
 
@@ -238,6 +253,7 @@ int main(int argc, char **argv)
      * Release the demo grab and the child process so ASan stays quiet. */
     (void)gsr_hotkey_grab(ctx.display, ctx.test_hotkey, false);
     recorder_process_terminate();
+    gsr_capabilities_free(&ctx.caps);
     app_state_free(&ctx.config);
     return 0;
 }

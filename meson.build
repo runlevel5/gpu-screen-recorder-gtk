@@ -13,6 +13,7 @@ src = [
     'src/xdg_paths.c',
     'src/app_state.c',
     'src/audio_devices.c',
+    'src/capabilities.c',
     'src/notifications.c',
     'src/recorder_process.c',
     'src/x11_hotkeys.c',
